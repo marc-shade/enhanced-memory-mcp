@@ -13,7 +13,7 @@ Agent File (.af) Format:
 
 Use Cases:
 - Checkpoint agent state before risky operations
-- Transfer agent between nodes (macpro51 → mac-studio)
+- Transfer agent between nodes (builder → orchestrator)
 - Backup cognitive state for disaster recovery
 - Share trained agents with other clusters
 """
@@ -21,6 +21,8 @@ Use Cases:
 import json
 import gzip
 import sqlite3
+import socket
+import os
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -137,7 +139,7 @@ class AgentFileExporter:
             "metadata": {
                 "exporter": "enhanced-memory-mcp",
                 "database_path": str(self.db_path),
-                "cluster_node": "macpro51"
+                "cluster_node": os.environ.get("NODE_ID", socket.gethostname())
             }
         }
 

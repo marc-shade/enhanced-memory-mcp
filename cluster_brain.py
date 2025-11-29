@@ -28,35 +28,70 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Cluster brain database - shared location accessible by all nodes
-CLUSTER_DB_PATH = Path("/mnt/agentic-system/databases/cluster/cluster_brain.db")
+CLUSTER_DB_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "databases/cluster/cluster_brain.db"))
 
-# Node roles and their specialties
-NODE_ROLES = {
-    "macpro51": {
-        "role": "builder",
-        "name": "Builder (Motor Cortex)",
-        "specialty": ["compilation", "testing", "containers", "benchmarks", "Linux"],
-        "can_execute": ["build", "test", "containerize", "benchmark", "deploy"]
-    },
-    "mac-studio": {
-        "role": "orchestrator",
-        "name": "Orchestrator (Prefrontal Cortex)",
-        "specialty": ["coordination", "planning", "monitoring", "routing"],
-        "can_execute": ["coordinate", "plan", "monitor", "route", "decide"]
-    },
-    "macbook-air-m3": {
-        "role": "researcher",
-        "name": "Researcher (Hippocampus)",
-        "specialty": ["analysis", "documentation", "research", "learning"],
-        "can_execute": ["research", "analyze", "document", "synthesize"]
-    },
-    "completeu-server": {
-        "role": "inference",
-        "name": "AI Inference (Cerebellum)",
-        "specialty": ["inference", "patterns", "classification", "AI"],
-        "can_execute": ["infer", "classify", "predict", "recognize"]
+# Node roles and their specialties - loaded from config
+def _load_node_roles() -> dict:
+    """
+    Load node roles from environment or config file.
+
+    Configuration sources (in priority order):
+    1. NODE_ROLES_JSON environment variable (JSON string)
+    2. cluster-nodes.json file in ~/.claude/
+    3. Default generic roles
+
+    Example cluster-nodes.json:
+    {
+        "builder-node": {"role": "builder", "name": "Builder", "specialty": ["build", "test"]},
+        "orchestrator-node": {"role": "orchestrator", "name": "Orchestrator", "specialty": ["coordination"]}
     }
-}
+    """
+    # Try environment variable
+    env_config = os.environ.get("NODE_ROLES_JSON")
+    if env_config:
+        try:
+            return json.loads(env_config)
+        except json.JSONDecodeError:
+            pass
+
+    # Try config file
+    config_path = Path.home() / ".claude" / "cluster-nodes.json"
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # Return generic default roles
+    return {
+        "builder": {
+            "role": "builder",
+            "name": "Builder",
+            "specialty": ["compilation", "testing", "containers", "benchmarks"],
+            "can_execute": ["build", "test", "containerize", "benchmark", "deploy"]
+        },
+        "orchestrator": {
+            "role": "orchestrator",
+            "name": "Orchestrator",
+            "specialty": ["coordination", "planning", "monitoring", "routing"],
+            "can_execute": ["coordinate", "plan", "monitor", "route", "decide"]
+        },
+        "researcher": {
+            "role": "researcher",
+            "name": "Researcher",
+            "specialty": ["analysis", "documentation", "research", "learning"],
+            "can_execute": ["research", "analyze", "document", "synthesize"]
+        },
+        "inference": {
+            "role": "inference",
+            "name": "AI Inference",
+            "specialty": ["inference", "patterns", "classification", "AI"],
+            "can_execute": ["infer", "classify", "predict", "recognize"]
+        }
+    }
+
+NODE_ROLES = _load_node_roles()
 
 
 class ClusterBrain:
@@ -90,13 +125,23 @@ class ClusterBrain:
         """Auto-detect node ID from hostname or config"""
         hostname = socket.gethostname().lower()
 
-        # Map hostnames to node IDs
-        hostname_map = {
-            "macpro51": "macpro51",
-            "mac-studio": "mac-studio",
-            "macbook-air": "macbook-air-m3",
-            "completeu": "completeu-server"
-        }
+        # Load hostname mappings from config (or use empty dict)
+        hostname_map = {}
+        env_map = os.environ.get("HOSTNAME_NODE_MAP_JSON")
+        if env_map:
+            try:
+                hostname_map = json.loads(env_map)
+            except json.JSONDecodeError:
+                pass
+
+        if not hostname_map:
+            config_path = Path.home() / ".claude" / "hostname-map.json"
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        hostname_map = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    pass
 
         for key, node_id in hostname_map.items():
             if key in hostname:
@@ -588,7 +633,7 @@ class ClusterBrain:
 
         # Default to orchestrator if no clear match
         if not best_node:
-            best_node = "mac-studio"
+            best_node = "orchestrator"
             reasoning.append("Defaulting to orchestrator for unknown task type")
 
         return {

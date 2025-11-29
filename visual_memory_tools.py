@@ -20,11 +20,12 @@ import logging
 import sys
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+import os
 
 logger = logging.getLogger(__name__)
 
 # Add perception module to path
-PERCEPTION_PATH = Path('/mnt/agentic-system/intelligent-agents/perception')
+PERCEPTION_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "intelligent-agents/perception"))
 sys.path.insert(0, str(PERCEPTION_PATH))
 
 
@@ -541,7 +542,7 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
         """
         Get natural language description of image using GPU vision model.
 
-        Uses moondream vision-language model on completeu-server for
+        Uses moondream vision-language model on GPU inference node for
         rich semantic understanding of image content.
 
         Args:
@@ -747,7 +748,7 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
             for r in results["results"]:
                 print(f"{r['context']}: {r['similarity']:.3f}")
         """
-        memory = get_adapted_memory()
+        memory = get_adapted_visual_memory()
         if memory is None:
             return {"error": "Adapted visual memory not initialized", "success": False}
 
@@ -811,7 +812,7 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
                 k=10
             )
         """
-        memory = get_adapted_memory()
+        memory = get_adapted_visual_memory()
         if memory is None:
             return {"error": "Adapted visual memory not initialized", "success": False}
 
@@ -821,9 +822,12 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
                 image_path=image_path,
                 k=k,
                 text_weight=text_weight,
-                visual_weight=visual_weight,
-                min_significance=min_significance
+                visual_weight=visual_weight
             )
+
+            # Filter by min_significance if specified
+            if min_significance > 0:
+                results = [r for r in results if r.get('significance', 0) >= min_significance]
 
             return {
                 "success": True,
@@ -857,7 +861,7 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
             if result["success"]:
                 print(f"Added {result['crossmodal_dim']}-dim embedding")
         """
-        memory = get_adapted_memory()
+        memory = get_adapted_visual_memory()
         if memory is None:
             return {"error": "Adapted visual memory not initialized", "success": False}
 
@@ -892,7 +896,7 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
             result = await batch_add_crossmodal(limit=100)
             print(f"Processed: {result['processed']}, Failed: {result['failed']}")
         """
-        memory = get_adapted_memory()
+        memory = get_adapted_visual_memory()
         if memory is None:
             return {"error": "Adapted visual memory not initialized", "success": False}
 
@@ -923,7 +927,7 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
             print(f"Coverage: {stats['coverage_percent']:.1f}%")
             print(f"Episodes with crossmodal: {stats['with_crossmodal']}")
         """
-        memory = get_adapted_memory()
+        memory = get_adapted_visual_memory()
         if memory is None:
             return {"error": "Adapted visual memory not initialized", "success": False}
 

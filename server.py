@@ -32,6 +32,22 @@ from memory_client import MemoryClient
 from sandbox.executor import CodeExecutor, create_api_context
 from sandbox.security import comprehensive_safety_check, sanitize_output
 
+# TPU importance scoring (optional, graceful fallback to heuristics)
+_TPU_AVAILABLE = False
+_score_importance_fn = None
+try:
+    import sys as _sys
+    _agentic_path = os.environ.get("AGENTIC_SYSTEM_PATH", str(Path.home() / "agentic-system"))
+    _tpu_path = os.path.join(_agentic_path, "scripts", "hooks")
+    if _tpu_path not in _sys.path:
+        _sys.path.insert(0, _tpu_path)
+    from tpu_importance import score_importance as _tpu_score, is_tpu_available
+    if is_tpu_available():
+        _score_importance_fn = _tpu_score
+        _TPU_AVAILABLE = True
+except ImportError:
+    pass  # TPU not available, will use heuristic fallback
+
 # Set up logging - CRITICAL: Must use stderr for MCP compatibility
 # MCP protocol requires stdout is reserved for JSON-RPC messages only
 import sys
@@ -299,6 +315,74 @@ def create_version(entity_id: int, data: Any, message: str = None, author: str =
 
     return version_id
 
+
+def _score_entity_importance(entity: Dict[str, Any]) -> Tuple[float, str]:
+    """
+    Score entity importance using TPU when available.
+
+    Uses Coral TPU for neural importance scoring with heuristic fallback.
+
+    Args:
+        entity: Entity dict with name, entityType, observations
+
+    Returns:
+        Tuple of (importance_score, tier)
+        - importance_score: 0.0 (low) to 1.0 (critical)
+        - tier: 'working', 'episodic', or 'long_term'
+    """
+    # Build text to score
+    name = entity.get('name', '')
+    entity_type = entity.get('entityType', '')
+    observations = entity.get('observations', [])
+
+    text = f"{name} ({entity_type}): {' | '.join(observations[:3])}"
+
+    # Use TPU when available
+    if _TPU_AVAILABLE and _score_importance_fn:
+        try:
+            score = _score_importance_fn(text, "memory")
+        except Exception:
+            score = _heuristic_importance(text)
+    else:
+        score = _heuristic_importance(text)
+
+    # Assign tier based on importance
+    if score >= 0.8:
+        tier = "long_term"
+    elif score >= 0.6:
+        tier = "episodic"
+    else:
+        tier = "working"
+
+    return score, tier
+
+
+def _heuristic_importance(text: str) -> float:
+    """Fallback heuristic importance scoring when TPU unavailable."""
+    text_lower = text.lower()
+    score = 0.5
+
+    # High importance indicators
+    high = ["critical", "error", "security", "bug", "fix", "important",
+            "vulnerability", "crash", "failure", "learned", "discovered"]
+    # Medium importance
+    medium = ["pattern", "insight", "decision", "strategy", "improvement"]
+    # Low importance
+    low = ["minor", "trivial", "note", "todo", "maybe"]
+
+    for word in high:
+        if word in text_lower:
+            score = min(1.0, score + 0.12)
+    for word in medium:
+        if word in text_lower:
+            score = min(1.0, score + 0.06)
+    for word in low:
+        if word in text_lower:
+            score = max(0.2, score - 0.1)
+
+    return round(score, 2)
+
+
 # ORIGINAL TOOLS WITH VERSION CONTROL ADDED
 
 @app.tool()
@@ -308,13 +392,34 @@ async def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     CONCURRENT ACCESS: Uses memory-db Unix socket service for database operations.
     CONTEXTUAL ENRICHMENT: Automatically adds LLM-generated contextual prefixes (RAG Tier 1).
+    TPU IMPORTANCE SCORING: Uses Coral TPU when available for intelligent tier assignment.
 
     Args:
         entities: List of entity objects with name, entityType, and observations
 
     Returns:
-        Results with compression statistics and entity details
+        Results with compression statistics, entity details, and importance scoring stats
     """
+    # Score importance and assign tier for each entity using TPU when available
+    importance_stats = {"tpu_scored": 0, "heuristic_scored": 0, "promoted": 0, "tiers": {}}
+    for entity in entities:
+        score, tier = _score_entity_importance(entity)
+        entity["importance_score"] = score
+        entity["tier"] = tier
+
+        # Track scoring method used
+        if _TPU_AVAILABLE:
+            importance_stats["tpu_scored"] += 1
+        else:
+            importance_stats["heuristic_scored"] += 1
+
+        # Track tier distribution
+        importance_stats["tiers"][tier] = importance_stats["tiers"].get(tier, 0) + 1
+
+        # Count promotions (non-working tier)
+        if tier != "working":
+            importance_stats["promoted"] += 1
+
     try:
         # Delegate to memory-db service for concurrent access
         response = await memory_client.create_entities(entities)
@@ -327,13 +432,15 @@ async def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "created": response.get("count", 0),
                 "failed": 0,
                 "results": response.get("results", []),
-                "contextual_enrichment": enrichment_stats
+                "contextual_enrichment": enrichment_stats,
+                "importance_scoring": importance_stats
             }
         else:
             return {
                 "created": 0,
                 "failed": len(entities),
-                "error": response.get("error", "Unknown error from memory-db service")
+                "error": response.get("error", "Unknown error from memory-db service"),
+                "importance_scoring": importance_stats
             }
 
     except Exception as e:
@@ -341,7 +448,8 @@ async def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         return {
             "created": 0,
             "failed": len(entities),
-            "error": f"Memory-DB service error: {str(e)}"
+            "error": f"Memory-DB service error: {str(e)}",
+            "importance_scoring": importance_stats
         }
 
 

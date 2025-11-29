@@ -4,7 +4,7 @@
 storage:
   # SQLite for metadata and core storage
   sqlite:
-    path: "/mnt/agentic-system/databases/mcp/enhanced_memories.db"
+    path: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/databases/mcp/enhanced_memories.db"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
     wal_mode: true
     cache_size: 10000
 
@@ -21,7 +21,7 @@ storage:
 
   # File-based portable storage
   files:
-    root: "/mnt/agentic-system/agent-memory/nmf_files"
+    root: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agent-memory/nmf_files"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
     compression: true
     max_file_size: "10MB"
 
@@ -61,7 +61,7 @@ embeddings:
       model: "nomic-embed-text"
       dimensions: 768
       # Cloud-first Ollama (embeddings can run locally but prefer cloud GPU)
-      base_url: "${OLLAMA_HOST:-http://Marcs-Mac-Studio.local:11434}"
+      base_url: "${OLLAMA_HOST:-http://Marcs-<HOSTNAME>.local:11434}"
       local: false  # Use cloud GPU nodes for better performance
 
     # Additional experimental providers
@@ -213,13 +213,13 @@ benchmarking:
     - "ollama"
 
   # Output
-  results_path: "/mnt/agentic-system/logs/nmf_benchmark_results.json"
+  results_path: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/logs/nmf_benchmark_results.json"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
 
 # Logging
 logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "/mnt/agentic-system/logs/nmf.log"
+  file: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/logs/nmf.log"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
   max_size_mb: 100
   backup_count: 3
 

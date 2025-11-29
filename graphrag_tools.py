@@ -18,11 +18,15 @@ Research basis:
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+# Get agentic system path from environment
+AGENTIC_SYSTEM_PATH = os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}")
 
 
 def register_graphrag_tools(app, db_path: Path = None):
@@ -34,13 +38,13 @@ def register_graphrag_tools(app, db_path: Path = None):
         db_path: Path to SQLite database (defaults to enhanced-memory DB)
     """
     # Import GraphRAG implementation from scripts
-    sys.path.insert(0, str(Path('/mnt/agentic-system/scripts')))
+    sys.path.insert(0, os.path.join(AGENTIC_SYSTEM_PATH, "scripts"))
 
     # Import using importlib to handle hyphenated filename
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "graph_rag",
-        "/mnt/agentic-system/scripts/graph-rag.py"
+        os.path.join(AGENTIC_SYSTEM_PATH, "scripts", "graph-rag.py")
     )
     graph_rag_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(graph_rag_module)

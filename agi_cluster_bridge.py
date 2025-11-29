@@ -16,10 +16,12 @@ This bridges:
 - cluster_brain.py (shared knowledge, goals, learnings, routing)
 """
 
+import json
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from pathlib import Path
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ class AGIClusterBridge:
 
         if safla is None:
             from safla_orchestrator import SAFLAOrchestrator
-            db_path = Path("/mnt/agentic-system/databases/mcp/memory.db")
+            db_path = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "databases/mcp/memory.db"))
             safla = SAFLAOrchestrator(db_path)
 
         self.brain = cluster_brain
@@ -58,6 +60,24 @@ class AGIClusterBridge:
         self.node_id = self.brain.node_id
 
         logger.info(f"AGI-Cluster Bridge initialized for node: {self.node_id}")
+
+    def _load_capability_map(self) -> Dict[str, str]:
+        """
+        Load capability-to-node mapping from environment.
+
+        Set CAPABILITY_NODE_MAP_JSON env var with JSON like:
+        {"compilation": "builder-node", "testing": "builder-node",
+         "coordination": "orchestrator", "inference": "gpu-node"}
+
+        Returns empty dict if not configured (no capability routing).
+        """
+        env_config = os.environ.get("CAPABILITY_NODE_MAP_JSON")
+        if env_config:
+            try:
+                return json.loads(env_config)
+            except json.JSONDecodeError:
+                pass
+        return {}
 
     # =========================================================================
     # SKILL SYNCING
@@ -359,22 +379,9 @@ Lessons Learned:
             Result with goal_id
         """
         # Determine which nodes should work on this based on capabilities
-        capability_to_node = {
-            "compilation": "macpro51",
-            "testing": "macpro51",
-            "benchmarks": "macpro51",
-            "containers": "macpro51",
-            "linux": "macpro51",
-            "coordination": "mac-studio",
-            "planning": "mac-studio",
-            "monitoring": "mac-studio",
-            "research": "macbook-air-m3",
-            "analysis": "macbook-air-m3",
-            "documentation": "macbook-air-m3",
-            "inference": "completeu-server",
-            "ai": "completeu-server",
-            "patterns": "completeu-server",
-        }
+        # Configure capability mappings via CAPABILITY_NODE_MAP_JSON env var
+        # Example: {"compilation": "builder-node", "inference": "gpu-node"}
+        capability_to_node = self._load_capability_map()
 
         assigned_nodes = set()
         for cap in (requires_capabilities or []):

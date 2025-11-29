@@ -10,6 +10,7 @@ Registers MCP tools for Letta-style memory blocks that agents can use to:
 """
 
 import logging
+import os
 from typing import Dict, List, Any
 from letta_memory_blocks import MemoryBlockManager
 
@@ -42,7 +43,7 @@ def register_letta_tools(app, db_path):
         - Entities: Long-term, consolidated, unlimited (enhanced-memory)
 
         Args:
-            agent_id: Agent identifier (e.g., "macpro51", "default")
+            agent_id: Agent identifier (e.g., "my_agent", "default")
             label: Block identifier (e.g., "identity", "human", "task", "learnings")
             description: What this block contains
             initial_value: Starting content (optional)
@@ -54,10 +55,10 @@ def register_letta_tools(app, db_path):
 
         Example:
             create_memory_block(
-                agent_id="macpro51",
+                agent_id="my_agent",
                 label="identity",
                 description="My identity and capabilities",
-                initial_value="I am macpro51, a Linux Builder node...",
+                initial_value="I am a cluster node...",
                 limit=2000
             )
         """
@@ -93,7 +94,7 @@ def register_letta_tools(app, db_path):
 
         Example:
             core_memory_append(
-                agent_id="macpro51",
+                agent_id="my_agent",
                 label="task",
                 content="Currently implementing Letta memory blocks - Phase 1 complete"
             )
@@ -125,10 +126,10 @@ def register_letta_tools(app, db_path):
 
         Example:
             core_memory_replace(
-                agent_id="macpro51",
+                agent_id="my_agent",
                 label="identity",
-                old_content="Linux Builder",
-                new_content="Linux Builder with Letta integration"
+                old_content="Builder Node",
+                new_content="Builder Node with Letta integration"
             )
         """
         return manager.replace_in_block(agent_id, label, old_content, new_content)
@@ -149,7 +150,7 @@ def register_letta_tools(app, db_path):
             List of blocks with metadata
 
         Example:
-            list_memory_blocks(agent_id="macpro51")
+            list_memory_blocks(agent_id="my_agent")
         """
         blocks = manager.list_blocks(agent_id)
         return {
@@ -173,7 +174,7 @@ def register_letta_tools(app, db_path):
             Block details or error if not found
 
         Example:
-            get_memory_block(agent_id="macpro51", label="identity")
+            get_memory_block(agent_id="my_agent", label="identity")
         """
         block = manager.get_block(agent_id, label)
 
@@ -209,7 +210,7 @@ def register_letta_tools(app, db_path):
             XML-formatted memory blocks
 
         Example:
-            render_memory_blocks(agent_id="macpro51", use_line_numbers=False)
+            render_memory_blocks(agent_id="my_agent", use_line_numbers=False)
 
         Output format:
         <memory_blocks>
@@ -220,7 +221,7 @@ def register_letta_tools(app, db_path):
         - chars_limit=2000
         </metadata>
         <value>
-        I am macpro51...
+        I am a cluster node...
         </value>
         </identity>
         ...
@@ -238,7 +239,7 @@ def register_letta_tools(app, db_path):
     @app.tool()
     async def create_default_memory_blocks(
         agent_id: str,
-        node_id: str = "macpro51"
+        node_id: str = None
     ) -> Dict[str, Any]:
         """
         Create default memory blocks for a new agent.
@@ -251,14 +252,17 @@ def register_letta_tools(app, db_path):
 
         Args:
             agent_id: Agent identifier
-            node_id: Node identifier for identity block (default "macpro51")
+            node_id: Node identifier for identity block (default: auto-detect from hostname)
 
         Returns:
             Result with blocks created
 
         Example:
-            create_default_memory_blocks(agent_id="macpro51_agent", node_id="macpro51")
+            create_default_memory_blocks(agent_id="my_agent", node_id="builder")
         """
+        import socket
+        if node_id is None:
+            node_id = os.environ.get("NODE_ID", socket.gethostname())
         return manager.create_default_blocks(agent_id, node_id)
 
     # Tool 8: Create Shared Block (Multi-Agent)
@@ -314,7 +318,7 @@ def register_letta_tools(app, db_path):
             Result with attachment status
 
         Example:
-            attach_shared_block(agent_id="macpro51", shared_block_id=1)
+            attach_shared_block(agent_id="my_agent", shared_block_id=1)
         """
         return manager.attach_shared_block(agent_id, shared_block_id)
 

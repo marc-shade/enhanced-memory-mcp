@@ -123,7 +123,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self, model: str = "llama3"):
         self.model = model
         # Cloud-first Ollama (never use local CPU for LLM inference)
-        self.base_url = os.environ.get('OLLAMA_HOST', 'http://Marcs-Mac-Studio.local:11434')
+        self.base_url = os.environ.get('OLLAMA_HOST', 'http://Marcs-<HOSTNAME>.local:11434')
 
     async def generate(
         self,

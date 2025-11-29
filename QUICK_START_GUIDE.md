@@ -5,7 +5,7 @@
 ### Step 1: Run Migration (2 minutes)
 
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 
 # See what will change (safe)
 python3 migrate_to_knowledge_graph.py --dry-run
@@ -21,7 +21,7 @@ Knowledge Graph Migration Starting
 ============================================================
 
 Step 1: Creating backup...
-  ✓ Backup created: /Users/marc/.claude/enhanced_memories/memory_backup_20250111_100000.db
+  ✓ Backup created: ${HOME}/.claude/enhanced_memories/memory_backup_20250111_100000.db
 
 Current Database Statistics:
   Entities: 1234
@@ -38,7 +38,7 @@ Step 4: Validating migration...
   ✓ Migration validated successfully
 
 Step 5: Generating report...
-  ✓ Report saved: /Users/marc/.claude/enhanced_memories/migration_report_20250111_100000.json
+  ✓ Report saved: ${HOME}/.claude/enhanced_memories/migration_report_20250111_100000.json
 
 ============================================================
 Migration Complete!
@@ -363,7 +363,7 @@ lsof ~/.claude/enhanced_memories/memory.db
 **Solution**:
 ```bash
 # Make sure you're in the right directory
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 
 # Check Python path
 which python3

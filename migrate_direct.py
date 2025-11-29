@@ -12,6 +12,7 @@ import time
 import json
 from pathlib import Path
 from typing import List, Dict, Any
+import os
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -175,7 +176,7 @@ async def main():
     parser = argparse.ArgumentParser(description='Migrate memory-db entities to Qdrant (direct access)')
     parser.add_argument('--batch-size', type=int, default=20, help='Batch size for migration')
     parser.add_argument('--limit', type=int, default=None, help='Limit number of entities to migrate')
-    parser.add_argument('--db-path', type=str, default='/Users/marc/.claude/enhanced_memories/memory.db',
+    parser.add_argument('--db-path', type=str, default=os.path.join(os.environ.get("HOME", "${HOME}"), ".claude/enhanced_memories/memory.db"),
                         help='Path to memory database')
     args = parser.parse_args()
 

@@ -455,7 +455,7 @@ class MemoryBlockManager:
         conn.close()
         return s.getvalue()
 
-    def create_default_blocks(self, agent_id: str, node_id: str = "macpro51") -> Dict[str, Any]:
+    def create_default_blocks(self, agent_id: str, node_id: str = None) -> Dict[str, Any]:
         """
         Create default blocks for a new agent.
 
@@ -464,14 +464,21 @@ class MemoryBlockManager:
         - human: Information about the human user
         - task: Current work and goals
         - learnings: Recent insights (updated by sleeptime agent)
+
+        Args:
+            agent_id: Agent identifier
+            node_id: Optional node identifier (defaults to NODE_ID env var or hostname)
         """
+        import socket
+        if node_id is None:
+            node_id = os.environ.get("NODE_ID", socket.gethostname())
+
         blocks_created = []
 
         # Identity block
         identity_value = f"""I am {node_id}, an autonomous AI agent with persistent memory.
 
-Node Type: Linux Builder (if macpro51)
-Capabilities: Compilation, testing, containerization, benchmarking
+Capabilities: As configured for this node
 Location: {MEMORY_DIR}
 Memory System: Enhanced Memory with Letta-style blocks
 
@@ -671,7 +678,7 @@ def test_memory_blocks():
 
     # Create default blocks for test agent
     print("Creating default blocks...")
-    result = manager.create_default_blocks(agent_id="test_agent", node_id="macpro51")
+    result = manager.create_default_blocks(agent_id="test_agent", node_id="builder")
     print(json.dumps(result, indent=2))
 
     # List blocks

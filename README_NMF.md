@@ -188,7 +188,7 @@ cat /Volumes/FILES/agentic-system/memory-fabric/nmf_config.yaml
 4. ⏳ Phase 4: Memory blocks enhancement
 5. ⏳ Phase 5: Distributed sync
 
-See `/Users/marc/NEURAL_MEMORY_FABRIC_ARCHITECTURE.md` for complete roadmap.
+See `${HOME}/NEURAL_MEMORY_FABRIC_ARCHITECTURE.md` for complete roadmap.
 
 ---
 

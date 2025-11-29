@@ -15,6 +15,7 @@ import logging
 import sqlite3
 from typing import Dict, Any, List
 from pathlib import Path
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +82,9 @@ def register_filesystem_tools(app, db_path):
 
         Example:
             create_agent_folder(
-                agent_id="macpro51",
+                agent_id="my_agent",
                 folder_name="architecture_docs",
-                folder_path="/mnt/agentic-system/docs",
+                folder_path=os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "docs"),
                 description="System architecture documentation"
             )
         """
@@ -126,7 +127,7 @@ def register_filesystem_tools(app, db_path):
             List of attached folders
 
         Example:
-            list_agent_folders(agent_id="macpro51")
+            list_agent_folders(agent_id="my_agent")
         """
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -183,7 +184,7 @@ def register_filesystem_tools(app, db_path):
             Matching files
 
         Example:
-            simple_file_search(agent_id="macpro51", query="CLAUDE.md")
+            simple_file_search(agent_id="my_agent", query="CLAUDE.md")
         """
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()

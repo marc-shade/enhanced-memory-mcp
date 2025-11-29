@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 from collections import Counter
+import os
 
 logger = logging.getLogger("consolidation")
 
@@ -27,7 +28,7 @@ _TPU_AVAILABLE = False
 _score_importance_fn = None
 
 try:
-    tpu_path = "/mnt/agentic-system/mcp-servers/coral-tpu-mcp/src"
+    tpu_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "mcp-servers/coral-tpu-mcp/src")
     if tpu_path not in sys.path:
         sys.path.insert(0, tpu_path)
 
@@ -1138,7 +1139,7 @@ class ConsolidationEngine:
         # Import visual memory module
         try:
             import sys
-            perception_path = "/mnt/agentic-system/intelligent-agents/perception"
+            perception_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "intelligent-agents/perception")
             if perception_path not in sys.path:
                 sys.path.insert(0, perception_path)
             from visual_memory import VisualMemory, VISUAL_MEMORY_DB

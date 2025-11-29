@@ -245,7 +245,8 @@ class OllamaProvider(EmbeddingProvider):
         self.model = config.get("model", "mxbai-embed-large")
         self.dimensions = config.get("dimensions", 1024)  # mxbai-embed-large uses 1024 dimensions
         # Cloud-first Ollama for embeddings (prefer GPU nodes)
-        default_url = os.environ.get('OLLAMA_HOST', 'http://Marcs-Mac-Studio.local:11434')
+        # Set OLLAMA_HOST to your inference node (e.g., http://your-gpu-node:11434)
+        default_url = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
         self.base_url = config.get("base_url", default_url)
 
     def is_available(self) -> bool:
@@ -420,7 +421,7 @@ class TPUProvider(EmbeddingProvider):
         try:
             # Check if TPU engine can be imported and initialized
             import sys
-            tpu_path = "/mnt/agentic-system/mcp-servers/coral-tpu-mcp/src"
+            tpu_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "mcp-servers/coral-tpu-mcp/src")
             if tpu_path not in sys.path:
                 sys.path.insert(0, tpu_path)
 
@@ -440,7 +441,7 @@ class TPUProvider(EmbeddingProvider):
         if self._engine is None:
             try:
                 import sys
-                tpu_path = "/mnt/agentic-system/mcp-servers/coral-tpu-mcp/src"
+                tpu_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "mcp-servers/coral-tpu-mcp/src")
                 if tpu_path not in sys.path:
                     sys.path.insert(0, tpu_path)
 

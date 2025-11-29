@@ -2,14 +2,13 @@
 """
 Cluster Shared Memory Blocks
 
-Sets up shared memory blocks for cluster coordination between:
-- macpro51 (Linux Builder)
-- mac-studio (Orchestrator)
-- macbook-air-m3 (Researcher)
+Sets up shared memory blocks for cluster coordination between cluster nodes.
+Node configuration is loaded from environment or config files.
 
 Shared blocks enable real-time coordination without polling or message-passing.
 """
 
+import os
 import json
 import logging
 from letta_memory_blocks import MemoryBlockManager
@@ -20,6 +19,35 @@ logger = logging.getLogger(__name__)
 # Database path
 MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
 DB_PATH = MEMORY_DIR / "memory.db"
+
+
+def _load_cluster_nodes() -> list:
+    """Load cluster node IDs from configuration."""
+    env_nodes = os.environ.get("CLUSTER_NODE_IDS")
+    if env_nodes:
+        try:
+            return json.loads(env_nodes)
+        except json.JSONDecodeError:
+            pass
+    config_path = Path.home() / ".claude" / "cluster-nodes.json"
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                data = json.load(f)
+                return list(data.keys()) if isinstance(data, dict) else data
+        except (json.JSONDecodeError, IOError):
+            pass
+    return ["builder", "orchestrator", "researcher"]
+
+
+def _get_node_description(node_id: str) -> str:
+    """Get human-readable description for a node."""
+    descriptions = {
+        "builder": "Linux builder node for compilation, testing, containers",
+        "orchestrator": "Orchestrator node for coordination, monitoring, routing",
+        "researcher": "Researcher node for analysis, documentation, research"
+    }
+    return descriptions.get(node_id, f"{node_id} cluster node")
 
 
 def setup_cluster_shared_blocks() -> dict:
@@ -41,14 +69,18 @@ def setup_cluster_shared_blocks() -> dict:
         "attachments_created": []
     }
 
+    # Load cluster nodes dynamically
+    cluster_nodes = _load_cluster_nodes()
+
+    # Build cluster configuration description
+    node_descriptions = "\n".join([f"- {node_id}: {_get_node_description(node_id)}" for node_id in cluster_nodes])
+
     # Block 1: cluster_context (coordination state)
     context_result = manager.create_shared_block(
         label="cluster_context",
         description="Cluster-wide coordination state and active goals",
-        initial_value="""Cluster Configuration:
-- macpro51 (Linux Builder): Compilation, testing, containers, benchmarks
-- mac-studio (Orchestrator): Coordination, monitoring, task routing
-- macbook-air-m3 (Researcher): Analysis, documentation, research
+        initial_value=f"""Cluster Configuration:
+{node_descriptions}
 
 Active Goals:
 - Integrate Letta memory blocks across cluster
@@ -75,18 +107,19 @@ Last Update: System initialization
                 "block_id": existing_block["shared_block_id"]
             })
 
+    # Build initial status string
+    status_lines = "\n".join([f"- {node_id}: Online (initialized)" for node_id in cluster_nodes])
+
     # Block 2: cluster_status (health monitoring)
     status_result = manager.create_shared_block(
         label="cluster_status",
         description="Node health, availability, and resource status",
-        initial_value="""Node Status:
-- macpro51: Online, 64GB RAM available, RAID10 healthy, 24 cores
-- mac-studio: Online (assumed), M2 Max/Ultra, primary orchestrator
-- macbook-air-m3: Online (assumed), M3, portable research node
+        initial_value=f"""Node Status:
+{status_lines}
 
 Cluster Health: All nodes operational
-Network: SSH mesh configured, 1Gbps LAN
-Services: Temporal, n8n, Qdrant, Redis, Prometheus, Grafana operational
+Network: SSH mesh configured
+Services: Operational
 
 Last Health Check: System initialization
 """,
@@ -130,9 +163,7 @@ Last Health Check: System initialization
             })
 
     # Attach blocks to all node agents
-    nodes = ["macpro51", "mac-studio", "macbook-air-m3"]
-
-    for node_id in nodes:
+    for node_id in cluster_nodes:
         agent_id = f"{node_id}_agent"
 
         for block_info in results["blocks_created"]:
@@ -161,7 +192,7 @@ Last Health Check: System initialization
 
 def update_cluster_context(
     update: str,
-    updated_by: str = "macpro51"
+    updated_by: str = None
 ) -> dict:
     """
     Update cluster context with new information.
@@ -173,6 +204,10 @@ def update_cluster_context(
     Returns:
         Update result
     """
+    import socket
+    if updated_by is None:
+        updated_by = os.environ.get("NODE_ID", socket.gethostname())
+
     manager = MemoryBlockManager(DB_PATH)
     block = manager.get_shared_block("cluster_context")
 
@@ -223,8 +258,7 @@ def test_cluster_shared_blocks():
     # Update cluster context
     print("\nUpdating cluster context...")
     update_result = update_cluster_context(
-        "Phase 3 complete - shared blocks operational across all nodes",
-        updated_by="macpro51"
+        "Phase 3 complete - shared blocks operational across all nodes"
     )
     print(json.dumps(update_result, indent=2))
 

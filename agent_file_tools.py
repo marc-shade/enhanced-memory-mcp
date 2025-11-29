@@ -48,7 +48,7 @@ def register_agent_file_tools(app, db_path):
             Export result with file path and statistics
 
         Example:
-            export_agent_to_file(agent_id="macpro51", compress=True)
+            export_agent_to_file(agent_id="my_agent", compress=True)
         """
         from datetime import datetime
 

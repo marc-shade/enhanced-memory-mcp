@@ -18,7 +18,7 @@ def register_sleeptime_tools(app, db_path):
     # Tool 1: Run Consolidation Cycle
     @app.tool()
     async def run_memory_consolidation(
-        agent_id: str = "macpro51",
+        agent_id: str = "default_agent",
         time_window_hours: int = 24
     ) -> Dict[str, Any]:
         """
@@ -35,14 +35,14 @@ def register_sleeptime_tools(app, db_path):
         to strengthen important memories and discard unimportant details.
 
         Args:
-            agent_id: Agent to consolidate memories for (default "macpro51")
+            agent_id: Agent to consolidate memories for (default "default_agent")
             time_window_hours: Hours of memory to consolidate (default 24)
 
         Returns:
             Consolidation results with statistics
 
         Example:
-            run_memory_consolidation(agent_id="macpro51", time_window_hours=24)
+            run_memory_consolidation(agent_id="my_agent", time_window_hours=24)
 
         Expected output:
         {
@@ -61,7 +61,7 @@ def register_sleeptime_tools(app, db_path):
     # Tool 2: Get Recent Episodic Memories (for manual inspection)
     @app.tool()
     async def get_recent_episodic_memories(
-        agent_id: str = "macpro51",
+        agent_id: str = "default_agent",
         time_window_hours: int = 24
     ) -> Dict[str, Any]:
         """
@@ -77,7 +77,7 @@ def register_sleeptime_tools(app, db_path):
             List of episodic memories
 
         Example:
-            get_recent_episodic_memories(agent_id="macpro51", time_window_hours=24)
+            get_recent_episodic_memories(agent_id="my_agent", time_window_hours=24)
         """
         agent = SleetimeAgent(agent_id=agent_id, db_path=db_path)
         memories = agent.get_recent_episodic_memories(time_window_hours)
@@ -93,7 +93,7 @@ def register_sleeptime_tools(app, db_path):
     # Tool 3: Extract Patterns (without full consolidation)
     @app.tool()
     async def extract_memory_patterns(
-        agent_id: str = "macpro51",
+        agent_id: str = "default_agent",
         time_window_hours: int = 24,
         min_frequency: int = 2
     ) -> Dict[str, Any]:
@@ -111,7 +111,7 @@ def register_sleeptime_tools(app, db_path):
             Identified patterns
 
         Example:
-            extract_memory_patterns(agent_id="macpro51", time_window_hours=24, min_frequency=2)
+            extract_memory_patterns(agent_id="my_agent", time_window_hours=24, min_frequency=2)
         """
         agent = SleetimeAgent(agent_id=agent_id, db_path=db_path)
         memories = agent.get_recent_episodic_memories(time_window_hours)
@@ -129,7 +129,7 @@ def register_sleeptime_tools(app, db_path):
     # Tool 4: Discover Causal Relationships
     @app.tool()
     async def discover_causal_patterns(
-        agent_id: str = "macpro51",
+        agent_id: str = "default_agent",
         time_window_hours: int = 24
     ) -> Dict[str, Any]:
         """
@@ -145,7 +145,7 @@ def register_sleeptime_tools(app, db_path):
             Discovered causal chains
 
         Example:
-            discover_causal_patterns(agent_id="macpro51", time_window_hours=24)
+            discover_causal_patterns(agent_id="my_agent", time_window_hours=24)
         """
         agent = SleetimeAgent(agent_id=agent_id, db_path=db_path)
         memories = agent.get_recent_episodic_memories(time_window_hours)

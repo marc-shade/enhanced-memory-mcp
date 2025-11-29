@@ -56,10 +56,13 @@ class SleetimeAgent:
 
     def __init__(
         self,
-        agent_id: str = "macpro51",
+        agent_id: str = None,
         db_path: Path = DB_PATH,
         consolidation_interval_hours: int = 1
     ):
+        import socket
+        if agent_id is None:
+            agent_id = os.environ.get("NODE_ID", socket.gethostname())
         self.agent_id = agent_id
         self.db_path = db_path
         self.consolidation_interval = consolidation_interval_hours

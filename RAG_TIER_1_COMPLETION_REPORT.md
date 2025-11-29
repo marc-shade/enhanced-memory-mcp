@@ -287,7 +287,7 @@ curl -s http://localhost:6333/collections/enhanced_memory | python3 -c "import s
 
 ### Run Migration
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 .venv/bin/python migrate_direct_sqlite.py
 ```
 

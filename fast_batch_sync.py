@@ -24,8 +24,9 @@ logger = logging.getLogger(__name__)
 # Database path
 DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
 # Cloud-first Ollama for embeddings (prefer GPU nodes)
+# Set OLLAMA_HOST to your inference node (e.g., http://your-node:11434)
 import os
-OLLAMA_URL = os.environ.get('OLLAMA_HOST', 'http://Marcs-Mac-Studio.local:11434') + "/api/embeddings"
+OLLAMA_URL = os.environ.get('OLLAMA_HOST', 'http://localhost:11434') + "/api/embeddings"
 QDRANT_URL = "http://localhost:6333/collections/enhanced_memory/points"
 BATCH_SIZE = 20  # Process 20 embeddings in parallel
 MODEL = "nomic-embed-text"

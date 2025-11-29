@@ -140,7 +140,7 @@ if __name__ == '__main__':
         'entityType': 'experience',
         'observations': [
             'The distributed execution system was tested with seven different test cases to verify functionality across the cluster. All tests passed successfully, demonstrating that tasks can be routed to the appropriate nodes based on their requirements.',
-            'The macpro51 builder node successfully executed Linux-specific commands, while the mac-studio orchestrator coordinated the overall workflow.',
+            'The builder node successfully executed Linux-specific commands, while the orchestrator coordinated the overall workflow.',
             'We observed approximately 0.5 seconds of routing overhead and 1-2 seconds of SSH connection time, which is acceptable for tasks with execution times greater than 5 seconds.'
         ]
     }

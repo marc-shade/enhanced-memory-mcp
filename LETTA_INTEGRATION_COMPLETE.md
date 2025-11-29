@@ -97,9 +97,9 @@ CREATE TABLE memory_blocks (
 3. `cluster_learnings` - Collective insights across nodes (8000 chars)
 
 **Attached to All Nodes**:
-- macpro51_agent (Linux Builder)
-- mac-studio_agent (Orchestrator)
-- macbook-air-m3_agent (Researcher)
+- builder_agent (Linux Builder)
+- orchestrator_agent (Orchestrator)
+- researcher_agent (Researcher)
 
 **Database Schema**:
 ```sql
@@ -144,7 +144,7 @@ CREATE TABLE block_attachments (
     "format": "letta-enhanced-memory",
     "exported_at": "2025-11-22T...",
     "agent": {
-        "agent_id": "macpro51",
+        "agent_id": "my_agent",
         "memory_blocks": [...],
         "entities": [...],
         "entity_count": 100,
@@ -153,7 +153,7 @@ CREATE TABLE block_attachments (
     "metadata": {
         "exporter": "enhanced-memory-mcp",
         "database_path": "/path/to/db",
-        "cluster_node": "macpro51"
+        "cluster_node": "builder"
     }
 }
 ```
@@ -167,7 +167,7 @@ CREATE TABLE block_attachments (
 
 **Use Cases**:
 - Checkpoint agent state before risky operations
-- Transfer agent between nodes (macpro51 → mac-studio)
+- Transfer agent between nodes (builder → orchestrator)
 - Backup cognitive state for disaster recovery
 - Share trained agents with other clusters
 
@@ -342,4 +342,4 @@ Implementation based on Letta's memory architecture patterns:
 - Multi-agent shared memory coordination
 - Agent file portability format
 
-Adapted for the agentic system's 4-tier memory architecture (Working, Episodic, Semantic, Procedural) with cluster coordination across macpro51, mac-studio, and macbook-air-m3 nodes.
+Adapted for the agentic system's 4-tier memory architecture (Working, Episodic, Semantic, Procedural) with cluster coordination across builder, orchestrator, and researcher nodes.

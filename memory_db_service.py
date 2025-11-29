@@ -150,28 +150,43 @@ class MemoryDatabase:
                     cursor.execute("SELECT id FROM entities WHERE name = ?", (name,))
                     existing = cursor.fetchone()
 
+                    # Get tier and importance from entity (set by TPU scoring in server.py)
+                    tier = entity.get("tier", "working")
+                    importance_score = entity.get("importance_score")
+
                     if existing:
-                        # Update existing entity
-                        cursor.execute('''
-                            UPDATE entities
-                            SET entity_type = ?, compressed_data = ?, original_size = ?,
-                                compressed_size = ?, compression_ratio = ?, checksum = ?,
-                                access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP,
-                                current_version = current_version + 1
-                            WHERE name = ?
-                        ''', (entity_type, compressed, original_size, compressed_size,
-                              compression_ratio, checksum, name))
+                        # Update existing entity (preserve tier if not provided)
+                        if tier != "working":  # Only update tier if explicitly set
+                            cursor.execute('''
+                                UPDATE entities
+                                SET entity_type = ?, compressed_data = ?, original_size = ?,
+                                    compressed_size = ?, compression_ratio = ?, checksum = ?, tier = ?,
+                                    access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP,
+                                    current_version = current_version + 1
+                                WHERE name = ?
+                            ''', (entity_type, compressed, original_size, compressed_size,
+                                  compression_ratio, checksum, tier, name))
+                        else:
+                            cursor.execute('''
+                                UPDATE entities
+                                SET entity_type = ?, compressed_data = ?, original_size = ?,
+                                    compressed_size = ?, compression_ratio = ?, checksum = ?,
+                                    access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP,
+                                    current_version = current_version + 1
+                                WHERE name = ?
+                            ''', (entity_type, compressed, original_size, compressed_size,
+                                  compression_ratio, checksum, name))
                         results["updated"] += 1
                         entity_id = existing[0]
                     else:
-                        # Create new entity
+                        # Create new entity with tier from TPU scoring
                         cursor.execute('''
                             INSERT INTO entities
                             (name, entity_type, compressed_data, original_size, compressed_size,
-                             compression_ratio, checksum)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                             compression_ratio, checksum, tier)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (name, entity_type, compressed, original_size, compressed_size,
-                              compression_ratio, checksum))
+                              compression_ratio, checksum, tier))
                         results["created"] += 1
                         entity_id = cursor.lastrowid
 
