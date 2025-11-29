@@ -146,7 +146,7 @@ The `execute_code` sandbox provides:
 ## Testing
 
 ```bash
-cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/mcp-servers/enhanced-memory-mcp
+cd /mnt/agentic-system/mcp-servers/enhanced-memory-mcp
 python3 test_advanced_tool_use.py
 ```
 

@@ -25,7 +25,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # Add perception module to path
-PERCEPTION_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "intelligent-agents/perception"))
+PERCEPTION_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "intelligent-agents/perception"))
 sys.path.insert(0, str(PERCEPTION_PATH))
 
 

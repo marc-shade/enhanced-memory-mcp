@@ -52,7 +52,7 @@ class AGIClusterBridge:
 
         if safla is None:
             from safla_orchestrator import SAFLAOrchestrator
-            db_path = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "databases/mcp/memory.db"))
+            db_path = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "databases/mcp/memory.db"))
             safla = SAFLAOrchestrator(db_path)
 
         self.brain = cluster_brain

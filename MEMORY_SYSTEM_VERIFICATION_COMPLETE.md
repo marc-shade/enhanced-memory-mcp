@@ -114,8 +114,8 @@ recent_projects = mcp__memory__search_nodes(query="project_context")  # 2 entiti
 ## Deployment Status
 
 ### Configuration Verified ✅
-- **Server Path**: `${HOME}/Documents/Cline/MCP/memvid-enhanced-memory-mcp/server.py`
-- **Python Path**: `${HOME}/Documents/Cline/MCP/.venv_mcp/bin/python`
+- **Server Path**: `/Users/marc/Documents/Cline/MCP/memvid-enhanced-memory-mcp/server.py`
+- **Python Path**: `/Users/marc/Documents/Cline/MCP/.venv_mcp/bin/python`
 - **Database Path**: `~/.claude/enhanced_memories/memory.db`
 
 ### Connection Issues Resolved ✅
