@@ -674,7 +674,7 @@ class LateChunker:
 
 ---
 
-### 4.5 Fine-tuned Embeddings
+### 4.5 Fine-tuned Embeddings ⚡ LOW PRIORITY
 
 **Objective**: Domain-specific embedding models
 
