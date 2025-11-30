@@ -202,7 +202,7 @@ await get_ontology_info()
 
 ### Run Tests
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 python3 test_knowledge_graph.py
 ```
 
@@ -292,7 +292,7 @@ results = await kg_hybrid_search(
 
 ### 1. Run Migration
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 
 # Dry run first
 python3 migrate_to_knowledge_graph.py --dry-run

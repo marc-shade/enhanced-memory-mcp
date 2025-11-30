@@ -98,7 +98,7 @@ If issues occur, rollback by reverting the changes:
 
 ```bash
 # 1. Revert code change
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 git diff embedding_providers.py  # Review changes
 git checkout embedding_providers.py  # Revert to nomic-embed-text
 

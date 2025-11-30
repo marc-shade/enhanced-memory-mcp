@@ -23,7 +23,7 @@ Based on production testing:
 
 1. Ensure you have Python 3.11+ and the virtual environment:
 ```bash
-cd /Users/marc/Documents/Cline/MCP/enhanced-memory-mcp
+cd ${HOME}/Documents/Cline/MCP/enhanced-memory-mcp
 ~/.cargo/bin/uv venv --python 3.11 ../.venv_mcp
 ~/.cargo/bin/uv pip install -r requirements.txt
 ```

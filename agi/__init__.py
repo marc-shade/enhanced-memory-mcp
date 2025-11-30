@@ -21,6 +21,20 @@ from .self_improvement import SelfImprovement, CoordinationManager
 from .belief_tracking import BeliefTracker, get_all_agent_beliefs, get_epistemic_flexibility_summary
 from .counterfactual_testing import CounterfactualTester, run_flexibility_audit, create_standard_counterfactuals
 from .cluster_beliefs import ClusterBeliefManager, get_cluster_belief_summary
+from .probability_reversal_task import (
+    ProbabilityReversalTask,
+    PRTSession,
+    PRTTrial,
+    run_quick_calibration,
+    get_agent_prt_summary
+)
+from .epistemic_scheduler import (
+    EpistemicScheduler,
+    ScheduledChallenge,
+    run_scheduler_cycle,
+    schedule_immediate_challenge,
+    get_system_epistemic_health
+)
 from .adaptive_granularity import (
     AdaptiveGranularityManager,
     GranularityLevel,
@@ -79,6 +93,18 @@ __all__ = [
     'create_standard_counterfactuals',
     'ClusterBeliefManager',
     'get_cluster_belief_summary',
+    # Phase 5b: Probability Reversal Task (Reflection-Bench)
+    'ProbabilityReversalTask',
+    'PRTSession',
+    'PRTTrial',
+    'run_quick_calibration',
+    'get_agent_prt_summary',
+    # Phase 5c: Epistemic Scheduler
+    'EpistemicScheduler',
+    'ScheduledChallenge',
+    'run_scheduler_cycle',
+    'schedule_immediate_challenge',
+    'get_system_epistemic_health',
     # Phase 6: Adaptive Granularity & RL Retrieval (Mem0/RMM)
     'AdaptiveGranularityManager',
     'GranularityLevel',

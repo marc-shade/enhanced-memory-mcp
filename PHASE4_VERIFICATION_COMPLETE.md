@@ -105,7 +105,7 @@ The "tools not accessible" issue was a configuration problem:
 ## Server Status
 
 **Process**: PID 42795 (started 10:25 AM)
-**Command**: `/Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp/.venv/bin/python server.py`
+**Command**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp/.venv/bin/python server.py`
 **Transport**: stdio (MCP protocol)
 **Parent**: Claude Code (PID 42067)
 
@@ -123,7 +123,7 @@ The "tools not accessible" issue was a configuration problem:
 **File**: `~/.claude.json` (lines 75-82)
 ```json
 "enhanced-memory": {
-  "command": "/Volumes/SSDRAID0/.../server.py",
+  "command": "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/.../server.py",
   "description": "Enhanced Memory MCP - Knowledge graph and entity storage",
   "timeout": 30000
 }

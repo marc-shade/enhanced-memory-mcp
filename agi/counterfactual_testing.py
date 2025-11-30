@@ -123,19 +123,38 @@ class CounterfactualTester:
         original_prob = scenario['original_belief_probability'] or 0.5
         expected_rev = scenario['expected_revision']
 
-        # Calculate actual revision
-        actual_revision = abs(new_belief_probability - original_prob)
+        # Calculate actual revision (SIGNED - preserves direction)
+        # Positive = probability increased, Negative = probability decreased
+        actual_revision = new_belief_probability - original_prob
+        abs_actual = abs(actual_revision)
 
-        # Calculate belief rigidity (how much belief resisted change)
-        # If expected was 0.5 change but only got 0.1, rigidity = 0.8
-        if expected_rev and expected_rev > 0:
-            rigidity_score = max(0.0, 1.0 - (actual_revision / expected_rev))
-            flexibility_score = actual_revision / expected_rev
+        # Calculate belief rigidity with direction awareness
+        # A revision in the wrong direction is WORSE than no revision
+        if expected_rev is not None and expected_rev != 0:
+            abs_expected = abs(expected_rev)
+
+            # Check if revision went in expected direction
+            # expected_rev < 0 means we expect decrease, > 0 means expect increase
+            direction_aligned = (
+                (expected_rev > 0 and actual_revision > 0) or
+                (expected_rev < 0 and actual_revision < 0) or
+                actual_revision == 0  # No change is neutral
+            )
+
+            if direction_aligned:
+                # Direction correct - calculate flexibility based on magnitude
+                rigidity_score = max(0.0, 1.0 - (abs_actual / abs_expected))
+                flexibility_score = min(1.5, abs_actual / abs_expected)  # Allow up to 1.5 for over-revision
+            else:
+                # Direction WRONG - penalize heavily (narrative overfitting indicator)
+                # Rigidity > 1.0 indicates active resistance/opposite response
+                rigidity_score = 1.0 + (abs_actual / abs_expected)
+                flexibility_score = -(abs_actual / abs_expected)  # Negative score = wrong direction
         else:
             # Default: assume strong counterfactual should cause 0.4+ revision
             expected_default = 0.4
-            rigidity_score = max(0.0, 1.0 - (actual_revision / expected_default))
-            flexibility_score = min(1.0, actual_revision / expected_default)
+            rigidity_score = max(0.0, 1.0 - (abs_actual / expected_default))
+            flexibility_score = min(1.0, abs_actual / expected_default)
 
         # Update scenario with results
         cursor.execute('''
@@ -154,6 +173,14 @@ class CounterfactualTester:
         conn.commit()
         conn.close()
 
+        # Determine direction alignment
+        direction_correct = True
+        if expected_rev is not None and expected_rev != 0:
+            direction_correct = (
+                (expected_rev > 0 and actual_revision >= 0) or
+                (expected_rev < 0 and actual_revision <= 0)
+            )
+
         result = {
             "scenario_id": scenario_id,
             "scenario_name": scenario['scenario_name'],
@@ -161,6 +188,7 @@ class CounterfactualTester:
             "counterfactual_probability": new_belief_probability,
             "actual_revision": actual_revision,
             "expected_revision": expected_rev,
+            "direction_correct": direction_correct,
             "rigidity_score": rigidity_score,
             "flexibility_score": flexibility_score,
             "interpretation": self._interpret_flexibility(flexibility_score),
@@ -171,8 +199,16 @@ class CounterfactualTester:
         return result
 
     def _interpret_flexibility(self, score: float) -> str:
-        """Interpret flexibility score"""
-        if score >= 0.8:
+        """Interpret flexibility score (handles negative scores for wrong-direction revisions)"""
+        if score < 0:
+            # Negative score = revised in WRONG direction (critical issue)
+            if score <= -0.5:
+                return "CRITICAL: Strong opposite-direction revision - severe narrative overfitting"
+            else:
+                return "WARNING: Opposite-direction revision - possible confirmation bias"
+        elif score >= 1.0:
+            return "Highly responsive - may be over-revising (check for instability)"
+        elif score >= 0.8:
             return "Highly flexible - readily revises beliefs with new evidence"
         elif score >= 0.6:
             return "Moderately flexible - appropriately considers new evidence"
@@ -295,7 +331,13 @@ class CounterfactualTester:
         """Generate improvement recommendations based on flexibility analysis"""
         recommendations = []
 
-        if score < 0.4:
+        if score < 0:
+            recommendations.append(
+                "CRITICAL: Agent shows opposite-direction revisions - evidence of "
+                "confirmation bias or narrative overfitting. Review belief formation process."
+            )
+
+        if 0 <= score < 0.4:
             recommendations.append(
                 "Critical: Agent shows narrative overfitting risk. "
                 "Implement regular counterfactual challenges."
@@ -311,7 +353,12 @@ class CounterfactualTester:
                 "Agent has not revised any beliefs. Review evidence handling."
             )
 
-        if score >= 0.7:
+        if score >= 1.0:
+            recommendations.append(
+                "Caution: Agent may be over-responsive to evidence. "
+                "Check for belief instability and ensure consistent reasoning."
+            )
+        elif score >= 0.7:
             recommendations.append(
                 "Agent shows healthy epistemic flexibility. Continue monitoring."
             )

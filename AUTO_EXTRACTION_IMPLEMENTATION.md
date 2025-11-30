@@ -346,7 +346,7 @@ result = await client.create_entities([{
 
 1. **Run Migration**:
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 python3 migrations/run_source_attribution.py
 ```
 

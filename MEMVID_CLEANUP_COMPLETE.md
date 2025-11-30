@@ -65,7 +65,7 @@ enhanced-memory-mcp/
 To verify Framework Status cleanup:
 ```bash
 # Check for any remaining memvid references
-find /Users/marc/Documents/Cline/MCP -type f -name "*.py" -o -name "*.md" -o -name "*.json" | xargs grep -i memvid 2>/dev/null
+find ${HOME}/Documents/Cline/MCP -type f -name "*.py" -o -name "*.md" -o -name "*.json" | xargs grep -i memvid 2>/dev/null
 
 # Should return:  (testing required)
 ```
@@ -75,14 +75,14 @@ find /Users/marc/Documents/Cline/MCP -type f -name "*.py" -o -name "*.md" -o -na
 The enhanced memory system is now properly organized as a single, clean MCP server:
 
 ```
-/Users/marc/Documents/Cline/MCP/enhanced-memory-mcp/
+${HOME}/Documents/Cline/MCP/enhanced-memory-mcp/
 ```
 
 **Configuration entry:**
 ```json
 "enhanced-memory-mcp": {
-  "command": "/Users/marc/Documents/Cline/MCP/.venv_mcp/bin/python",
-  "args": ["/Users/marc/Documents/Cline/MCP/enhanced-memory-mcp/server.py"]
+  "command": "${HOME}/Documents/Cline/MCP/.venv_mcp/bin/python",
+  "args": ["${HOME}/Documents/Cline/MCP/enhanced-memory-mcp/server.py"]
 }
 ```
 

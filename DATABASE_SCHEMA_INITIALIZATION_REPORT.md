@@ -95,7 +95,7 @@ sqlite3 memory.db < migrations/004_agi_phase4_metacognition.sql
 ## Database Location
 
 ```
-/mnt/agentic-system/mcp-servers/enhanced-memory-mcp/memory.db
+${AGENTIC_SYSTEM_PATH:-/opt/agentic}/mcp-servers/enhanced-memory-mcp/memory.db
 ```
 
 ## Impact
@@ -135,11 +135,11 @@ New Phase 4 tables extend functionality without breaking existing features.
 
 ## Files Modified
 
-- `/mnt/agentic-system/mcp-servers/enhanced-memory-mcp/memory.db` (schema updated)
+- `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/mcp-servers/enhanced-memory-mcp/memory.db` (schema updated)
 
 ## Migration File Used
 
-- `/mnt/agentic-system/mcp-servers/enhanced-memory-mcp/migrations/004_agi_phase4_metacognition.sql`
+- `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/mcp-servers/enhanced-memory-mcp/migrations/004_agi_phase4_metacognition.sql`
 
 ---
 

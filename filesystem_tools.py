@@ -84,7 +84,7 @@ def register_filesystem_tools(app, db_path):
             create_agent_folder(
                 agent_id="my_agent",
                 folder_name="architecture_docs",
-                folder_path=os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "docs"),
+                folder_path=os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "docs"),
                 description="System architecture documentation"
             )
         """

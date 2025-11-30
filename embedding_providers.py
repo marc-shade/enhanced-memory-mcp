@@ -409,61 +409,103 @@ class CohereProvider(EmbeddingProvider):
 
 
 class TPUProvider(EmbeddingProvider):
-    """Google Coral Edge TPU embedding provider (local hardware acceleration)"""
+    """
+    Google Coral Edge TPU embedding provider (local hardware acceleration)
+
+    NOTE: This provider produces 384-dim embeddings (MiniLM-L6-v2) which are
+    INCOMPATIBLE with the default 768-dim vector store. Use only for:
+    - Specialized tasks requiring smaller embeddings
+    - Comparison/benchmarking purposes
+    - Systems configured for 384-dim vectors
+
+    For standard enhanced-memory operations, prefer Google or OpenAI providers
+    which produce 768-dim embeddings matching the vector store.
+
+    Text embeddings actually run on CPU via sentence-transformers in coral-venv.
+    TPU hardware is used for IMAGE inference (MobileNet, EfficientNet, etc.)
+    """
+
+    # Path to coral-venv Python which has pycoral and sentence-transformers
+    CORAL_VENV_PYTHON = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "coral-venv/bin/python")
+    CORAL_TPU_SRC = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "mcp-servers/coral-tpu-mcp/src")
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.model = config.get("model", "MiniLM-L6-v2")
         self.dimensions = config.get("dimensions", 384)
-        self._engine = None
+        self._tpu_checked = False
+        self._tpu_available = False
 
     def is_available(self) -> bool:
-        try:
-            # Check if TPU engine can be imported and initialized
-            import sys
-            tpu_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "mcp-servers/coral-tpu-mcp/src")
-            if tpu_path not in sys.path:
-                sys.path.insert(0, tpu_path)
+        """Check if TPU/coral-venv is available via subprocess"""
+        if self._tpu_checked:
+            return self._tpu_available
 
-            from coral_tpu_mcp.tpu_engine import TPUEngine
-            # Try to detect TPU hardware
-            try:
-                from pycoral.utils import edgetpu
-                tpus = edgetpu.list_edge_tpus()
-                return len(tpus) > 0
-            except Exception:
-                return False
-        except ImportError:
+        self._tpu_checked = True
+
+        import subprocess
+        from pathlib import Path
+
+        if not Path(self.CORAL_VENV_PYTHON).exists():
+            logger.info("coral-venv not found for TPU embeddings")
+            self._tpu_available = False
             return False
 
-    def _get_engine(self):
-        """Lazy load TPU engine on first use"""
-        if self._engine is None:
-            try:
-                import sys
-                tpu_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "mcp-servers/coral-tpu-mcp/src")
-                if tpu_path not in sys.path:
-                    sys.path.insert(0, tpu_path)
+        try:
+            # Check if sentence-transformers is available in coral-venv
+            result = subprocess.run(
+                [self.CORAL_VENV_PYTHON, "-c",
+                 "from sentence_transformers import SentenceTransformer; print('ok')"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0 and "ok" in result.stdout:
+                self._tpu_available = True
+                logger.info("TPU/coral-venv embeddings available (384-dim, CPU-based)")
+                return True
+        except Exception as e:
+            logger.warning(f"TPU availability check failed: {e}")
 
-                from coral_tpu_mcp.tpu_engine import TPUEngine
-                self._engine = TPUEngine()
-                logger.info("TPU engine loaded for embeddings")
-            except Exception as e:
-                logger.error(f"Failed to load TPU engine: {e}")
-                raise
-        return self._engine
+        self._tpu_available = False
+        return False
 
     async def generate(self, text: str) -> Optional[EmbeddingResult]:
+        """Generate embedding via subprocess to coral-venv"""
         start_time = time.time()
 
+        if not self.is_available():
+            return None
+
         try:
-            engine = self._get_engine()
+            import subprocess
+            import json
 
-            text = self._truncate_text(text, 512)  # TPU models have shorter context
-            embedding = engine.embed_text(text)
+            text = self._truncate_text(text, 512)  # Shorter context for MiniLM
 
-            if embedding is None:
-                logger.warning("TPU embed_text returned None")
+            # Python code to run in coral-venv
+            code = f'''
+import json
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+text = {json.dumps(text)}
+embedding = model.encode([text], batch_size=1)[0].tolist()
+print(json.dumps({{"embedding": embedding, "dimensions": len(embedding)}}))
+'''
+
+            result = subprocess.run(
+                [self.CORAL_VENV_PYTHON, "-c", code],
+                capture_output=True, text=True, timeout=30
+            )
+
+            if result.returncode != 0:
+                logger.warning(f"TPU embedding subprocess failed: {result.stderr[:200]}")
+                return None
+
+            data = json.loads(result.stdout.strip())
+            embedding = data.get("embedding", [])
+
+            if not embedding:
+                logger.warning("TPU embed_text returned empty embedding")
                 return None
 
             latency_ms = (time.time() - start_time) * 1000
@@ -476,9 +518,15 @@ class TPUProvider(EmbeddingProvider):
                 model=self.model,
                 dimensions=len(embedding),
                 latency_ms=latency_ms,
-                cost_estimate=0.0  # Local TPU is free
+                cost_estimate=0.0  # Local is free
             )
 
+        except subprocess.TimeoutExpired:
+            logger.warning("TPU embedding timed out")
+            return None
+        except json.JSONDecodeError as e:
+            logger.warning(f"TPU embedding invalid JSON: {e}")
+            return None
         except Exception as e:
             logger.warning(f"TPU embedding failed: {e}")
             return None
