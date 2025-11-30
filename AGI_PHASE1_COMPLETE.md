@@ -328,7 +328,7 @@ Phase 2 (Temporal Reasoning & Consolidation) will build on this foundation:
 
 1. **Apply Migration**:
 ```bash
-cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
+cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
 python3 run_migration.py --auto
 ```
 

@@ -33,7 +33,7 @@ Enhanced-memory-mcp was migrated from Node.js to Python FastMCP, but intelligent
 ```
 
 **File Modified**:
-- `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/intelligent-agents/specialized/system_remediation_agent_expanded.py:203`
+- `/Volumes/SSDRAID0/agentic-system/intelligent-agents/specialized/system_remediation_agent_expanded.py:203`
 
 ---
 
@@ -133,7 +133,7 @@ Total: 6/6 tests passed (100%)
 ```json
 {
   "enhanced-memory": {
-    "command": "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp/.venv/bin/python",
+    "command": "/Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp/.venv/bin/python",
     "args": ["server.py"]
   }
 }

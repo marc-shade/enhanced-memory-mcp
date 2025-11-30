@@ -26,7 +26,7 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger(__name__)
 
 # Get agentic system path from environment
-AGENTIC_SYSTEM_PATH = os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}")
+AGENTIC_SYSTEM_PATH = os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system")
 
 
 def register_graphrag_tools(app, db_path: Path = None):

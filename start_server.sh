@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PATH="${AGENTIC_SYSTEM_PATH:-${AGENTIC_SYSTEM_PATH:-/opt/agentic}}/.venv"
+VENV_PATH="${AGENTIC_SYSTEM_PATH:-/mnt/agentic-system}/.venv"
 
 # Activate venv
 source "$VENV_PATH/bin/activate"

@@ -29,7 +29,7 @@ _score_importance_fn = None
 
 try:
     # Import from hooks module which uses subprocess to coral-venv (avoiding pycoral dependency)
-    hooks_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "scripts/hooks")
+    hooks_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "scripts/hooks")
     if hooks_path not in sys.path:
         sys.path.insert(0, hooks_path)
 
@@ -1125,7 +1125,7 @@ class ConsolidationEngine:
         # Import visual memory module
         try:
             import sys
-            perception_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "intelligent-agents/perception")
+            perception_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "intelligent-agents/perception")
             if perception_path not in sys.path:
                 sys.path.insert(0, perception_path)
             from visual_memory import VisualMemory, VISUAL_MEMORY_DB
