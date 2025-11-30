@@ -50,9 +50,9 @@ We have successfully completed **RAG Tiers 1-3** core strategies plus GraphRAG f
 | Query Expansion | 2 | ✅ COMPLETE | Medium | +15-25% recall |
 | Multi-Query RAG | 2 | ✅ COMPLETE | Medium | +20-30% coverage |
 | Contextual Retrieval | 3 | ✅ COMPLETE | High | +35-49% accuracy |
+| Context-Aware Chunking | 3 | ✅ COMPLETE | High | +10-20% relevance |
+| Hierarchical RAG | 3 | ✅ COMPLETE | High | +15-25% precision |
 | GraphRAG / Knowledge Graphs | 4 | ✅ COMPLETE | Very High | +25-35% relationships |
-| Context-Aware Chunking | 3 | ⚡ PENDING | High | +10-20% relevance |
-| Hierarchical RAG | 3 | ⚡ PENDING | High | +15-25% precision |
 | Agentic RAG / Self-Reflective | 4 | ⚡ PENDING | Very High | +30-40% adaptability |
 | Late Chunking | 4 | ⚡ LOW PRIORITY | Medium | +10-15% context |
 | Fine-tuned Embeddings | 4 | ⚡ LOW PRIORITY | Very High | +15-25% domain accuracy |
