@@ -23,23 +23,25 @@ import os
 
 logger = logging.getLogger("consolidation")
 
-# TPU importance scoring integration (optional, graceful degradation)
+# TPU importance scoring integration (uses subprocess to coral-venv)
 _TPU_AVAILABLE = False
 _score_importance_fn = None
 
 try:
-    tpu_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "mcp-servers/coral-tpu-mcp/src")
-    if tpu_path not in sys.path:
-        sys.path.insert(0, tpu_path)
+    # Import from hooks module which uses subprocess to coral-venv (avoiding pycoral dependency)
+    hooks_path = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "scripts/hooks")
+    if hooks_path not in sys.path:
+        sys.path.insert(0, hooks_path)
 
-    from pycoral.utils import edgetpu
-    if len(edgetpu.list_edge_tpus()) > 0:
-        from coral_tpu_mcp.server import handle_score_importance
-        _score_importance_fn = handle_score_importance
+    from tpu_importance import score_importance, is_tpu_available
+    if is_tpu_available():
+        _score_importance_fn = score_importance
         _TPU_AVAILABLE = True
-        logger.info("TPU importance scoring available for consolidation")
-except ImportError:
-    logger.debug("TPU not available for consolidation, using heuristics")
+        logger.info("TPU importance scoring available for consolidation (via coral-venv subprocess)")
+    else:
+        logger.debug("TPU not available for consolidation, using heuristics")
+except ImportError as e:
+    logger.debug(f"TPU importance module not found: {e}")
 except Exception as e:
     logger.warning(f"TPU init error in consolidation: {e}")
 
@@ -57,24 +59,8 @@ def score_importance_tpu(text: str, context: str = "memory") -> float:
     """
     if _TPU_AVAILABLE and _score_importance_fn:
         try:
-            import asyncio
-
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            # TPU MCP expects "content" not "text"
-            result = loop.run_until_complete(
-                _score_importance_fn({"content": text, "context": context})
-            )
-
-            if result and len(result) > 0:
-                import json as json_mod
-                data = json_mod.loads(result[0].text)
-                return float(data.get("importance_score", 0.5))
-
+            # tpu_importance.score_importance is synchronous (uses subprocess)
+            return _score_importance_fn(text, context)
         except Exception as e:
             logger.debug(f"TPU scoring failed, using heuristic: {e}")
 
