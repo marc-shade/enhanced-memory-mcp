@@ -547,7 +547,7 @@ class KnowledgeGraphRAG:
 
 ---
 
-### 4.3 Self-Reflective RAG
+### 4.3 Self-Reflective RAG ⚡ PENDING
 
 **Objective**: Autonomous evaluation and query refinement
 
