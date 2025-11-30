@@ -344,7 +344,7 @@ class SemanticChunker:
 
 ---
 
-### 3.3 Hierarchical RAG
+### 3.3 Hierarchical RAG ⚡ PENDING
 
 **Objective**: Multi-level document organization (summaries → sections → chunks)
 
