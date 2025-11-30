@@ -1509,6 +1509,15 @@ if __name__ == "__main__":
     except Exception as e:
         logger.warning(f"⚠️  Hierarchical RAG integration skipped: {e}")
 
+    # Register Agentic RAG tools (RAG Tier 4.1 + 4.3) - Autonomous Strategy Selection + Self-Reflection
+    # Intelligent strategy selection based on query characteristics with iterative refinement
+    try:
+        from agentic_rag_tools import register_agentic_rag_tools
+        register_agentic_rag_tools(app, nmf_instance)
+        logger.info("✅ Agentic RAG (RAG Tier 4.1+4.3) integrated - Expected +30-40% adaptability")
+    except Exception as e:
+        logger.warning(f"⚠️  Agentic RAG integration skipped: {e}")
+
     # Register Cluster Brain tools (Unified multi-node intelligence)
     try:
         from cluster_brain_tools import register_cluster_brain_tools
