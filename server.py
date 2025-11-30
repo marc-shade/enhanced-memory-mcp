@@ -1500,6 +1500,15 @@ if __name__ == "__main__":
     except Exception as e:
         logger.warning(f"⚠️  Context-Aware Chunking integration skipped: {e}")
 
+    # Register Hierarchical RAG tools (RAG Tier 3.3 Strategy) - Multi-Level Indexing
+    # Progressive retrieval: summary → sections → chunks
+    try:
+        from hierarchical_rag_tools import register_hierarchical_rag_tools
+        register_hierarchical_rag_tools(app, nmf_instance)
+        logger.info("✅ Hierarchical RAG (RAG Tier 3.3) integrated - Expected +15-25% precision")
+    except Exception as e:
+        logger.warning(f"⚠️  Hierarchical RAG integration skipped: {e}")
+
     # Register Cluster Brain tools (Unified multi-node intelligence)
     try:
         from cluster_brain_tools import register_cluster_brain_tools
