@@ -112,7 +112,10 @@ class EpistemicScheduler:
 
         Checks all agents and schedules challenges as needed.
         """
-        from .counterfactual_testing import run_flexibility_audit
+        try:
+            from .counterfactual_testing import run_flexibility_audit
+        except ImportError:
+            from counterfactual_testing import run_flexibility_audit
 
         # Run the audit
         audit_results = run_flexibility_audit()
