@@ -626,7 +626,7 @@ class ReflectiveRetriever:
 
 ---
 
-### 4.4 Late Chunking
+### 4.4 Late Chunking ⚡ LOW PRIORITY
 
 **Objective**: Preserve full document context during embedding
 
