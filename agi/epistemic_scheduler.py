@@ -482,7 +482,10 @@ async def run_scheduler_cycle():
 
             # Execute based on type
             if challenge['challenge_type'] == 'prt':
-                from .probability_reversal_task import ProbabilityReversalTask
+                try:
+                    from .probability_reversal_task import ProbabilityReversalTask
+                except ImportError:
+                    from probability_reversal_task import ProbabilityReversalTask
                 prt = ProbabilityReversalTask(challenge['agent_id'])
                 session = prt.create_session(task_type='calibration')
                 result = {
@@ -492,7 +495,10 @@ async def run_scheduler_cycle():
                 }
 
             elif challenge['challenge_type'] == 'counterfactual':
-                from .counterfactual_testing import CounterfactualTester
+                try:
+                    from .counterfactual_testing import CounterfactualTester
+                except ImportError:
+                    from counterfactual_testing import CounterfactualTester
                 tester = CounterfactualTester(challenge['agent_id'])
                 scenarios = tester.get_scenarios(tested_only=False, limit=1)
                 result = {
@@ -558,7 +564,10 @@ def get_system_epistemic_health() -> Dict[str, Any]:
     schedule_summary = scheduler.get_schedule_summary()
 
     # Run quick audit
-    from .counterfactual_testing import run_flexibility_audit
+    try:
+        from .counterfactual_testing import run_flexibility_audit
+    except ImportError:
+        from counterfactual_testing import run_flexibility_audit
     audit = run_flexibility_audit()
 
     # Determine overall health
