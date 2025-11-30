@@ -1491,6 +1491,15 @@ if __name__ == "__main__":
         except Exception as e:
             logger.warning(f"⚠️  Contextual Retrieval integration skipped: {e}")
 
+    # Register Context-Aware Chunking tools (RAG Tier 3.2 Strategy) - Semantic Boundaries
+    # Maintains semantic coherence through intelligent chunking at topic boundaries
+    try:
+        from context_aware_chunking import register_context_aware_chunking_tools
+        register_context_aware_chunking_tools(app, nmf_instance)
+        logger.info("✅ Context-Aware Chunking (RAG Tier 3.2) integrated - Semantic boundary detection")
+    except Exception as e:
+        logger.warning(f"⚠️  Context-Aware Chunking integration skipped: {e}")
+
     # Register Cluster Brain tools (Unified multi-node intelligence)
     try:
         from cluster_brain_tools import register_cluster_brain_tools
