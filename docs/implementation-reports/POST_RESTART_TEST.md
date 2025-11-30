@@ -82,7 +82,7 @@ result = mcp__enhanced-memory__resolve_conflict(
 
 ### Test 4: Verify in Database
 ```bash
-sqlite3 /Users/marc/.claude/enhanced_memories/memory.db <<EOF
+sqlite3 ${HOME}/.claude/enhanced_memories/memory.db <<EOF
 -- Check auto-extracted entities
 SELECT COUNT(*) FROM entities WHERE source_session = 'post-restart-test-001';
 
@@ -114,7 +114,7 @@ EOF
 
 2. Check tool registration:
    ```bash
-   grep "async def auto_extract_facts" /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp/server.py
+   grep "async def auto_extract_facts" ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp/server.py
    ```
 
 3. View MCP logs:
@@ -124,5 +124,5 @@ EOF
 
 4. Verify database schema:
    ```bash
-   sqlite3 /Users/marc/.claude/enhanced_memories/memory.db "PRAGMA table_info(conflicts)"
+   sqlite3 ${HOME}/.claude/enhanced_memories/memory.db "PRAGMA table_info(conflicts)"
    ```

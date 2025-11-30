@@ -306,7 +306,7 @@ await get_ontology_info()
 Run comprehensive tests:
 
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 python3 test_knowledge_graph.py
 ```
 

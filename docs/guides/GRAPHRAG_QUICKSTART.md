@@ -307,8 +307,8 @@ neighbors = await get_entity_neighbors(
 
 - **Full Documentation**: `GRAPHRAG_TOOLS_DOCS.md`
 - **Test Script**: `test_graphrag_integration.py`
-- **GraphRAG Implementation**: `/mnt/agentic-system/scripts/graph-rag.py`
-- **README**: `/mnt/agentic-system/scripts/README-GRAPHRAG.md`
+- **GraphRAG Implementation**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/scripts/graph-rag.py`
+- **README**: `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/scripts/README-GRAPHRAG.md`
 
 ---
 

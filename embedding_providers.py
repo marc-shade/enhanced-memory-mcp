@@ -426,8 +426,8 @@ class TPUProvider(EmbeddingProvider):
     """
 
     # Path to coral-venv Python which has pycoral and sentence-transformers
-    CORAL_VENV_PYTHON = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "coral-venv/bin/python")
-    CORAL_TPU_SRC = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "mcp-servers/coral-tpu-mcp/src")
+    CORAL_VENV_PYTHON = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "coral-venv/bin/python")
+    CORAL_TPU_SRC = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "mcp-servers/coral-tpu-mcp/src")
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)

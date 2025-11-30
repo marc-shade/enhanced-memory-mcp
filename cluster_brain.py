@@ -28,7 +28,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Cluster brain database - shared location accessible by all nodes
-CLUSTER_DB_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "/mnt/agentic-system"), "databases/cluster/cluster_brain.db"))
+CLUSTER_DB_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "databases/cluster/cluster_brain.db"))
 
 # Node roles and their specialties - loaded from config
 def _load_node_roles() -> dict:

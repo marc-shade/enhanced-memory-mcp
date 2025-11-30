@@ -158,7 +158,7 @@ source ~/.zshrc
 ### 4. Install Dependencies
 
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 .venv/bin/pip install "ollama>=0.4.0"
 ```
 
@@ -173,7 +173,7 @@ The server will automatically use Ollama Cloud when `OLLAMA_API_KEY` is set.
 To verify Ollama Cloud integration:
 
 ```bash
-cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
+cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
 .venv/bin/python3 test_ollama_integration.py
 ```
 

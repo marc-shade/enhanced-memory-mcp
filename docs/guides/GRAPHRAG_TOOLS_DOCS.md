@@ -8,7 +8,7 @@ GraphRAG (Graph-Enhanced Retrieval-Augmented Generation) tools integrate relatio
 
 ### Components
 
-1. **GraphRAG Core** (`/mnt/agentic-system/scripts/graph-rag.py`)
+1. **GraphRAG Core** (`${AGENTIC_SYSTEM_PATH:-/opt/agentic}/scripts/graph-rag.py`)
    - SQLite-based relationship storage (extends existing `relations` table)
    - Qdrant vector search integration (when available)
    - Graph traversal algorithms
@@ -393,7 +393,7 @@ async def build_local_graph(
 
 ### Server Integration
 
-Added to `/mnt/agentic-system/mcp-servers/enhanced-memory-mcp/server.py`:
+Added to `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/mcp-servers/enhanced-memory-mcp/server.py`:
 
 ```python
 # Register GraphRAG tools (Relationship-aware retrieval)
@@ -547,10 +547,10 @@ subgraph = await build_local_graph(entity_ids=entity_ids)
 
 ```bash
 # Verify GraphRAG script exists
-ls -la /mnt/agentic-system/scripts/graph-rag.py
+ls -la ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/scripts/graph-rag.py
 
 # Check Python syntax
-python3 -m py_compile /mnt/agentic-system/scripts/graph-rag.py
+python3 -m py_compile ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/scripts/graph-rag.py
 ```
 
 ### Database Issues
