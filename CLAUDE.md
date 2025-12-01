@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Enhanced Memory MCP Server - a high-performance memory management system for AI agents. Provides compressed SQLite storage with 4-tier architecture, Git-like versioning, and advanced RAG (Retrieval-Augmented Generation) capabilities.
+Enhanced Memory MCP Server - a high-performance memory management system for AI agents. Provides compressed SQLite storage with 4-tier architecture, Git-like versioning, and advanced RAG (Retrieval-Augmented Generation) capabilities with 200+ MCP tools.
 
 ## Build & Test Commands
 
@@ -16,25 +16,33 @@ source .venv/bin/activate
 python3 server.py
 
 # Run comprehensive tests
-python3 test_comprehensive.py
+python3 comprehensive_test.py
 
-# Test RAG features
+# Test all RAG tiers (22 tests)
+python3 test_rag_integration_comprehensive.py
+
+# Test specific RAG features
 python3 test_graphrag_integration.py
 python3 test_letta_integration.py
 
 # Test code execution sandbox
 python3 test_advanced_tool_use.py
+
+# Test individual modules
+python3 test_agi_phase2.py  # Temporal reasoning & consolidation
+python3 test_agi_phase3.py  # Emotional tagging & associative networks
+python3 test_agi_phase4.py  # Meta-cognition & self-improvement
 ```
 
 ## Architecture
 
 ### Core Components
 
-**server.py** - Main FastMCP server with 200+ MCP tools. Architecture:
+**server.py** (~1566 lines) - Main FastMCP server. Architecture:
 - Uses `memory_client.py` to connect to memory-db Unix socket service for concurrent access
 - Core operations (create_entities, search_nodes) delegated to memory-db service
-- Advanced features (versioning, branching, RAG) handled locally
-- Tools registered modularly via `register_*_tools()` functions
+- Tools registered modularly via `register_*_tools()` functions (lines 1355-1566)
+- TPU importance scoring at entity creation time (lines 36-50)
 
 **memory_db_service.py** - Unix socket service providing centralized SQLite access. Enables multiple Claude Code instances to share memory without corruption.
 
@@ -51,70 +59,97 @@ python3 test_advanced_tool_use.py
 
 ### RAG Strategy Implementation
 
-The system implements multiple RAG strategies from the roadmap in `COMPLETE_RAG_ROADMAP.md`:
+All RAG strategies are registered in `server.py` main block (lines 1441-1562):
 
-| Strategy | Status | Tools |
-|----------|--------|-------|
-| Hybrid Search (BM25+Vector) | ✅ Active | `search_hybrid`, `search_with_reranking` |
-| Query Expansion | ✅ Active | `search_with_query_expansion` |
-| Multi-Query RAG | ✅ Active | `search_with_multi_query` |
-| Contextual Retrieval | ✅ Active | `generate_context_for_chunk`, `reindex_with_context` |
-| GraphRAG/Knowledge Graph | ✅ Active | `graph_enhanced_search`, `get_entity_neighbors` |
-| Visual Memory | ✅ Active | `store_visual_episode`, `find_similar_visual` |
+| Tier | Strategy | Status | Tools | File |
+|------|----------|--------|-------|------|
+| 1 | Hybrid Search (BM25+Vector) | ✅ | `search_hybrid` | `hybrid_search_tools_nmf.py` |
+| 1 | Re-ranking (Cross-Encoder) | ✅ | `search_with_reranking` | `reranking_tools_nmf.py` |
+| 2 | Query Expansion | ✅ | `search_with_query_expansion` | `query_expansion_tools.py` |
+| 2 | Multi-Query RAG | ✅ | `search_with_multi_query` | `multi_query_rag_tools.py` |
+| 3.1 | Contextual Retrieval | ✅ | `generate_context_for_chunk`, `reindex_with_context` | `contextual_retrieval_tools.py` |
+| 3.2 | Context-Aware Chunking | ✅ | `chunk_document_semantic` | `context_aware_chunking.py` |
+| 3.3 | Hierarchical RAG | ✅ | `index_document_hierarchical`, `search_hierarchical` | `hierarchical_rag_tools.py` |
+| 4.1+4.3 | Agentic + Self-Reflective RAG | ✅ | `agentic_retrieve`, `analyze_query`, `evaluate_results` | `agentic_rag_tools.py` |
+| 4 | GraphRAG | ✅ | `graph_enhanced_search`, `get_entity_neighbors` | `graphrag_tools.py` |
+| 4 | Visual Memory | ✅ | `store_visual_episode`, `find_similar_visual` | `visual_memory_tools.py` |
 
 ### Tool Registration Pattern
 
-Tools are registered modularly in `server.py` around line 1370+:
+Tools are registered modularly in `server.py` main block (~line 1355):
 
 ```python
 from query_expansion_tools import register_query_expansion_tools
 register_query_expansion_tools(app, nmf_instance)
 ```
 
-To add new tools:
-1. Create `{feature}_tools.py` with a `register_{feature}_tools(app, ...)` function
+**To add new tools**:
+1. Create `{feature}_tools.py` with `register_{feature}_tools(app, ...)`
 2. Import and call in server.py's tool registration section
-3. Tools automatically appear in MCP tool list
+3. Add to `tool_catalog.py` for progressive tool discovery
+4. Add tests in `test_rag_integration_comprehensive.py`
 
-### Key Directories
+### Key Tool Files
 
 ```
-agi/                    # AGI-specific modules (22 files)
-  consolidation.py      # Sleep-like memory consolidation
-  metacognition.py      # Self-awareness tracking
-  belief_tracking.py    # Probabilistic belief states
-  epistemic_scheduler.py # Epistemic flexibility audit
+*_tools.py files (25+):
+├── agi_tools.py           # AGI Phase 1: Identity & actions
+├── agi_tools_phase2.py    # Temporal reasoning, consolidation
+├── agi_tools_phase3.py    # Emotional tagging, associative networks
+├── agi_tools_phase4.py    # Meta-cognition, self-improvement
+├── agentic_rag_tools.py   # Tier 4.1+4.3: Autonomous + self-reflective RAG
+├── cluster_brain_tools.py # Multi-node cluster intelligence
+├── contextual_retrieval_tools.py  # Tier 3.1: Context enhancement
+├── graphrag_tools.py      # Graph-enhanced retrieval
+├── hierarchical_rag_tools.py  # Tier 3.3: Multi-level indexing
+├── hybrid_search_tools.py # Tier 1: BM25 + Vector
+├── multi_query_rag_tools.py   # Tier 2: Query perspectives
+├── nmf_tools.py           # Neural Memory Fabric
+├── query_expansion_tools.py   # Tier 2: Query expansion
+├── reasoning_tools.py     # 75/15 rule prioritization
+├── reranking_tools.py     # Tier 1: Cross-encoder re-ranking
+├── safla_tools.py         # SAFLA 4-tier memory
+├── sleeptime_tools.py     # Letta sleeptime compute
+├── tool_search.py         # Progressive tool discovery
+└── visual_memory_tools.py # LVR-style visual embeddings
 
-sandbox/                # Code execution sandbox
-  executor.py           # RestrictedPython execution
-  security.py           # Safety checks and PII tokenization
+agi/                       # AGI-specific modules (22 files)
+├── consolidation.py       # Sleep-like memory consolidation
+├── metacognition.py       # Self-awareness tracking
+├── belief_tracking.py     # Probabilistic belief states
+├── epistemic_scheduler.py # Epistemic flexibility audit
+├── action_tracker.py      # Action outcome recording
+├── agent_identity.py      # Cross-session identity
+├── associative_network.py # Memory associations
+├── emotional_memory.py    # Emotional tagging
+├── self_improvement.py    # Self-improvement cycles
+└── temporal_reasoning.py  # Causal chains
 
-docs/                   # Organized documentation
-  architecture/         # Technical specs, system design
-  guides/               # User guides, API reference
-  implementation-reports/  # Status and completion reports
-  session-summaries/    # Development session notes
+sandbox/                   # Code execution sandbox
+├── executor.py            # RestrictedPython execution
+└── security.py            # Safety checks, PII tokenization
 ```
 
 ### Database Schema
 
 Primary tables in `~/.claude/enhanced_memories/memory.db`:
 
-- `entities` - Core memory storage with compression, versioning
+- `entities` - Core memory storage with compression, versioning, tier assignment
 - `observations` - Entity observations/facts
-- `relations` - Entity relationships (from → to)
+- `relations` - Entity relationships (from → to, with weight and causal flag)
 - `entity_versions` - Git-like version history
 - `entity_branches` - Branch management
 - `working_memory` - TTL-based temporary storage
 - `episodic_memory` - Time-bound experiences
 - `semantic_memory` - Abstract concepts
 - `procedural_memory` - Skills and procedures
+- `visual_episodes` - Visual memory with TPU embeddings
 
 ### Dependencies
 
 Critical dependencies (from requirements.txt):
 - `fastmcp` - MCP protocol implementation
-- `sentence-transformers` - Re-ranking with cross-encoder
+- `sentence-transformers` - Re-ranking with cross-encoder (ms-marco-MiniLM-L-6-v2)
 - `qdrant-client` - Hybrid search with BM25 + Vector
 - `RestrictedPython` - Secure sandbox code execution
 - `anthropic` - Claude API for contextual prefix generation
@@ -127,14 +162,15 @@ Critical dependencies (from requirements.txt):
 
 ### TPU Integration
 
-Real-time importance scoring via Google Coral TPU (when available):
-- Entities scored at creation time
-- Auto-assigned to appropriate tier based on importance
+Real-time importance scoring via Google Coral TPU (when available on builder):
+- Entities scored at creation time in `create_entities()`
+- Auto-assigned to tier (working/episodic/long_term) based on score
 - Graceful fallback to heuristic scoring when TPU unavailable
+- Score ≥0.8 → long_term, ≥0.6 → episodic, <0.6 → working
 
 ### Neural Memory Fabric (NMF)
 
-Alternative memory architecture in `nmf_*.py` files. Provides Letta-style memory blocks with open/edit/close semantics. See `README_NMF.md` for details.
+Alternative memory architecture in `neural_memory_fabric.py` and `nmf_*.py` files. Provides Letta-style memory blocks with open/edit/close semantics. Required by RAG Tier 1-2 tools.
 
 ## Common Patterns
 
@@ -145,16 +181,25 @@ Alternative memory architecture in `nmf_*.py` files. Provides Letta-style memory
 3. Implement `register_{feature}_tools(app, db_path)`
 4. Register in server.py tool registration section
 5. Update `tool_catalog.py` for progressive tool discovery
+6. Add tests to `test_rag_integration_comprehensive.py`
 
 ### Testing MCP tools locally
 
 ```python
-# Direct tool testing (bypasses MCP protocol)
-from server import app
+# MockFastMCPApp pattern for testing tool registration
+class MockFastMCPApp:
+    def __init__(self):
+        self.tools = {}
+    def tool(self):
+        def decorator(func):
+            self.tools[func.__name__] = func
+            return func
+        return decorator
 
-# Get tool function directly
-tool_fn = app.tools['search_nodes']
-result = await tool_fn(query="test", limit=5)
+# Use in tests
+mock_app = MockFastMCPApp()
+register_your_tools(mock_app, dependencies)
+assert 'your_tool_name' in mock_app.tools
 ```
 
 ### Memory consolidation (sleep-like cycles)
@@ -164,18 +209,27 @@ result = await tool_fn(query="test", limit=5)
 result = await run_full_consolidation(time_window_hours=24)
 ```
 
-## RAG Roadmap Status
+### Agentic RAG retrieval (self-reflective)
 
-The `COMPLETE_RAG_ROADMAP.md` shows planned strategies but is outdated. Actual implementation status:
+```python
+from agentic_rag_tools import AgenticRetriever
 
-- **Tier 1** (Hybrid + Reranking): ✅ Complete
-- **Tier 2** (Query Expansion, Multi-Query): ✅ Implemented
-- **Tier 3** (Contextual Retrieval): ✅ Implemented
-- **Tier 4** (GraphRAG, Visual Memory): ✅ Implemented
+retriever = AgenticRetriever(nmf_instance)
+result = retriever.retrieve(
+    query="How does memory consolidation work?",
+    max_iterations=3,
+    quality_threshold=0.7
+)
+# Returns: RetrievalResult with results, quality_score, iterations, refinements
+```
 
-Remaining from roadmap not yet integrated:
-- Context-Aware Chunking
-- Hierarchical RAG
-- Self-Reflective RAG
-- Late Chunking
-- Fine-tuned Embeddings
+## Test Coverage
+
+Main test file: `test_rag_integration_comprehensive.py` (22 tests, 100% pass rate)
+
+| Tier | Tests |
+|------|-------|
+| Tier 1 | Hybrid search, re-ranking imports and registration |
+| Tier 2 | Query expansion, multi-query RAG imports and registration |
+| Tier 3 | Contextual retrieval, hierarchical RAG imports, registration, class creation |
+| Tier 4 | Agentic RAG classes (QueryAnalyzer, ResultEvaluator, AgenticRetriever) |
