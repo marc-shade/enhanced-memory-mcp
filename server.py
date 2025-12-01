@@ -1518,6 +1518,15 @@ if __name__ == "__main__":
     except Exception as e:
         logger.warning(f"⚠️  Agentic RAG integration skipped: {e}")
 
+    # Register Late Chunking tools (RAG Tier 4) - Long-Context Document Embedding
+    # Uses 8k-token models (bge-m3, qwen3-embedding) on inference node for document-aware chunks
+    try:
+        from late_chunking_tools import register_late_chunking_tools
+        register_late_chunking_tools(app, DB_PATH)
+        logger.info("✅ Late Chunking (RAG Tier 4) integrated - 8k context embedding via Ollama")
+    except Exception as e:
+        logger.warning(f"⚠️  Late Chunking integration skipped: {e}")
+
     # Register Cluster Brain tools (Unified multi-node intelligence)
     try:
         from cluster_brain_tools import register_cluster_brain_tools
