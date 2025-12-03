@@ -197,7 +197,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
             return {
                 "success": True,
                 "classified": False,
-                "best_match_id": best_match,
+                "best_match_id": best_match_cat.id if best_match_cat else None,
                 "best_match_score": float(best_score),
                 "vigilance_threshold": vig,
                 "reason": f"Best match ({best_score:.3f}) below vigilance ({vig})"
@@ -275,12 +275,12 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         art = get_art_instance()
 
         categories = []
-        for cat_id, category in art.categories.items():
+        for category in art.categories:
             categories.append({
-                "category_id": cat_id,
-                "pattern_count": category.pattern_count,
-                "created_at": category.created_at,
-                "updated_at": category.updated_at,
+                "category_id": category.id,
+                "match_count": category.match_count,
+                "created_at": category.created_at.isoformat() if hasattr(category.created_at, 'isoformat') else str(category.created_at),
+                "last_matched": category.last_matched.isoformat() if hasattr(category.last_matched, 'isoformat') else str(category.last_matched),
                 "metadata": category.metadata,
                 "prototype_norm": float(np.linalg.norm(category.prototype))
             })
@@ -290,7 +290,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
             "total_categories": len(categories),
             "categories": categories,
             "vigilance": art.vigilance,
-            "stats": art.stats
+            "stats": art.get_stats()
         }
 
 
@@ -331,6 +331,13 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         # Auto-save
         save_art_state()
 
+        # Find the category to get match count
+        cat_match_count = 0
+        for cat in art_hybrid.art.categories:
+            if cat.id == category_id:
+                cat_match_count = cat.match_count
+                break
+
         return {
             "success": True,
             "category_id": category_id,
@@ -338,7 +345,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
             "match_score": float(match_score),
             "cluster_info": {
                 "total_clusters": len(art_hybrid.art.categories),
-                "patterns_in_cluster": art_hybrid.art.categories[category_id].pattern_count
+                "patterns_in_cluster": cat_match_count
             },
             "vigilance": art_hybrid.art.vigilance
         }
@@ -373,12 +380,12 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
 
         # Score all categories
         scores = []
-        for cat_id, category in art_hybrid.art.categories.items():
+        for category in art_hybrid.art.categories:
             match_score = art_hybrid.art._match_function(coded, category.prototype)
             scores.append({
-                "category_id": cat_id,
+                "category_id": category.id,
                 "match_score": float(match_score),
-                "pattern_count": category.pattern_count,
+                "match_count": category.match_count,
                 "metadata": category.metadata
             })
 
