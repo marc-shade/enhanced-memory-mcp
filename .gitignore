@@ -35,23 +35,35 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.nox/
 
-# Local files
-.env
+# Local data (not for publishing)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
+*.sqlite3
+
+# Archives and backups
+.archive/
+*.backup
+*.bak
+~
+
+# Environment and secrets
+.env
+.env.local
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
-
-# Runtime data (cache, logs, data)
-data/
-cache/
 logs/
-*_cache.json
-*.cache
 
-# Node (if TypeScript)
-node_modules/
-
-# Claude Code
-.claude-flow/
-.swarm/
+# Literal path artifacts (should never exist)
+${AGENTIC_SYSTEM_PATH:-*
