@@ -394,6 +394,94 @@ result = summarize_results(high_conf)
         module="multi_query_rag_tools"
     ),
 
+    # ART (Adaptive Resonance Theory) Tools (WARM)
+    "art_learn": ToolDefinition(
+        name="art_learn",
+        description="Learn a new pattern using Fuzzy ART - online learning without catastrophic forgetting",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "learn", "pattern", "cluster", "online", "resonance", "neural"],
+        parameters=["data", "metadata", "vigilance"],
+        module="art_tools",
+        example={
+            "description": "Learn a pattern from embedding vector",
+            "input": {"data": [0.1, 0.2, 0.3, 0.4], "vigilance": 0.75},
+            "output": {"category_id": "cat_001", "is_new_category": True, "match_score": 0.0}
+        }
+    ),
+
+    "art_classify": ToolDefinition(
+        name="art_classify",
+        description="Classify a pattern without learning (inference only)",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "classify", "pattern", "inference", "category", "match"],
+        parameters=["data", "vigilance"],
+        module="art_tools"
+    ),
+
+    "art_adjust_vigilance": ToolDefinition(
+        name="art_adjust_vigilance",
+        description="Adjust THE KEY DIAL - vigilance controls category granularity (0.9=fine, 0.3=coarse)",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "vigilance", "adjust", "granularity", "control", "dial"],
+        parameters=["vigilance", "instance"],
+        module="art_tools",
+        example={
+            "description": "Set vigilance for fine-grained categories",
+            "input": {"vigilance": 0.9, "instance": "main"},
+            "output": {"old_vigilance": 0.75, "new_vigilance": 0.9, "effect": "Very fine-grained"}
+        }
+    ),
+
+    "art_get_categories": ToolDefinition(
+        name="art_get_categories",
+        description="Get all learned ART categories with their prototypes and stats",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "categories", "clusters", "prototypes", "list", "stats"],
+        parameters=[],
+        module="art_tools"
+    ),
+
+    "art_hybrid_learn": ToolDefinition(
+        name="art_hybrid_learn",
+        description="Learn from transformer embeddings using ART Hybrid - combines semantic embeddings with ART clustering",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "hybrid", "embedding", "transformer", "learn", "cluster"],
+        parameters=["embedding", "content", "metadata"],
+        module="art_tools"
+    ),
+
+    "art_hybrid_find_similar": ToolDefinition(
+        name="art_hybrid_find_similar",
+        description="Find similar ART categories for an embedding without learning",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "hybrid", "similar", "find", "match", "embedding"],
+        parameters=["embedding", "top_k"],
+        module="art_tools"
+    ),
+
+    "art_get_stats": ToolDefinition(
+        name="art_get_stats",
+        description="Get comprehensive ART system statistics",
+        tier=ToolTier.WARM,
+        category="learning",
+        subcategory="art_clustering",
+        keywords=["art", "stats", "statistics", "status", "system"],
+        parameters=[],
+        module="art_tools"
+    ),
+
     # =========================================================================
     # COLD TIER - Loaded only on specific search (~90+ tools)
     # =========================================================================
@@ -795,7 +883,7 @@ CATEGORIES = {
     "memory": ["core", "retrieval", "versioning", "maintenance", "working", "semantic",
                "episodic", "emotional", "letta", "safla", "associations", "procedural"],
     "cluster": ["status", "knowledge", "goals", "learning", "beliefs", "coordination"],
-    "learning": ["action_tracking", "symbolic_regression", "self_improvement"],
+    "learning": ["action_tracking", "symbolic_regression", "self_improvement", "art_clustering"],
     "cognition": ["beliefs", "causality", "knowledge_graph", "metacognition"],
     "agent": ["identity", "session"],
     "execution": ["sandbox"],
