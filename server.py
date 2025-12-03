@@ -1014,6 +1014,14 @@ if __name__ == "__main__":
     except Exception as e:
         logger.warning(f"⚠️  AGI Memory Phase 4 integration skipped: {e}")
 
+    # Register ART (Adaptive Resonance Theory) tools - Online learning without catastrophic forgetting
+    try:
+        from art_tools import register_art_tools
+        register_art_tools(app)
+        logger.info("✅ ART tools integrated (Fuzzy ART clustering, vigilance control, hybrid architecture)")
+    except Exception as e:
+        logger.warning(f"⚠️  ART integration skipped: {e}")
+
     # Initialize Neural Memory Fabric for RAG tools
     nmf_instance = None
     try:
