@@ -127,6 +127,15 @@ class FuzzyART:
 
         logger.info(f"FuzzyART initialized: vigilance={vigilance}, lr={learning_rate}")
 
+    def reset(self) -> None:
+        """Reset all learned categories and statistics."""
+        self.categories = []
+        self.input_dim = None
+        self.total_inputs = 0
+        self.resonance_count = 0
+        self.new_category_count = 0
+        logger.info("FuzzyART reset: all categories cleared")
+
     def _normalize(self, x: np.ndarray) -> np.ndarray:
         """Normalize input to [0, 1] range"""
         x_min, x_max = x.min(), x.max()

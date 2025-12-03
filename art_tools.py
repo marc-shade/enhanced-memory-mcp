@@ -174,25 +174,24 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         vig = vigilance if vigilance is not None else art.vigilance
 
         # Find best matching category
-        best_match = None
+        best_match_cat = None
         best_score = -1.0
 
-        for cat_id, category in art.categories.items():
+        for category in art.categories:
             match_score = art._match_function(coded, category.prototype)
             if match_score > best_score:
                 best_score = match_score
-                best_match = cat_id
+                best_match_cat = category
 
-        if best_score >= vig:
-            category = art.categories[best_match]
+        if best_score >= vig and best_match_cat is not None:
             return {
                 "success": True,
                 "classified": True,
-                "category_id": best_match,
+                "category_id": best_match_cat.id,
                 "match_score": float(best_score),
                 "vigilance_threshold": vig,
-                "category_metadata": category.metadata,
-                "category_pattern_count": category.pattern_count
+                "category_metadata": best_match_cat.metadata,
+                "category_pattern_count": best_match_cat.match_count
             }
         else:
             return {
