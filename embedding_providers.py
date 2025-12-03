@@ -25,7 +25,6 @@ class ProviderType(Enum):
     OLLAMA = "ollama"
     VOYAGE = "voyage"
     COHERE = "cohere"
-    TPU = "tpu"
 
 
 @dataclass
@@ -238,16 +237,13 @@ class MLXProvider(EmbeddingProvider):
 
 
 class OllamaProvider(EmbeddingProvider):
-    """Ollama embedding provider (cloud-first for GPU acceleration)"""
+    """Ollama local embedding provider"""
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.model = config.get("model", "mxbai-embed-large")
         self.dimensions = config.get("dimensions", 1024)  # mxbai-embed-large uses 1024 dimensions
-        # Cloud-first Ollama for embeddings (prefer GPU nodes)
-        # Set OLLAMA_HOST to your inference node (e.g., http://your-gpu-node:11434)
-        default_url = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
-        self.base_url = config.get("base_url", default_url)
+        self.base_url = config.get("base_url", "http://localhost:11434")
 
     def is_available(self) -> bool:
         try:
@@ -408,130 +404,6 @@ class CohereProvider(EmbeddingProvider):
             return None
 
 
-class TPUProvider(EmbeddingProvider):
-    """
-    Google Coral Edge TPU embedding provider (local hardware acceleration)
-
-    NOTE: This provider produces 384-dim embeddings (MiniLM-L6-v2) which are
-    INCOMPATIBLE with the default 768-dim vector store. Use only for:
-    - Specialized tasks requiring smaller embeddings
-    - Comparison/benchmarking purposes
-    - Systems configured for 384-dim vectors
-
-    For standard enhanced-memory operations, prefer Google or OpenAI providers
-    which produce 768-dim embeddings matching the vector store.
-
-    Text embeddings actually run on CPU via sentence-transformers in coral-venv.
-    TPU hardware is used for IMAGE inference (MobileNet, EfficientNet, etc.)
-    """
-
-    # Path to coral-venv Python which has pycoral and sentence-transformers
-    CORAL_VENV_PYTHON = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "coral-venv/bin/python")
-    CORAL_TPU_SRC = os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "mcp-servers/coral-tpu-mcp/src")
-
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
-        self.model = config.get("model", "MiniLM-L6-v2")
-        self.dimensions = config.get("dimensions", 384)
-        self._tpu_checked = False
-        self._tpu_available = False
-
-    def is_available(self) -> bool:
-        """Check if TPU/coral-venv is available via subprocess"""
-        if self._tpu_checked:
-            return self._tpu_available
-
-        self._tpu_checked = True
-
-        import subprocess
-        from pathlib import Path
-
-        if not Path(self.CORAL_VENV_PYTHON).exists():
-            logger.info("coral-venv not found for TPU embeddings")
-            self._tpu_available = False
-            return False
-
-        try:
-            # Check if sentence-transformers is available in coral-venv
-            result = subprocess.run(
-                [self.CORAL_VENV_PYTHON, "-c",
-                 "from sentence_transformers import SentenceTransformer; print('ok')"],
-                capture_output=True, text=True, timeout=10
-            )
-            if result.returncode == 0 and "ok" in result.stdout:
-                self._tpu_available = True
-                logger.info("TPU/coral-venv embeddings available (384-dim, CPU-based)")
-                return True
-        except Exception as e:
-            logger.warning(f"TPU availability check failed: {e}")
-
-        self._tpu_available = False
-        return False
-
-    async def generate(self, text: str) -> Optional[EmbeddingResult]:
-        """Generate embedding via subprocess to coral-venv"""
-        start_time = time.time()
-
-        if not self.is_available():
-            return None
-
-        try:
-            import subprocess
-            import json
-
-            text = self._truncate_text(text, 512)  # Shorter context for MiniLM
-
-            # Python code to run in coral-venv
-            code = f'''
-import json
-from sentence_transformers import SentenceTransformer
-
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-text = {json.dumps(text)}
-embedding = model.encode([text], batch_size=1)[0].tolist()
-print(json.dumps({{"embedding": embedding, "dimensions": len(embedding)}}))
-'''
-
-            result = subprocess.run(
-                [self.CORAL_VENV_PYTHON, "-c", code],
-                capture_output=True, text=True, timeout=30
-            )
-
-            if result.returncode != 0:
-                logger.warning(f"TPU embedding subprocess failed: {result.stderr[:200]}")
-                return None
-
-            data = json.loads(result.stdout.strip())
-            embedding = data.get("embedding", [])
-
-            if not embedding:
-                logger.warning("TPU embed_text returned empty embedding")
-                return None
-
-            latency_ms = (time.time() - start_time) * 1000
-
-            logger.debug(f"TPU embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
-
-            return EmbeddingResult(
-                embedding=embedding,
-                provider="tpu",
-                model=self.model,
-                dimensions=len(embedding),
-                latency_ms=latency_ms,
-                cost_estimate=0.0  # Local is free
-            )
-
-        except subprocess.TimeoutExpired:
-            logger.warning("TPU embedding timed out")
-            return None
-        except json.JSONDecodeError as e:
-            logger.warning(f"TPU embedding invalid JSON: {e}")
-            return None
-        except Exception as e:
-            logger.warning(f"TPU embedding failed: {e}")
-            return None
-
-
 class EmbeddingManager:
     """
     Manages multiple embedding providers with automatic fallback
@@ -541,10 +413,8 @@ class EmbeddingManager:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.providers: Dict[str, EmbeddingProvider] = {}
-        # Prefer TPU as primary when available (local, fast, free)
-        self.primary_provider = config.get("primary", "tpu")
-        # Fallback chain: TPU first (local hardware), then cloud services
-        self.fallback_chain = config.get("fallback", ["tpu", "ollama", "google", "openai", "mlx"])
+        self.primary_provider = config.get("primary", "google")
+        self.fallback_chain = config.get("fallback", ["openai", "ollama", "mlx"])
 
         # Initialize providers
         self._init_providers()
@@ -557,8 +427,7 @@ class EmbeddingManager:
             "mlx": MLXProvider,
             "ollama": OllamaProvider,
             "voyage": VoyageProvider,
-            "cohere": CohereProvider,
-            "tpu": TPUProvider
+            "cohere": CohereProvider
         }
 
         providers_config = self.config.get("providers", {})

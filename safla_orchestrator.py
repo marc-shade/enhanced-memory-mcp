@@ -583,17 +583,14 @@ class SAFLAOrchestrator:
             row = cursor.fetchone()
             analysis["procedural_memory"] = dict(row)
 
-            # Generate recommendations (with null-safety checks)
-            working_expired = analysis["working_memory"].get("expired") or 0
-            if working_expired > 10:
+            # Generate recommendations
+            if analysis["working_memory"]["expired"] > 10:
                 analysis["recommendations"].append("High number of expired working memory items - consider running cleanup")
 
-            episodic_total = analysis["episodic_memory"].get("total") or 0
-            if episodic_total > 1000:
+            if analysis["episodic_memory"]["total"] > 1000:
                 analysis["recommendations"].append("Large episodic memory - consider consolidating to semantic")
 
-            procedural_success = analysis["procedural_memory"].get("avg_success_rate")
-            if procedural_success is not None and procedural_success < 0.5:
+            if analysis["procedural_memory"]["avg_success_rate"] and analysis["procedural_memory"]["avg_success_rate"] < 0.5:
                 analysis["recommendations"].append("Low average skill success rate - review and refine procedures")
 
             return analysis

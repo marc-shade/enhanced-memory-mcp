@@ -57,62 +57,15 @@ class ReasoningPrioritizer:
             r'for\s*\(',
             r'if\s*\(',
             r'\{[^}]*\}',
-            r'async\s+def',
-            r'return\s+',
-            r'lambda\s+',
         ]
 
-        # Math patterns - EXPANDED
+        # Math patterns
         self.math_patterns = [
             r'\$.*?\$',
-            r'theorem|lemma|proof|corollary|axiom',
-            r'\\frac|\\sum|\\int|\\prod',
+            r'theorem|lemma|proof|corollary',
+            r'\\frac|\\sum|\\int',
             r'\d+\s*[+\-*/]\s*\d+',
-            r'∀|∃|∈|∉|⊂|⊃|∪|∩',
-            r'O\([nlogN²³]+\)',  # Big-O notation
-            r'Ω\([nlogN²³]+\)',  # Big-Omega notation
-            r'Θ\([nlogN²³]+\)',  # Big-Theta notation
-            r'bijection|isomorphism|homomorphism',
-            r'matrix|vector|tensor|eigenvalue',
-            r'derivative|integral|limit|convergence',
-            r'probability|expectation|variance',
-            r'gradient|jacobian|hessian',
-            r'algebra|topology|geometry|calculus',
-            r'induction|recursion|iteration',
-            r'∇|∂|∫|∑|∏',  # Math operators
-        ]
-
-        # Algorithm/CS Theory patterns - NEW
-        self.algorithm_patterns = [
-            r'algorithm|algorithmic',
-            r'complexity|time complexity|space complexity',
-            r'O\(n\)|O\(log n\)|O\(n\^2\)|O\(1\)',
-            r'divide[- ]and[- ]conquer',
-            r'dynamic programming|greedy|backtracking',
-            r'breadth[- ]first|depth[- ]first|BFS|DFS',
-            r'graph|tree|heap|hash|stack|queue',
-            r'sorting|searching|traversal',
-            r'optimization|optimize|optimal',
-            r'data structure|linked list|binary tree',
-            r'partition|pivot|merge|quicksort|mergesort',
-            r'NP[- ]complete|NP[- ]hard|polynomial time',
-            r'recursion|recursive|base case',
-            r'invariant|precondition|postcondition',
-            r'amortized|worst[- ]case|average[- ]case|best[- ]case',
-        ]
-
-        # Theoretical CS patterns - NEW
-        self.theory_patterns = [
-            r'automata|turing machine|finite state',
-            r'decidable|undecidable|halting problem',
-            r'P vs NP|computational complexity',
-            r'type theory|type system|polymorphism',
-            r'lambda calculus|functional programming',
-            r'formal verification|model checking',
-            r'logic programming|prolog',
-            r'compiler|parser|lexer|AST',
-            r'semantics|syntax|grammar',
-            r'category theory|monad|functor',
+            r'∀|∃|∈|∉|⊂|⊃',
         ]
 
         # Science patterns
@@ -122,93 +75,24 @@ class ReasoningPrioritizer:
             r'p\s*[<>=]\s*0\.\d+',
             r'DNA|RNA|protein',
             r'velocity|acceleration|force',
-            r'statistical significance|confidence interval',
-            r'control group|experimental group',
-            r'correlation|causation|causal',
         ]
 
-        # Logic patterns - EXPANDED
+        # Logic patterns
         self.logic_patterns = [
             r'if\s+.*\s+then',
-            r'therefore|thus|hence|consequently',
-            r'assume|suppose|given|let\s+',
+            r'therefore|thus|hence',
+            r'assume|suppose|given',
             r'necessary|sufficient',
-            r'implies|implication|entails',
-            r'contradiction|contrapositive',
-            r'∧|∨|¬|→|↔',  # Logic operators
-            r'forall|exists|quantifier',
-            r'syllogism|modus ponens|modus tollens',
-            r'deduction|induction|abduction',
-            r'inference|reasoning|rational',
         ]
 
-        # Numerical/Optimization patterns - NEW
-        self.numerical_patterns = [
-            r'gradient descent|backpropagation',
-            r'neural network|deep learning|CNN|RNN|LSTM',
-            r'optimization problem|minimize|maximize',
-            r'convex|concave|saddle point',
-            r'learning rate|momentum|adam optimizer',
-            r'loss function|cost function|objective',
-            r'regularization|overfitting|underfitting',
-            r'cross[- ]validation|train[- ]test split',
-            r'precision|recall|F1[- ]score|accuracy',
-            r'regression|classification|clustering',
-        ]
-
-        # Visual patterns (expanded for comprehensive visual/spatial detection)
+        # Visual patterns
         self.visual_patterns = [
-            # Basic visual terms
-            r'color|colour|red|blue|green|yellow|orange|purple|pink|hue|saturation|brightness',
-            r'shape|circle|square|triangle|rectangle|polygon|ellipse|curve',
-            r'image|picture|photo|photograph|screenshot|thumbnail|icon|illustration',
-            r'looks like|appears|visible|visual|sight|seen|view|display',
-            r'left|right|top|bottom|center|middle|corner|edge|border|margin|padding',
-
-            # Spatial reasoning
-            r'spatial|position|location|coordinate|x-axis|y-axis|z-axis|dimension',
-            r'rotate|rotation|translate|scale|transform|perspective|projection',
-            r'distance|proximity|overlap|intersect|adjacent|parallel|perpendicular',
-            r'width|height|depth|size|area|volume|aspect ratio',
-            r'3D|2D|three-dimensional|two-dimensional|isometric|orthographic',
-
-            # UI/UX design
-            r'layout|grid|flexbox|responsive|breakpoint|viewport|mobile|desktop',
-            r'typography|font|typeface|serif|sans-serif|kerning|leading|baseline',
-            r'whitespace|negative space|visual hierarchy|contrast|alignment',
-            r'button|input|form|card|modal|dropdown|navigation|menu|tab',
-            r'hover|focus|active|disabled|animation|transition|easing',
-
-            # Data visualization
-            r'chart|graph|plot|diagram|infographic|dashboard|visualization',
-            r'bar chart|line chart|pie chart|scatter|histogram|heatmap|treemap',
-            r'axis|legend|label|tooltip|annotation|gridline|tick mark',
-            r'sparkline|gauge|KPI|metric|trend|comparison',
-
-            # Graphics and rendering
-            r'pixel|resolution|DPI|PPI|retina|vector|raster|bitmap|SVG|PNG|JPEG',
-            r'render|draw|paint|stroke|fill|gradient|shadow|blur|opacity|alpha',
-            r'layer|z-index|composite|blend mode|mask|clip|filter',
-            r'vertex|fragment|shader|texture|mesh|polygon|primitive',
-            r'lighting|ambient|diffuse|specular|reflection|refraction',
-
-            # Computer vision
-            r'edge detection|segmentation|feature|keypoint|descriptor|SIFT|SURF',
-            r'convolution|kernel|filter|pooling|CNN|object detection|classification',
-            r'bounding box|mask|contour|region|blob|corner|Harris',
-            r'optical flow|tracking|motion|stereo|depth map|point cloud',
-
-            # Cartography/GIS
-            r'map|geographic|latitude|longitude|projection|Mercator|GIS|tile',
-            r'choropleth|marker|polygon|polyline|geofence|geocode',
-
-            # Composition and design
-            r'composition|rule of thirds|golden ratio|focal point|balance|symmetry',
-            r'foreground|background|midground|depth|framing|leading line',
-            r'gestalt|proximity|similarity|continuity|closure|figure-ground',
-
-            # Accessibility
-            r'WCAG|contrast ratio|colorblind|accessibility|alt text|screen reader',
+            r'color|colour|red|blue|green',
+            r'shape|circle|square|triangle',
+            r'image|picture|photo',
+            r'looks like|appears',
+            r'visual|visible|sight',
+            r'left|right|top|bottom',
         ]
 
     def classify_content(self, content: str) -> PriorityScore:
@@ -224,27 +108,15 @@ class ReasoningPrioritizer:
         # Calculate scores for each content type
         code_score = self._calculate_pattern_score(content, self.code_patterns)
         math_score = self._calculate_pattern_score(content, self.math_patterns)
-        algorithm_score = self._calculate_pattern_score(content, self.algorithm_patterns)
-        theory_score = self._calculate_pattern_score(content, self.theory_patterns)
         science_score = self._calculate_pattern_score(content, self.science_patterns)
         logic_score = self._calculate_pattern_score(content, self.logic_patterns)
-        numerical_score = self._calculate_pattern_score(content, self.numerical_patterns)
         visual_score = self._calculate_pattern_score(content, self.visual_patterns)
 
-        # Overall reasoning score (max of all reasoning-related scores)
-        reasoning_score = max(
-            code_score,
-            math_score,
-            algorithm_score,
-            theory_score,
-            science_score,
-            logic_score,
-            numerical_score
-        )
+        # Overall reasoning score
+        reasoning_score = max(code_score, math_score, science_score, logic_score)
 
         # Determine category and weight
-        # Lower threshold to 0.3 to catch more reasoning content
-        if reasoning_score > 0.3:
+        if reasoning_score > 0.5:
             category = ContentCategory.REASONING_CENTRIC
             weight = 0.75
         elif visual_score > 0.5:
@@ -406,14 +278,13 @@ class ReasoningPrioritizer:
             else:
                 return "working"  # Active reasoning
 
-        # Visual content gets working tier to maintain 15% balance (75/15/10 rule)
+        # Visual and general content mostly in reference
         elif priority.category == ContentCategory.VISUAL_CENTRIC:
-            if access_count > 10 or priority.visual_score > 0.8:
-                return "core"  # High-value visual patterns
-            else:
-                return "working"  # Active visual content (not demoted to reference)
+            if access_count > 20:  # Very frequently accessed visual
+                return "working"
+            return "reference"
 
-        else:  # General content - lowest priority
+        else:  # General content
             return "reference"
 
 

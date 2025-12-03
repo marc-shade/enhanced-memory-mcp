@@ -4,14 +4,14 @@
 storage:
   # SQLite for metadata and core storage
   sqlite:
-    path: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/databases/mcp/enhanced_memories.db"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
+    path: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/databases/mcp/enhanced_memories.db"
     wal_mode: true
     cache_size: 10000
 
   # Qdrant for vector embeddings
   vector:
     backend: "qdrant"
-    host: "127.0.0.1"
+    host: "localhost"
     port: 6333
     collection: "enhanced_memory"
     distance_metric: "Cosine"
@@ -21,7 +21,7 @@ storage:
 
   # File-based portable storage
   files:
-    root: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agent-memory/nmf_files"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
+    root: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agent-memory/nmf_files"
     compression: true
     max_file_size: "10MB"
 
@@ -60,9 +60,8 @@ embeddings:
     ollama:
       model: "nomic-embed-text"
       dimensions: 768
-      # Cloud-first Ollama (embeddings can run locally but prefer cloud GPU)
-      base_url: "${OLLAMA_HOST:-http://Marcs-orchestrator.example.local:11434}"
-      local: false  # Use cloud GPU nodes for better performance
+      base_url: "http://localhost:11434"
+      local: true
 
     # Additional experimental providers
     voyage:
@@ -77,20 +76,6 @@ embeddings:
       api_key_env: "COHERE_API_KEY"
       input_type: "search_document"
       rate_limit: 100
-
-    # Google Coral TPU - available for specialized tasks
-    # NOTE: Text embeddings are 384-dim (MiniLM), incompatible with 768-dim vector store
-    # Use TPU for: intent classification, importance scoring, visual embeddings
-    tpu:
-      model: "MiniLM-L6-v2"
-      dimensions: 384  # Different from vector_size - use for specialized tasks only
-      local: true
-      # TPU capabilities (via coral-tpu MCP):
-      # - classify_intent: Fast intent classification
-      # - score_importance: Memory importance scoring
-      # - classify_image: MobileNet V2 image classification
-      # - get_visual_embedding: Visual feature extraction
-      # - detect_anomaly: Anomaly detection
 
 # Memory tier configuration
 tiers:
@@ -213,13 +198,13 @@ benchmarking:
     - "ollama"
 
   # Output
-  results_path: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/logs/nmf_benchmark_results.json"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
+  results_path: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/logs/nmf_benchmark_results.json"
 
 # Logging
 logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/logs/nmf.log"  # TODO: Use ${AGENTIC_SYSTEM_PATH} or env var
+  file: "${AGENTIC_SYSTEM_PATH:-/opt/agentic}/logs/nmf.log"
   max_size_mb: 100
   backup_count: 3
 

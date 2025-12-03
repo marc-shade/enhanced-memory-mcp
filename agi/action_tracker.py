@@ -80,22 +80,22 @@ class ActionTracker:
             success_score
         )
 
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)  # Wait up to 30s for lock
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
         cursor.execute(
             '''
             INSERT INTO action_outcomes (
-                agent_id, entity_id, session_id,
+                entity_id, session_id,
                 action_type, action_description, action_context,
                 expected_result, actual_result,
                 success_score, outcome_category,
                 learning_extracted, will_retry,
                 executed_at, duration_ms, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
-                self.agent_id, entity_id, session_id,
+                entity_id, session_id,
                 action_type, action_description, action_context,
                 expected_result, actual_result,
                 success_score, outcome_category,
@@ -124,7 +124,7 @@ class ActionTracker:
 
         Returns most recent similar actions with outcomes
         """
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)  # Wait up to 30s for lock
+        conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -190,7 +190,7 @@ class ActionTracker:
         """
         cutoff_time = datetime.now() - timedelta(hours=time_window_hours)
 
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
         cursor.execute(
@@ -230,7 +230,7 @@ class ActionTracker:
 
         Returns list of learning strings
         """
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
         cursor.execute(
@@ -278,7 +278,7 @@ class ActionTracker:
                 "suggested_changes": List[str]
             }
         """
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -331,7 +331,7 @@ class ActionTracker:
 
     def get_action_statistics(self) -> Dict[str, Any]:
         """Get overall action statistics"""
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
         # Total actions

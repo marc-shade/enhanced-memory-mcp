@@ -187,7 +187,7 @@ class SelfImprovement:
             (cycle_id,)
         )
         row = cursor.fetchone()
-        baseline_performance = float(row[0]) if row and row[0] is not None else 0.0
+        baseline_performance = row[0] if row else 0.0
 
         # Calculate improvement
         improvement_delta = new_performance - baseline_performance

@@ -103,18 +103,9 @@ class MemoryDatabase:
         return compressed
 
     def _decompress_data(self, compressed: bytes) -> Any:
-        """Decompress data - handles both pickle and JSON formats for backwards compatibility"""
+        """Decompress data"""
         decompressed = zlib.decompress(compressed)
-        # Try pickle first (new format)
-        try:
-            return pickle.loads(decompressed)
-        except (pickle.UnpicklingError, Exception):
-            # Fall back to JSON (old format from before migration)
-            try:
-                return json.loads(decompressed.decode('utf-8'))
-            except Exception:
-                # Return as raw string if all else fails
-                return {"observations": [decompressed.decode('utf-8', errors='replace')]}
+        return pickle.loads(decompressed)
 
     def _calculate_checksum(self, data: bytes) -> str:
         """Calculate SHA-256 checksum"""
@@ -150,43 +141,28 @@ class MemoryDatabase:
                     cursor.execute("SELECT id FROM entities WHERE name = ?", (name,))
                     existing = cursor.fetchone()
 
-                    # Get tier and importance from entity (set by TPU scoring in server.py)
-                    tier = entity.get("tier", "working")
-                    importance_score = entity.get("importance_score")
-
                     if existing:
-                        # Update existing entity (preserve tier if not provided)
-                        if tier != "working":  # Only update tier if explicitly set
-                            cursor.execute('''
-                                UPDATE entities
-                                SET entity_type = ?, compressed_data = ?, original_size = ?,
-                                    compressed_size = ?, compression_ratio = ?, checksum = ?, tier = ?,
-                                    access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP,
-                                    current_version = current_version + 1
-                                WHERE name = ?
-                            ''', (entity_type, compressed, original_size, compressed_size,
-                                  compression_ratio, checksum, tier, name))
-                        else:
-                            cursor.execute('''
-                                UPDATE entities
-                                SET entity_type = ?, compressed_data = ?, original_size = ?,
-                                    compressed_size = ?, compression_ratio = ?, checksum = ?,
-                                    access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP,
-                                    current_version = current_version + 1
-                                WHERE name = ?
-                            ''', (entity_type, compressed, original_size, compressed_size,
-                                  compression_ratio, checksum, name))
+                        # Update existing entity
+                        cursor.execute('''
+                            UPDATE entities
+                            SET entity_type = ?, compressed_data = ?, original_size = ?,
+                                compressed_size = ?, compression_ratio = ?, checksum = ?,
+                                access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP,
+                                current_version = current_version + 1
+                            WHERE name = ?
+                        ''', (entity_type, compressed, original_size, compressed_size,
+                              compression_ratio, checksum, name))
                         results["updated"] += 1
                         entity_id = existing[0]
                     else:
-                        # Create new entity with tier from TPU scoring
+                        # Create new entity
                         cursor.execute('''
                             INSERT INTO entities
                             (name, entity_type, compressed_data, original_size, compressed_size,
-                             compression_ratio, checksum, tier)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                             compression_ratio, checksum)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
                         ''', (name, entity_type, compressed, original_size, compressed_size,
-                              compression_ratio, checksum, tier))
+                              compression_ratio, checksum))
                         results["created"] += 1
                         entity_id = cursor.lastrowid
 

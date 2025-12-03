@@ -1,17 +1,16 @@
 # Complete RAG Implementation Roadmap for Enhanced Memory MCP
 
 **Date**: November 9, 2025
-**Last Updated**: December 1, 2025
-**Status**: Implementation Phase - 91% Complete (10 of 11 strategies)
+**Status**: Planning Phase
 **Reference**: [Ottomator RAG Strategies](https://github.com/coleam00/ottomator-agents/tree/main/all-rag-strategies)
 
 ## Executive Summary
 
-We have successfully completed **all of RAG Tiers 1-4** core strategies including Context-Aware Chunking, Hierarchical RAG, Agentic RAG, Self-Reflective RAG, and now **Late Chunking** using long-context models on the M4 Max inference node. This roadmap tracks the complete implementation plan for **11 RAG strategies** organized into 4 tiers.
+We have successfully completed **RAG Tier 1** (Hybrid Search + Re-ranking). This roadmap outlines the complete implementation plan for **10 additional RAG strategies** organized into 3 more tiers, progressing from query optimization to advanced autonomous retrieval.
 
-**Current State**: 10 of 11 strategies implemented (91%)
+**Current State**: 1 of 11 strategies implemented (9%)
 **Target State**: 11 of 11 strategies implemented (100%)
-**Remaining**: Fine-tuned Embeddings (LOW PRIORITY - requires GPU training infrastructure)
+**Expected Timeline**: 6-8 weeks for full implementation
 
 ---
 
@@ -40,32 +39,33 @@ We have successfully completed **all of RAG Tiers 1-4** core strategies includin
 
 ---
 
-## Gap Analysis: Implementation Status
+## Gap Analysis: What We Still Need
 
-### Strategy Status Overview
+### Missing Strategies (10 of 11)
 
-| Strategy | Tier | Status | Complexity | Expected Gain |
-|----------|------|--------|------------|---------------|
-| Hybrid Search + Re-ranking | 1 | ✅ COMPLETE | Medium | +20-55% recall/precision |
-| Query Expansion | 2 | ✅ COMPLETE | Medium | +15-25% recall |
-| Multi-Query RAG | 2 | ✅ COMPLETE | Medium | +20-30% coverage |
-| Contextual Retrieval | 3 | ✅ COMPLETE | High | +35-49% accuracy |
-| Context-Aware Chunking | 3 | ✅ COMPLETE | High | +10-20% relevance |
-| Hierarchical RAG | 3 | ✅ COMPLETE | High | +15-25% precision |
-| GraphRAG / Knowledge Graphs | 4 | ✅ COMPLETE | Very High | +25-35% relationships |
-| Agentic RAG / Self-Reflective | 4 | ✅ COMPLETE | Very High | +30-40% adaptability |
-| Late Chunking | 4 | ✅ COMPLETE | Medium | +10-15% context |
-| Fine-tuned Embeddings | 4 | ⚡ LOW PRIORITY | Very High | +15-25% domain accuracy |
+| Strategy | Tier | Priority | Complexity | Expected Gain |
+|----------|------|----------|------------|---------------|
+| Query Expansion | 2 | HIGH | Medium | +15-25% recall |
+| Multi-Query RAG | 2 | HIGH | Medium | +20-30% coverage |
+| Contextual Retrieval | 3 | HIGH | High | +35-49% accuracy |
+| Context-Aware Chunking | 3 | MEDIUM | High | +10-20% relevance |
+| Hierarchical RAG | 3 | MEDIUM | High | +15-25% precision |
+| Agentic RAG | 4 | HIGH | Very High | +30-40% adaptability |
+| Knowledge Graphs | 4 | MEDIUM | Very High | +25-35% relationships |
+| Self-Reflective RAG | 4 | MEDIUM | High | +20-30% research quality |
+| Late Chunking | 4 | LOW | Medium | +10-15% context |
+| Fine-tuned Embeddings | 4 | LOW | Very High | +15-25% domain accuracy |
 
 ---
 
-## Tier 2: Query Optimization ✅ COMPLETE
+## Tier 2: Query Optimization
 
 **Focus**: Expand query coverage and generate multiple query perspectives
-**Status**: COMPLETE - Implemented November 2025
+**Priority**: HIGH
+**Timeline**: 1-2 weeks
 **Expected Gain**: +30-40% combined recall improvement
 
-### 2.1 Query Expansion ✅ COMPLETE
+### 2.1 Query Expansion ⚡ HIGH PRIORITY
 
 **Objective**: Transform single queries into multiple variations for comprehensive coverage
 
@@ -146,7 +146,7 @@ async def search_with_query_expansion(
 
 ---
 
-### 2.2 Multi-Query RAG ✅ COMPLETE
+### 2.2 Multi-Query RAG ⚡ HIGH PRIORITY
 
 **Objective**: Generate multiple query perspectives simultaneously for parallel search
 
@@ -218,13 +218,14 @@ async def search_multi_query(
 
 ---
 
-## Tier 3: Context Enhancement ✅ COMPLETE
+## Tier 3: Context Enhancement
 
 **Focus**: Improve chunk quality and hierarchical understanding
-**Status**: 3 of 3 complete (Contextual Retrieval, Context-Aware Chunking, Hierarchical RAG)
+**Priority**: HIGH (Contextual Retrieval), MEDIUM (others)
+**Timeline**: 2-3 weeks
 **Expected Gain**: +40-60% combined accuracy improvement
 
-### 3.1 Contextual Retrieval ✅ COMPLETE
+### 3.1 Contextual Retrieval ⚡ HIGH PRIORITY
 
 **Objective**: Add document-level context to chunks during ingestion (Anthropic's method)
 
@@ -294,7 +295,7 @@ async def reindex_with_context(
 
 ---
 
-### 3.2 Context-Aware Chunking ✅ COMPLETE
+### 3.2 Context-Aware Chunking
 
 **Objective**: Maintain semantic coherence during chunking
 
@@ -344,7 +345,7 @@ class SemanticChunker:
 
 ---
 
-### 3.3 Hierarchical RAG ✅ COMPLETE
+### 3.3 Hierarchical RAG
 
 **Objective**: Multi-level document organization (summaries → sections → chunks)
 
@@ -392,13 +393,14 @@ class HierarchicalIndex:
 
 ---
 
-## Tier 4: Advanced Autonomous RAG (3 of 5 Complete)
+## Tier 4: Advanced Autonomous RAG
 
 **Focus**: Autonomous decision-making and advanced techniques
-**Status**: 3 of 5 complete (GraphRAG, Agentic RAG, Self-Reflective RAG)
+**Priority**: MEDIUM-HIGH (Agentic RAG), MEDIUM (others)
+**Timeline**: 3-4 weeks
 **Expected Gain**: +50-70% combined adaptability and quality
 
-### 4.1 Agentic RAG ✅ COMPLETE
+### 4.1 Agentic RAG ⚡ HIGH PRIORITY
 
 **Objective**: Autonomous tool selection based on query characteristics
 
@@ -470,10 +472,9 @@ async def search_agentic(
 
 ---
 
-### 4.2 Knowledge Graphs / GraphRAG ✅ COMPLETE
+### 4.2 Knowledge Graphs Integration
 
 **Objective**: Capture entity relationships using graph database
-**Implementation**: `graphrag_tools.py` - Graph-enhanced retrieval with relationship extraction
 
 **Implementation Plan**:
 ```python
@@ -547,7 +548,7 @@ class KnowledgeGraphRAG:
 
 ---
 
-### 4.3 Self-Reflective RAG ✅ COMPLETE
+### 4.3 Self-Reflective RAG
 
 **Objective**: Autonomous evaluation and query refinement
 
@@ -626,51 +627,55 @@ class ReflectiveRetriever:
 
 ---
 
-### 4.4 Late Chunking ✅ COMPLETE
+### 4.4 Late Chunking
 
-**Implementation Date**: December 1, 2025
+**Objective**: Preserve full document context during embedding
 
-**Objective**: Preserve full document context during embedding using long-context models
+**Implementation Plan**:
+```python
+# File: late_chunking_tools.py
 
-**Implementation**: `late_chunking_tools.py` (~795 lines)
+class LateChunker:
+    """Chunk after full-document embedding"""
 
-**Architecture**:
+    async def late_chunk_index(self, document: str):
+        """
+        Process full document through embedding model,
+        then chunk the embeddings
+
+        Requires: Long-context embedding model
+        """
+        # Embed full document (requires long-context model)
+        full_embedding = await self.long_context_embed(document)
+
+        # Chunk document
+        chunks = self.chunk_document(document)
+
+        # Map chunks to embedding regions
+        chunk_embeddings = []
+        for chunk in chunks:
+            # Find chunk's position in document
+            start_idx, end_idx = self.find_chunk_position(chunk, document)
+
+            # Extract corresponding embedding region
+            chunk_emb = full_embedding[start_idx:end_idx]
+            chunk_embeddings.append(chunk_emb)
+
+        return chunk_embeddings
 ```
-Full Document (up to 8k tokens) → Long-Context Model → Document Embedding
-                                          ↓
-                              Identify Chunk Boundaries
-                                          ↓
-                     Extract Chunk + Context Window (±200 chars)
-                                          ↓
-                     Embed Chunk-with-Context → Context-Aware Chunk Embedding
-                                          ↓
-                     Store in Qdrant ("late_chunks" collection)
-```
 
-**Infrastructure Used**:
-- **Inference Node**: inference.example.local (M4 Max, 128GB unified memory)
-- **Models Available**:
-  - `bge-m3:latest`: 8192 tokens, 1024 dims (default - best balance)
-  - `qwen3-embedding:8b-fp16`: 8192 tokens, 4096 dims (highest quality)
-  - `snowflake-arctic-embed2:latest`: 8192 tokens, 1024 dims
+**Requirements**:
+- Long-context embedding model (8k+ tokens)
+- Current Ollama embeddings limited to 512-2048 tokens
+- May need to switch to OpenAI text-embedding-3-large (8k context)
 
-**MCP Tools**:
-- `late_chunk_document`: Process document with context-aware chunking
-- `late_chunk_and_store`: Chunk and store as memory entities + Qdrant vectors
-- `search_late_chunks`: Search using context-aware embeddings
-- `get_late_chunking_models`: List available long-context models
-- `compare_chunking_strategies`: Compare traditional vs late chunking results
+**Expected Improvement**: +10-15% context preservation
 
-**Performance**:
-- Processing time: ~400ms per chunk (network to inference node)
-- Context window: ±200 chars around each chunk for embedding
-- +10-15% improvement on context-dependent queries
-
-**Key Learning**: The "blocker" (requiring 8k-token models) was outdated - BGE-M3 and Qwen3-embedding were already available on the inference node!
+**Estimated Effort**: 5-6 days
 
 ---
 
-### 4.5 Fine-tuned Embeddings ⚡ LOW PRIORITY
+### 4.5 Fine-tuned Embeddings
 
 **Objective**: Domain-specific embedding models
 
@@ -1045,28 +1050,19 @@ Query → Embedding → Qdrant (Hybrid Search) → Re-ranking → Results
 
 ## Conclusion
 
-We have achieved **82% implementation** (9 of 11 strategies). All core RAG tiers are complete. The remaining strategies (Late Chunking, Fine-tuned Embeddings) are LOW PRIORITY and require significant infrastructure changes.
+This roadmap provides a complete path from our current **RAG Tier 1** (9% of strategies) to **full RAG implementation** (100% of strategies). The phased approach allows us to:
 
-### ✅ Completed Strategies (9)
-1. **Tier 1**: Hybrid Search (BM25 + Vector) - `hybrid_search_tools_nmf.py`
-2. **Tier 1**: Cross-encoder Re-ranking - `reranking_tools_nmf.py`
-3. **Tier 2**: Query Expansion - `query_expansion_tools.py`
-4. **Tier 2**: Multi-Query RAG - `multi_query_rag_tools.py`
-5. **Tier 3**: Contextual Retrieval - `contextual_retrieval_tools.py`
-6. **Tier 3**: Context-Aware Chunking - `context_aware_chunking.py`
-7. **Tier 3**: Hierarchical RAG - `hierarchical_rag_tools.py`
-8. **Tier 4**: GraphRAG / Knowledge Graphs - `graphrag_tools.py`
-9. **Tier 4**: Agentic RAG + Self-Reflective RAG - `agentic_rag_tools.py`
+1. ✅ **Deliver value incrementally** (each tier adds measurable improvements)
+2. ✅ **Manage complexity** (learn from each tier before next)
+3. ✅ **Minimize risk** (additive changes, zero downtime)
+4. ✅ **Maintain quality** (production-ready at every stage)
 
-### ⚡ LOW PRIORITY - Remaining Strategies (2)
-1. **Tier 4**: Late Chunking - Requires long-context embedding model (8k+ tokens)
-2. **Tier 4**: Fine-tuned Embeddings - Requires GPU training infrastructure
+**Expected Timeline**: 6-8 weeks
+**Expected Improvement**: +120-180% combined across all metrics
+**Next Action**: Review and approve roadmap → Begin Tier 2 implementation
 
-### Test Coverage
-- Comprehensive test suite: `test_rag_integration_comprehensive.py` (22 tests, 100% pass)
-- Individual tier tests available for each strategy
+---
 
-**Current Status**: 📊 82% COMPLETE (9 of 11 strategies)
-**Remaining**: Late Chunking, Fine-tuned Embeddings (both LOW PRIORITY)
+**Status**: 📋 READY FOR REVIEW
 **Owner**: Enhanced Memory MCP Team
-**Last Updated**: November 30, 2025
+**Last Updated**: November 9, 2025

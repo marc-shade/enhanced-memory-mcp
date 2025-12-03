@@ -370,12 +370,10 @@ def _explain_tier_change(from_tier: str, to_tier: str, priority, access_count: i
             return "Low access count despite reasoning content"
 
     elif priority.category == ContentCategory.VISUAL_CENTRIC:
-        if to_tier == "core":
-            return f"Promoted to core: high-value visual content (accessed {access_count} times)"
-        elif to_tier == "working":
-            return "Kept in working: visual content maintains 15% balance (75/15/10 rule)"
+        if to_tier == "reference":
+            return "Moved to reference: visual content is lower priority"
         else:
-            return f"Moved to reference: low access visual content"
+            return f"Kept in {to_tier}: high access count ({access_count})"
 
     else:  # General
         return "Moved to reference: general content is lowest priority"

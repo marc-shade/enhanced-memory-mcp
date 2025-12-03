@@ -1,28 +1,14 @@
 """
 Core Memory Operations API
 Provides Python functions for agent code execution
-With integrated eval tracking for self-improvement
 """
 
 from typing import List, Dict, Any, Optional
 import sys
-import time
 from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Add SHARED evals to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'SHARED'))
-
-# Import eval tracking (graceful fallback if not available)
-try:
-    from evals import record_memory_retrieval, record_eval
-    EVALS_ENABLED = True
-except ImportError:
-    EVALS_ENABLED = False
-    def record_memory_retrieval(*args, **kwargs): pass
-    def record_eval(*args, **kwargs): pass
 
 def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
@@ -77,7 +63,6 @@ def search_nodes(
     """
     from memory_client import MemoryClient
 
-    start_time = time.time()
     client = MemoryClient()
     results = client.search_nodes(query, limit)
 
@@ -86,17 +71,6 @@ def search_nodes(
         results = [r for r in results if r.get('entityType') == entity_type]
     if min_confidence > 0:
         results = [r for r in results if r.get('confidence', 0) >= min_confidence]
-
-    # Track retrieval quality for self-improvement
-    latency_ms = (time.time() - start_time) * 1000
-    avg_relevance = sum(r.get('score', r.get('confidence', 0.5)) for r in results) / max(len(results), 1)
-    record_memory_retrieval(
-        query=query,
-        results_count=len(results),
-        relevance_score=avg_relevance,
-        latency_ms=latency_ms,
-        retrieval_type="standard"
-    )
 
     return results
 

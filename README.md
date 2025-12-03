@@ -151,6 +151,14 @@ previous_state = await memory.search_nodes({
 })
 ```
 
+## Why Not Video Encoding?
+
+After extensive testing with actual video-based memory systems:
+- Video encoding makes data **134x larger** (not compressed!)
+- Search operations are **354x slower**
+- Added complexity without benefits
+- SQLite provides actual compression and instant access
+
 ## Storage Location
 
 All data is stored in `~/.claude/enhanced_memories/`:

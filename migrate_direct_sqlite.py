@@ -9,7 +9,6 @@ import logging
 import sqlite3
 import sys
 from pathlib import Path
-import os
 
 # Add parent directory for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -23,8 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database path from get_memory_status
-DB_PATH = os.path.join(os.environ.get("HOME", "${HOME}"), ".claude/enhanced_memories/memory.db")
+# Database path - uses home directory
+DB_PATH = str(Path.home() / ".claude/enhanced_memories/memory.db")
 
 
 async def main():

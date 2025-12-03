@@ -27,7 +27,11 @@ DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
 # Set OLLAMA_HOST to your inference node (e.g., http://your-node:11434)
 import os
 OLLAMA_URL = os.environ.get('OLLAMA_HOST', 'http://localhost:11434') + "/api/embeddings"
-QDRANT_URL = "http://localhost:6333/collections/enhanced_memory/points"
+# Qdrant configuration - use environment variable with fallback
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = os.environ.get("QDRANT_PORT", "6333")
+QDRANT_BASE_URL = f"http://{QDRANT_HOST}:{QDRANT_PORT}"
+QDRANT_URL = f"{QDRANT_BASE_URL}/collections/enhanced_memory/points"
 BATCH_SIZE = 20  # Process 20 embeddings in parallel
 MODEL = "nomic-embed-text"
 
@@ -173,7 +177,7 @@ async def main():
     # Check current Qdrant count
     print(f"\n[2/3] Checking Qdrant status...")
     async with aiohttp.ClientSession() as session:
-        async with session.get("http://localhost:6333/collections/enhanced_memory") as resp:
+        async with session.get(f"{QDRANT_BASE_URL}/collections/enhanced_memory") as resp:
             data = await resp.json()
             initial_count = data['result']['points_count']
             print(f"✅ Qdrant has {initial_count} points currently")
@@ -208,7 +212,7 @@ async def main():
         elapsed = time.time() - start_time
 
         # Verify final count
-        async with session.get("http://localhost:6333/collections/enhanced_memory") as resp:
+        async with session.get(f"{QDRANT_BASE_URL}/collections/enhanced_memory") as resp:
             data = await resp.json()
             final_count = data['result']['points_count']
 

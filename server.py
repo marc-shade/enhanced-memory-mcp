@@ -11,7 +11,6 @@ ARCHITECTURE: Uses memory-db Unix socket service for core operations
 
 import asyncio
 import logging
-import os
 import sqlite3
 import hashlib
 import zlib
@@ -32,22 +31,6 @@ from memory_client import MemoryClient
 # Code Execution imports
 from sandbox.executor import CodeExecutor, create_api_context
 from sandbox.security import comprehensive_safety_check, sanitize_output
-
-# TPU importance scoring (optional, graceful fallback to heuristics)
-_TPU_AVAILABLE = False
-_score_importance_fn = None
-try:
-    import sys as _sys
-    _agentic_path = os.environ.get("AGENTIC_SYSTEM_PATH", str(Path.home() / "agentic-system"))
-    _tpu_path = os.path.join(_agentic_path, "scripts", "hooks")
-    if _tpu_path not in _sys.path:
-        _sys.path.insert(0, _tpu_path)
-    from tpu_importance import score_importance as _tpu_score, is_tpu_available
-    if is_tpu_available():
-        _score_importance_fn = _tpu_score
-        _TPU_AVAILABLE = True
-except ImportError:
-    pass  # TPU not available, will use heuristic fallback
 
 # Set up logging - CRITICAL: Must use stderr for MCP compatibility
 # MCP protocol requires stdout is reserved for JSON-RPC messages only
@@ -316,74 +299,6 @@ def create_version(entity_id: int, data: Any, message: str = None, author: str =
 
     return version_id
 
-
-def _score_entity_importance(entity: Dict[str, Any]) -> Tuple[float, str]:
-    """
-    Score entity importance using TPU when available.
-
-    Uses Coral TPU for neural importance scoring with heuristic fallback.
-
-    Args:
-        entity: Entity dict with name, entityType, observations
-
-    Returns:
-        Tuple of (importance_score, tier)
-        - importance_score: 0.0 (low) to 1.0 (critical)
-        - tier: 'working', 'episodic', or 'long_term'
-    """
-    # Build text to score
-    name = entity.get('name', '')
-    entity_type = entity.get('entityType', '')
-    observations = entity.get('observations', [])
-
-    text = f"{name} ({entity_type}): {' | '.join(observations[:3])}"
-
-    # Use TPU when available
-    if _TPU_AVAILABLE and _score_importance_fn:
-        try:
-            score = _score_importance_fn(text, "memory")
-        except Exception:
-            score = _heuristic_importance(text)
-    else:
-        score = _heuristic_importance(text)
-
-    # Assign tier based on importance
-    if score >= 0.8:
-        tier = "long_term"
-    elif score >= 0.6:
-        tier = "episodic"
-    else:
-        tier = "working"
-
-    return score, tier
-
-
-def _heuristic_importance(text: str) -> float:
-    """Fallback heuristic importance scoring when TPU unavailable."""
-    text_lower = text.lower()
-    score = 0.5
-
-    # High importance indicators
-    high = ["critical", "error", "security", "bug", "fix", "important",
-            "vulnerability", "crash", "failure", "learned", "discovered"]
-    # Medium importance
-    medium = ["pattern", "insight", "decision", "strategy", "improvement"]
-    # Low importance
-    low = ["minor", "trivial", "note", "todo", "maybe"]
-
-    for word in high:
-        if word in text_lower:
-            score = min(1.0, score + 0.12)
-    for word in medium:
-        if word in text_lower:
-            score = min(1.0, score + 0.06)
-    for word in low:
-        if word in text_lower:
-            score = max(0.2, score - 0.1)
-
-    return round(score, 2)
-
-
 # ORIGINAL TOOLS WITH VERSION CONTROL ADDED
 
 @app.tool()
@@ -393,34 +308,13 @@ async def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     CONCURRENT ACCESS: Uses memory-db Unix socket service for database operations.
     CONTEXTUAL ENRICHMENT: Automatically adds LLM-generated contextual prefixes (RAG Tier 1).
-    TPU IMPORTANCE SCORING: Uses Coral TPU when available for intelligent tier assignment.
 
     Args:
         entities: List of entity objects with name, entityType, and observations
 
     Returns:
-        Results with compression statistics, entity details, and importance scoring stats
+        Results with compression statistics and entity details
     """
-    # Score importance and assign tier for each entity using TPU when available
-    importance_stats = {"tpu_scored": 0, "heuristic_scored": 0, "promoted": 0, "tiers": {}}
-    for entity in entities:
-        score, tier = _score_entity_importance(entity)
-        entity["importance_score"] = score
-        entity["tier"] = tier
-
-        # Track scoring method used
-        if _TPU_AVAILABLE:
-            importance_stats["tpu_scored"] += 1
-        else:
-            importance_stats["heuristic_scored"] += 1
-
-        # Track tier distribution
-        importance_stats["tiers"][tier] = importance_stats["tiers"].get(tier, 0) + 1
-
-        # Count promotions (non-working tier)
-        if tier != "working":
-            importance_stats["promoted"] += 1
-
     try:
         # Delegate to memory-db service for concurrent access
         response = await memory_client.create_entities(entities)
@@ -433,15 +327,13 @@ async def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "created": response.get("count", 0),
                 "failed": 0,
                 "results": response.get("results", []),
-                "contextual_enrichment": enrichment_stats,
-                "importance_scoring": importance_stats
+                "contextual_enrichment": enrichment_stats
             }
         else:
             return {
                 "created": 0,
                 "failed": len(entities),
-                "error": response.get("error", "Unknown error from memory-db service"),
-                "importance_scoring": importance_stats
+                "error": response.get("error", "Unknown error from memory-db service")
             }
 
     except Exception as e:
@@ -449,8 +341,7 @@ async def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         return {
             "created": 0,
             "failed": len(entities),
-            "error": f"Memory-DB service error: {str(e)}",
-            "importance_scoring": importance_stats
+            "error": f"Memory-DB service error: {str(e)}"
         }
 
 
@@ -1055,318 +946,12 @@ try:
 except Exception as e:
     logger.warning(f"⚠️  NMF integration skipped: {e}")
 
-
-# ============================================================================
-# WORKFLOW-IMPORTABLE FUNCTIONS
-# These standalone functions can be imported by Temporal workflows
-# They create their own instances to avoid relying on main block initialization
-# ============================================================================
-
-async def autonomous_memory_curation() -> Dict[str, Any]:
-    """
-    Autonomous memory curation across all tiers.
-
-    Promotions:
-    - Working → Episodic: High-access items become episodes
-    - Episodic → Semantic: Patterns become concepts
-    - Episodic → Procedural: Repeated actions become skills
-
-    Returns:
-        Curation statistics dictionary
-    """
-    try:
-        from safla_orchestrator import SAFLAOrchestrator
-        init_database()  # Ensure database exists
-        safla = SAFLAOrchestrator(DB_PATH)
-        result = await safla.autonomous_memory_curation()
-        logger.info(f"Autonomous memory curation complete: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Autonomous memory curation failed: {e}")
-        return {"error": str(e), "promoted_to_episodic": 0, "promoted_to_semantic": 0}
-
-
-async def analyze_memory_distribution() -> Dict[str, Any]:
-    """
-    Analyze current memory distribution vs optimal 75/15 rule.
-
-    Returns:
-        Distribution analysis with current vs optimal percentages
-    """
-    try:
-        init_database()  # Ensure database exists
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        # Get entities with their observations
-        cursor.execute('''
-            SELECT e.entity_type, e.tier, COUNT(*) as count
-            FROM entities e
-            GROUP BY e.entity_type, e.tier
-        ''')
-        results = cursor.fetchall()
-        conn.close()
-
-        if not results:
-            return {
-                "total_memories": 0,
-                "needs_optimization": False,
-                "distribution": {},
-                "recommendation": "No memories found - add data first"
-            }
-
-        # Categorize by tier
-        tier_counts = {}
-        total = 0
-        for entity_type, tier, count in results:
-            tier = tier or "working"
-            tier_counts[tier] = tier_counts.get(tier, 0) + count
-            total += count
-
-        # Calculate distribution
-        distribution = {
-            tier: {
-                "count": count,
-                "percentage": f"{(count/total)*100:.1f}%"
-            }
-            for tier, count in tier_counts.items()
-        }
-
-        # Determine if optimization needed (simplified check)
-        core_pct = tier_counts.get("core", 0) / total if total > 0 else 0
-        needs_optimization = core_pct < 0.1  # Less than 10% in core tier
-
-        return {
-            "total_memories": total,
-            "distribution": distribution,
-            "needs_optimization": needs_optimization,
-            "compliance_score": min(1.0, core_pct / 0.1) if total > 0 else 0
-        }
-    except Exception as e:
-        logger.error(f"Memory distribution analysis failed: {e}")
-        return {"error": str(e), "needs_optimization": False}
-
-
-async def optimize_memory_tiers() -> Dict[str, Any]:
-    """
-    Optimize memory tier assignments based on access patterns.
-
-    Promotes frequently accessed memories to higher tiers,
-    demotes rarely accessed memories to lower tiers.
-
-    Returns:
-        Optimization results with counts of tier changes
-    """
-    try:
-        init_database()  # Ensure database exists
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        changes = {"promoted": 0, "demoted": 0, "unchanged": 0}
-
-        # Promote high-access working tier to core
-        cursor.execute('''
-            UPDATE entities
-            SET tier = 'core'
-            WHERE tier = 'working' AND access_count >= 10
-        ''')
-        changes["promoted"] += cursor.rowcount
-
-        # Promote moderate-access working to reference
-        cursor.execute('''
-            UPDATE entities
-            SET tier = 'reference'
-            WHERE tier = 'working' AND access_count >= 5 AND access_count < 10
-        ''')
-        changes["promoted"] += cursor.rowcount
-
-        # Demote unused reference tier to archive
-        cursor.execute('''
-            UPDATE entities
-            SET tier = 'archive'
-            WHERE tier = 'reference' AND access_count < 2
-            AND last_accessed < datetime('now', '-7 days')
-        ''')
-        changes["demoted"] += cursor.rowcount
-
-        conn.commit()
-
-        # Get total unchanged
-        cursor.execute('SELECT COUNT(*) FROM entities')
-        total = cursor.fetchone()[0]
-        changes["unchanged"] = total - changes["promoted"] - changes["demoted"]
-
-        conn.close()
-
-        logger.info(f"Memory tier optimization: {changes}")
-        return {
-            "success": True,
-            "changes": changes,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Memory tier optimization failed: {e}")
-        return {"error": str(e), "success": False}
-
-
-async def analyze_memory_usage_patterns() -> Dict[str, Any]:
-    """
-    Analyze memory usage patterns across all tiers.
-
-    Returns:
-        Usage statistics for working, episodic, semantic, and procedural memory
-    """
-    try:
-        from safla_orchestrator import SAFLAOrchestrator
-        init_database()  # Ensure database exists
-        safla = SAFLAOrchestrator(DB_PATH)
-        result = await safla.analyze_memory_usage_patterns()
-        logger.info(f"Memory usage pattern analysis complete")
-        return result
-    except Exception as e:
-        logger.error(f"Memory usage pattern analysis failed: {e}")
-        # Return fallback stats from entities table
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-
-            cursor.execute('''
-                SELECT tier, COUNT(*) as count, AVG(access_count) as avg_access
-                FROM entities
-                GROUP BY tier
-            ''')
-            results = cursor.fetchall()
-            conn.close()
-
-            stats = {
-                "entity_stats": {
-                    row[0] or "working": {"count": row[1], "avg_access": row[2] or 0}
-                    for row in results
-                },
-                "recommendations": ["Consider running full SAFLA analysis for detailed patterns"],
-                "fallback": True
-            }
-            return stats
-        except Exception as fallback_e:
-            return {"error": str(e), "fallback_error": str(fallback_e)}
-
-
-async def run_pattern_extraction(
-    time_window_hours: int = 24,
-    min_pattern_frequency: int = 3
-) -> Dict[str, Any]:
-    """
-    Extract patterns from recent episodic memories.
-
-    Promotes recurring patterns to semantic memory (like sleep consolidation).
-
-    Args:
-        time_window_hours: Hours of memory to analyze
-        min_pattern_frequency: Minimum occurrences to be a pattern
-
-    Returns:
-        Pattern extraction statistics
-    """
-    try:
-        from agi.consolidation import ConsolidationEngine
-        init_database()
-        consolidation = ConsolidationEngine()
-        result = consolidation.run_pattern_extraction(time_window_hours, min_pattern_frequency)
-        logger.info(f"Pattern extraction complete: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Pattern extraction failed: {e}")
-        return {"error": str(e), "patterns_found": 0, "patterns_promoted": 0}
-
-
-async def run_causal_discovery(
-    time_window_hours: int = 24,
-    min_confidence: float = 0.6
-) -> Dict[str, Any]:
-    """
-    Discover causal relationships from recent action outcomes.
-
-    Automatically creates causal links based on what worked and what didn't.
-
-    Args:
-        time_window_hours: Hours of memory to analyze
-        min_confidence: Minimum confidence for causal link
-
-    Returns:
-        Causal discovery statistics
-    """
-    try:
-        from agi.consolidation import ConsolidationEngine
-        init_database()
-        consolidation = ConsolidationEngine()
-        result = consolidation.run_causal_discovery(time_window_hours, min_confidence)
-        logger.info(f"Causal discovery complete: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Causal discovery failed: {e}")
-        return {"error": str(e), "chains_created": 0, "links_created": 0}
-
-
-async def run_memory_compression(
-    time_window_hours: int = 168  # 7 days default
-) -> Dict[str, Any]:
-    """
-    Compress old low-importance memories.
-
-    Frees up space while preserving important information.
-
-    Args:
-        time_window_hours: Only compress memories older than this
-
-    Returns:
-        Compression statistics
-    """
-    try:
-        from agi.consolidation import ConsolidationEngine
-        init_database()
-        consolidation = ConsolidationEngine()
-        result = consolidation.run_memory_compression(time_window_hours)
-        logger.info(f"Memory compression complete: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Memory compression failed: {e}")
-        return {"error": str(e), "memories_compressed": 0, "space_saved_bytes": 0}
-
-
-async def get_consolidation_stats() -> Dict[str, Any]:
-    """
-    Get consolidation statistics.
-
-    Returns:
-        Consolidation job statistics
-    """
-    try:
-        from agi.consolidation import ConsolidationEngine
-        init_database()
-        consolidation = ConsolidationEngine()
-        result = consolidation.get_consolidation_stats()
-        logger.info(f"Consolidation stats retrieved: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Get consolidation stats failed: {e}")
-        return {"error": str(e), "total_jobs": 0}
-
-
 if __name__ == "__main__":
     logger.info("Enhanced Memory MCP Server with Git Features starting...")
     logger.info(f"Database: {DB_PATH}")
 
     # Initialize database FIRST, inside main block
     init_database()
-
-    # Register Tool Search tools (Advanced Tool Use Pattern - Anthropic Nov 2025)
-    # This MUST be registered first - it's the meta-tool for discovering other tools
-    try:
-        from tool_search import register_tool_search
-        register_tool_search(app)
-        logger.info("✅ Tool Search (Advanced Tool Use) integrated - On-demand tool discovery")
-    except Exception as e:
-        logger.warning(f"⚠️  Tool Search integration skipped: {e}")
 
     # Register reasoning tools after database is ready
     try:
@@ -1490,85 +1075,6 @@ if __name__ == "__main__":
             logger.info("✅ Contextual Retrieval (RAG Tier 3.1) integrated - Expected +35-49% accuracy")
         except Exception as e:
             logger.warning(f"⚠️  Contextual Retrieval integration skipped: {e}")
-
-    # Register Context-Aware Chunking tools (RAG Tier 3.2 Strategy) - Semantic Boundaries
-    # Maintains semantic coherence through intelligent chunking at topic boundaries
-    try:
-        from context_aware_chunking import register_context_aware_chunking_tools
-        register_context_aware_chunking_tools(app, nmf_instance)
-        logger.info("✅ Context-Aware Chunking (RAG Tier 3.2) integrated - Semantic boundary detection")
-    except Exception as e:
-        logger.warning(f"⚠️  Context-Aware Chunking integration skipped: {e}")
-
-    # Register Hierarchical RAG tools (RAG Tier 3.3 Strategy) - Multi-Level Indexing
-    # Progressive retrieval: summary → sections → chunks
-    try:
-        from hierarchical_rag_tools import register_hierarchical_rag_tools
-        register_hierarchical_rag_tools(app, nmf_instance)
-        logger.info("✅ Hierarchical RAG (RAG Tier 3.3) integrated - Expected +15-25% precision")
-    except Exception as e:
-        logger.warning(f"⚠️  Hierarchical RAG integration skipped: {e}")
-
-    # Register Agentic RAG tools (RAG Tier 4.1 + 4.3) - Autonomous Strategy Selection + Self-Reflection
-    # Intelligent strategy selection based on query characteristics with iterative refinement
-    try:
-        from agentic_rag_tools import register_agentic_rag_tools
-        register_agentic_rag_tools(app, nmf_instance)
-        logger.info("✅ Agentic RAG (RAG Tier 4.1+4.3) integrated - Expected +30-40% adaptability")
-    except Exception as e:
-        logger.warning(f"⚠️  Agentic RAG integration skipped: {e}")
-
-    # Register Late Chunking tools (RAG Tier 4) - Long-Context Document Embedding
-    # Uses 8k-token models (bge-m3, qwen3-embedding) on inference node for document-aware chunks
-    try:
-        from late_chunking_tools import register_late_chunking_tools
-        register_late_chunking_tools(app, DB_PATH)
-        logger.info("✅ Late Chunking (RAG Tier 4) integrated - 8k context embedding via Ollama")
-    except Exception as e:
-        logger.warning(f"⚠️  Late Chunking integration skipped: {e}")
-
-    # Register Cluster Brain tools (Unified multi-node intelligence)
-    try:
-        from cluster_brain_tools import register_cluster_brain_tools
-        brain_instance = register_cluster_brain_tools(app)
-        logger.info(f"✅ Cluster Brain tools integrated - Node: {brain_instance.node_id}")
-    except Exception as e:
-        logger.warning(f"⚠️  Cluster Brain integration skipped: {e}")
-
-    # Register AGI-Cluster Bridge tools (Connects AGI system to cluster brain)
-    try:
-        from agi_cluster_bridge import register_agi_cluster_bridge_tools
-        bridge_instance = register_agi_cluster_bridge_tools(app)
-        logger.info(f"✅ AGI-Cluster Bridge integrated - Enables meta-learning sync")
-    except Exception as e:
-        logger.warning(f"⚠️  AGI-Cluster Bridge integration skipped: {e}")
-
-    # Register Mirror Mind Enhancement tools (Dual Manifold Cognitive Architecture)
-    # Based on Tsinghua University research (Nov 2025)
-    try:
-        from mirror_mind_enhancements import register_mirror_mind_tools
-        register_mirror_mind_tools(app, DB_PATH)
-        logger.info("✅ Mirror Mind enhancements integrated - Centrality, Trajectories, Dual Manifold")
-    except Exception as e:
-        logger.warning(f"⚠️  Mirror Mind integration skipped: {e}")
-
-    # Register GraphRAG tools (Relationship-aware retrieval)
-    # Based on Microsoft GraphRAG + Zapai memory patterns
-    try:
-        from graphrag_tools import register_graphrag_tools
-        register_graphrag_tools(app, DB_PATH)
-        logger.info("✅ GraphRAG tools integrated - Graph-enhanced search with relationship traversal")
-    except Exception as e:
-        logger.warning(f"⚠️  GraphRAG integration skipped: {e}")
-
-    # Visual Memory tools - LVR (Latent Visual Reasoning) Phase 2
-    # Implements visual embedding storage and similarity search using Edge TPU
-    try:
-        from visual_memory_tools import register_visual_memory_tools
-        register_visual_memory_tools(app, use_tpu=True)
-        logger.info("✅ Visual Memory tools integrated - LVR-style embedding search")
-    except Exception as e:
-        logger.warning(f"⚠️  Visual Memory integration skipped: {e}")
 
     # Disable banner to prevent stdout pollution (MCP protocol requirement)
     # Explicitly specify stdio transport for proper stdin/stdout handling
