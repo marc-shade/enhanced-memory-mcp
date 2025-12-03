@@ -32,7 +32,7 @@ AGENTIC_PATH = os.environ.get('AGENTIC_SYSTEM_PATH', os.path.expanduser('~/agent
 ART_STORAGE_DIR = Path(AGENTIC_PATH) / 'databases' / 'art'
 
 
-def get_art_instance(input_dim: int = 768, vigilance: float = 0.75) -> FuzzyART:
+def get_art_instance(vigilance: float = 0.75) -> FuzzyART:
     """Get or create the global ART instance."""
     global _art_instance
     if _art_instance is None:
@@ -43,11 +43,10 @@ def get_art_instance(input_dim: int = 768, vigilance: float = 0.75) -> FuzzyART:
             _art_instance = FuzzyART.load(str(state_file))
         else:
             _art_instance = FuzzyART(
-                input_dim=input_dim,
                 vigilance=vigilance,
-                learning_rate=1.0,
-                name="enhanced_memory_art"
+                learning_rate=1.0
             )
+            _art_instance.name = "enhanced_memory_art"
     return _art_instance
 
 
@@ -61,10 +60,12 @@ def get_art_hybrid_instance(embedding_dim: int = 384, vigilance: float = 0.75) -
         if state_file.exists():
             _art_hybrid_instance = ARTHybrid.load(str(state_file))
         else:
+            # Create a FuzzyART network first
+            art_network = FuzzyART(vigilance=vigilance, learning_rate=1.0)
+            art_network.name = "enhanced_memory_art_hybrid"
             _art_hybrid_instance = ARTHybrid(
-                embedding_dim=embedding_dim,
-                vigilance=vigilance,
-                name="enhanced_memory_art_hybrid"
+                art_network=art_network,
+                embedding_dim=embedding_dim
             )
     return _art_hybrid_instance
 
@@ -113,7 +114,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         Returns:
             Dict with category_id, is_new_category, match_score, stats
         """
-        art = get_art_instance(input_dim=len(data))
+        art = get_art_instance()
 
         # Temporarily adjust vigilance if specified
         original_vigilance = None
@@ -157,7 +158,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         Returns:
             Dict with best matching category or indication of novel pattern
         """
-        art = get_art_instance(input_dim=len(data))
+        art = get_art_instance()
 
         if not art.categories:
             return {
