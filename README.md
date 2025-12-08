@@ -1,4 +1,7 @@
+<img align="center" width="1024" height="1024" alt="Enhanced Memory MCP Server" src="https://github.com/user-attachments/assets/43639aae-da9b-4bb5-8fb9-3943d623a667" />
+
 # Enhanced Memory MCP Server
+
 
 [![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
 [![Python](https://img.shields.io/badge/Python-3.11+-green)](https://python.org)
