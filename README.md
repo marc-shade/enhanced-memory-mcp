@@ -7,6 +7,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-green)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-Ready-purple)](https://claude.ai/code)
+[![Part of Agentic System](https://img.shields.io/badge/Part_of-Agentic_System-brightgreen)](https://github.com/marc-shade/agentic-system-oss)
 
 > **Give your AI agents persistent memory that survives sessions, learns patterns, and actually remembers what you worked on.**
 
@@ -251,12 +252,56 @@ PRs welcome! Areas of interest:
 - Performance optimizations
 - Documentation improvements
 
-## Related Projects
+## Part of the MCP Ecosystem
 
-- [agent-runtime-mcp](https://github.com/marc-shade/agent-runtime-mcp) - Task queues and goal decomposition
-- [SAFLA](https://github.com/marc-shade/SAFLA) - Self-aware feedback loop algorithm
-- [claude-flow](https://github.com/marc-shade/claude-flow) - Multi-agent orchestration
-- [voicemode](https://github.com/marc-shade/voicemode) - Voice interface for Claude Code
+This server is part of a comprehensive 24/7 autonomous AI framework. See [agentic-system-oss](https://github.com/marc-shade/agentic-system-oss) for the complete system with all MCP servers pre-configured.
+
+### Related MCP Servers
+
+**Core AGI Infrastructure**
+| Server | Purpose |
+|--------|---------|
+| [agent-runtime-mcp](https://github.com/marc-shade/agent-runtime-mcp) | Persistent task queues, goal decomposition, relay pipelines |
+| [agi-mcp](https://github.com/marc-shade/agi-mcp) | Production-ready AGI orchestration |
+| [voice-agi-mcp](https://github.com/marc-shade/voice-agi-mcp) | Stateful voice-controlled AGI with Letta-style memory |
+
+**Multi-Agent Coordination**
+| Server | Purpose |
+|--------|---------|
+| [cluster-execution-mcp](https://github.com/marc-shade/cluster-execution-mcp) | Distributed execution across clusters |
+| [node-chat-mcp](https://github.com/marc-shade/node-chat-mcp) | Inter-node AI communication |
+| [claude-flow-mcp](https://github.com/marc-shade/claude-flow-mcp) | Workflow orchestration and agent coordination |
+| [code-execution-mcp](https://github.com/marc-shade/code-execution-mcp) | Sandboxed code execution |
+
+**Knowledge Acquisition**
+| Server | Purpose |
+|--------|---------|
+| [research-paper-mcp](https://github.com/marc-shade/research-paper-mcp) | arXiv/Semantic Scholar paper search |
+| [video-transcript-mcp](https://github.com/marc-shade/video-transcript-mcp) | YouTube transcript extraction and concept mining |
+
+**Quality & Security**
+| Server | Purpose |
+|--------|---------|
+| [ember-mcp](https://github.com/marc-shade/ember-mcp) | Production-only policy enforcement |
+| [security-scanner-mcp](https://github.com/marc-shade/security-scanner-mcp) | Nuclei vulnerability scanning |
+| [security-auditor-mcp](https://github.com/marc-shade/security-auditor-mcp) | AI-powered security vulnerability scanning |
+
+**Visual & Media**
+| Server | Purpose |
+|--------|---------|
+| [image-gen-mcp](https://github.com/marc-shade/image-gen-mcp) | Multi-provider image generation |
+
+**Hardware Integration**
+| Server | Purpose |
+|--------|---------|
+| [coral-tpu-mcp](https://github.com/marc-shade/coral-tpu-mcp) | Coral TPU local ML inference |
+| [network-scanner-mcp](https://github.com/marc-shade/network-scanner-mcp) | Network device scanning |
+
+### Other Projects
+
+- [Ollama-Workbench](https://github.com/marc-shade/Ollama-Workbench) - Local LLM management and testing
+- [Ollama-Workbench-2](https://github.com/marc-shade/Ollama-Workbench-2) - v2.0 with SvelteKit + Tauri
+- [TeamForgeAI](https://github.com/marc-shade/TeamForgeAI) - Multi-agent team collaboration
 
 ## License
 
