@@ -83,7 +83,7 @@ for new projects. I'll use TypeScript.
 - **Data Integrity**: SHA256 checksums on all stored data
 - **Memory Tiers**: Working, Reference, Archive - automatic lifecycle management
 
-### Advanced Features (40+ MCP Tools)
+### Advanced Features (100+ MCP Tools)
 - **Semantic Search**: Find memories by meaning, not just keywords
 - **Causal Chains**: Track cause-effect relationships
 - **Pattern Learning**: Automatic pattern extraction from experiences
@@ -91,6 +91,42 @@ for new projects. I'll use TypeScript.
 - **Episodic Memory**: Time-bound experiences and events
 - **Procedural Memory**: Skills that improve with use
 - **Theory of Mind**: Model other agents' beliefs and intentions
+
+### NEW: Production-Grade AGI Features
+
+| Feature | Description | Documentation |
+|---------|-------------|---------------|
+| **Holographic Memory** | Spreading activation across related memories | [docs/HOLOGRAPHIC_MEMORY.md](docs/HOLOGRAPHIC_MEMORY.md) |
+| **Anti-Hallucination** | L-Score provenance, shadow vector search, citation validation | [docs/ANTI_HALLUCINATION.md](docs/ANTI_HALLUCINATION.md) |
+| **Continuous Learning** | EWC++ to prevent catastrophic forgetting | [docs/CONTINUOUS_LEARNING.md](docs/CONTINUOUS_LEARNING.md) |
+| **Advanced Features** | Causal inference, strange loops, ReasoningBank, caching | [docs/ADVANCED_FEATURES.md](docs/ADVANCED_FEATURES.md) |
+
+**Holographic Memory** - 4-phase cognitive architecture:
+- Activation Field (spreading activation)
+- Memory-Influenced Routing
+- Procedural Evolution
+- Routing Learning
+
+**Anti-Hallucination System**:
+- Pattern detection for common hallucination indicators
+- L-Score provenance tracking (confidence × relevance / depth)
+- Shadow vector search for contradicting evidence
+- Citation validation and trusted source management
+
+**Continuous Learning (EWC++)**:
+- Elastic Weight Consolidation prevents forgetting
+- Pattern recognition from corrections
+- Source reliability tracking
+- Self-improvement cycles with meta-cognition
+
+**Additional Advanced Capabilities**:
+- Causal Inference Engine with DAG validation
+- Strange Loops Detector (circular reasoning, contradictions)
+- ReasoningBank for experience-based learning
+- Semantic Cache and FACT Cache for performance
+- Hybrid Search with cross-encoder reranking
+- Multi-Query RAG and query expansion
+- ART (Adaptive Resonance Theory) online learning
 
 ## Use Cases
 
