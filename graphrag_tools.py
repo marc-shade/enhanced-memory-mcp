@@ -16,6 +16,7 @@ Research basis:
 - "You're Doing Memory All Wrong" (Zapai): Graph traversal patterns
 - Anthropic Contextual Retrieval: Context-aware chunk enhancement
 """
+import platform
 
 import logging
 import os
@@ -26,7 +27,7 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger(__name__)
 
 # Get agentic system path from environment
-AGENTIC_SYSTEM_PATH = os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}")
+AGENTIC_SYSTEM_PATH = os.environ.get("AGENTIC_SYSTEM_PATH", str(_STORAGE_BASE))
 
 
 def register_graphrag_tools(app, db_path: Path = None):
@@ -42,6 +43,29 @@ def register_graphrag_tools(app, db_path: Path = None):
 
     # Import using importlib to handle hyphenated filename
     import importlib.util
+
+def _get_storage_base() -> Path:
+    """Detect storage base path based on platform."""
+    env_path = os.environ.get("AGENTIC_SYSTEM_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    elif system == "Linux":
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    return Path(__file__).parent.parent
+
+
+_STORAGE_BASE = _get_storage_base()
+
     spec = importlib.util.spec_from_file_location(
         "graph_rag",
         os.path.join(AGENTIC_SYSTEM_PATH, "scripts", "graph-rag.py")

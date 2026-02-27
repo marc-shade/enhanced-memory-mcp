@@ -50,7 +50,7 @@ Evaluate and upgrade to the best embedding model for semantic search and RAG qua
 4. ✅ Documented upgrade with rollback procedures
 
 ### Files Modified
-- `${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp/embedding_providers.py`
+- `/Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp/embedding_providers.py`
 
 ### Files Created
 - `EMBEDDING_UPGRADE_2025-11-13.md` - Complete upgrade documentation
@@ -366,7 +366,7 @@ identity = get_agent_identity()
 
 ```bash
 # 1. Navigate to enhanced-memory-mcp
-cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
+cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
 
 # 2. Apply migrations
 python3 run_migration.py --auto

@@ -34,7 +34,6 @@ ENV/
 # Testing
 .pytest_cache/
 .coverage
-.mypy_cache/
 htmlcov/
 .tox/
 .nox/
@@ -54,8 +53,7 @@ htmlcov/
 
 # Environment and secrets
 .env
-.env.*
-!.env.example
+.env.local
 *.pem
 *.key
 
@@ -67,9 +65,31 @@ Thumbs.db
 *.log
 logs/
 
-# Runtime data
-data/
-cache/
+# NMF local data files
+nmf_files/
+
+# Tool registry local state
+tool_registry/
+
+# Venv backups
+.venv_*/
 
 # Literal path artifacts (should never exist)
 ${AGENTIC_SYSTEM_PATH:-*
+
+# Server backups
+server_backup_*.py
+server_legacy_*.py
+server_original_backup.py
+server.py.backup-*
+
+# Local orchestration state
+.claude-flow/
+.swarm/
+
+# Stale symlinks
+enhanced-memory-mcp
+
+# JSON artifacts
+*_templates.json
+*_workflows.json

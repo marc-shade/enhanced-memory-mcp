@@ -21,10 +21,12 @@ import sqlite3
 import sys
 import hashlib
 import zlib
-import pickle
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+
+# Use the secure compression module (JSON serialization, HMAC-guarded legacy pickle)
+from server.compression import compress_data as _safe_compress, decompress_data as _safe_decompress
 
 # Logging configuration
 logging.basicConfig(
@@ -97,15 +99,13 @@ class MemoryDatabase:
         logger.info(f"Database initialized at {self.db_path}")
 
     def _compress_data(self, data: Any) -> bytes:
-        """Compress data using zlib"""
-        pickled = pickle.dumps(data)
-        compressed = zlib.compress(pickled, level=9)
+        """Compress data using JSON serialization + zlib (via secure compression module)"""
+        compressed, _orig, _comp, _ratio = _safe_compress(data)
         return compressed
 
     def _decompress_data(self, compressed: bytes) -> Any:
-        """Decompress data"""
-        decompressed = zlib.decompress(compressed)
-        return pickle.loads(decompressed)
+        """Decompress data (handles both JSON and legacy pickle formats)"""
+        return _safe_decompress(compressed)
 
     def _calculate_checksum(self, data: bytes) -> str:
         """Calculate SHA-256 checksum"""
@@ -131,9 +131,7 @@ class MemoryDatabase:
                         "type": entity_type,
                         "observations": observations
                     }
-                    compressed = self._compress_data(entity_data)
-                    original_size = len(pickle.dumps(entity_data))
-                    compressed_size = len(compressed)
+                    compressed, original_size, compressed_size, _ = _safe_compress(entity_data)
                     compression_ratio = compressed_size / original_size if original_size > 0 else 1.0
                     checksum = self._calculate_checksum(compressed)
 
@@ -357,8 +355,9 @@ class MemoryDBServer:
             path=self.socket_path
         )
 
-        # Set socket permissions
-        os.chmod(self.socket_path, 0o666)
+        # Set socket permissions for multi-process IPC access
+        # nosec B103 - intentional for Unix socket IPC, not a file
+        os.chmod(self.socket_path, 0o666)  # nosec B103
 
         logger.info(f"Memory-DB service listening on {self.socket_path}")
 

@@ -34,7 +34,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Ollama inference node (M4 Max with 128GB unified memory)
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://inference.example.local:11434")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://completeu-server.local:11434")
 
 # Long-context embedding models available on inference node
 LONG_CONTEXT_MODELS = {
@@ -225,7 +225,7 @@ class LateChunkingProcessor:
 
         # Generate document ID if not provided
         if document_id is None:
-            document_id = hashlib.md5(text[:1000].encode()).hexdigest()[:12]
+            document_id = hashlib.md5(text[:1000].encode(), usedforsecurity=False).hexdigest()[:12]
 
         # Estimate tokens
         total_tokens = self._estimate_tokens(text)
@@ -790,5 +790,5 @@ Performance Notes
 - Late chunking requires ~2x processing time but improves retrieval
 - Use for documents where context matters (research, technical docs)
 - Traditional chunking still fine for simple content
-- Ollama inference happens on GPU node (inference)
+- Ollama inference happens on GPU node (completeu-server)
 """

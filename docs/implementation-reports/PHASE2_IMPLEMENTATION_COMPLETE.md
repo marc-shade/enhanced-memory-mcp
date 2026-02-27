@@ -301,7 +301,7 @@ All Phase 2 features include graceful degradation:
 
 **Run Tests**:
 ```bash
-cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
+cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
 python3 test_phase2_features.py
 ```
 
@@ -445,7 +445,7 @@ results = await multi_query_search(
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 # Optional (SAFLA MCP handles this)
-# export SAFLA_MCP_PATH="${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/SAFLA/server.py"
+# export SAFLA_MCP_PATH="/Volumes/SSDRAID0/agentic-system/mcp-servers/SAFLA/server.py"
 ```
 
 ---

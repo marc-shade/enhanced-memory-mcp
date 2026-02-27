@@ -15,6 +15,7 @@ This bridges:
 - safla_orchestrator.py (working memory, episodes, concepts)
 - cluster_brain.py (shared knowledge, goals, learnings, routing)
 """
+import platform
 
 import json
 import logging
@@ -52,7 +53,7 @@ class AGIClusterBridge:
 
         if safla is None:
             from safla_orchestrator import SAFLAOrchestrator
-            db_path = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "databases/mcp/memory.db"))
+            db_path = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", str(_STORAGE_BASE)), "databases/mcp/memory.db"))
             safla = SAFLAOrchestrator(db_path)
 
         self.brain = cluster_brain
@@ -479,6 +480,29 @@ Lessons Learned:
             Sync result
         """
         import json
+
+def _get_storage_base() -> Path:
+    """Detect storage base path based on platform."""
+    env_path = os.environ.get("AGENTIC_SYSTEM_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    elif system == "Linux":
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    return Path(__file__).parent.parent
+
+
+_STORAGE_BASE = _get_storage_base()
+
 
         content = f"""
 Working Memory Snapshot from {self.node_id}

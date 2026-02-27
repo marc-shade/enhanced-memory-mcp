@@ -4,16 +4,18 @@ Enhanced Memory MCP Server
 Using FastMCP for better MCP protocol compliance
 """
 
-import asyncio
 import logging
 import sqlite3
 import hashlib
-import zlib
-import base64
-import pickle
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+
+# Use the secure compression module (JSON serialization, HMAC-guarded legacy pickle)
+from server.compression import (
+    compress_data as _safe_compress_tuple,
+    decompress_data as _safe_decompress,
+)
 
 # FastMCP implementation
 from fastmcp import FastMCP
@@ -92,24 +94,12 @@ def init_database():
     conn.close()
 
 def compress_data(data: Any) -> tuple[bytes, int, int, float]:
-    """Really compress data using zlib"""
-    # Serialize the data
-    serialized = pickle.dumps(data)
-    original_size = len(serialized)
-    
-    # Compress with zlib (level 9 = maximum compression)
-    compressed = zlib.compress(serialized, level=9)
-    compressed_size = len(compressed)
-    
-    # Calculate real compression ratio
-    compression_ratio = compressed_size / original_size if original_size > 0 else 1.0
-    
-    return compressed, original_size, compressed_size, compression_ratio
+    """Compress data using JSON serialization + zlib (delegates to secure compression module)"""
+    return _safe_compress_tuple(data)
 
 def decompress_data(compressed: bytes) -> Any:
-    """Decompress and deserialize data"""
-    decompressed = zlib.decompress(compressed)
-    return pickle.loads(decompressed)
+    """Decompress and deserialize data (handles both JSON and legacy pickle formats)"""
+    return _safe_decompress(compressed)
 
 def calculate_checksum(data: bytes) -> str:
     """Calculate SHA256 checksum for data integrity"""

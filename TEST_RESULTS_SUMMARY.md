@@ -130,16 +130,16 @@ implements applied the required boot sequence:
 ## Deployment Readiness
 
 ### Prerequisites ✅
-- Virtual environment Python path: `${HOME}/Documents/Cline/MCP/.venv_mcp/bin/python`
-- Server path: `${HOME}/Documents/Cline/MCP/memvid-enhanced-memory-mcp/server.py`
+- Virtual environment Python path: `/Users/marc/Documents/Cline/MCP/.venv_mcp/bin/python`
+- Server path: `/Users/marc/Documents/Cline/MCP/memvid-enhanced-memory-mcp/server.py`
 - Database directory: `~/.claude/enhanced_memories/`  (testing required)
 
 ### Configuration Entry
 ```json
 {
   "memvid-enhanced-memory": {
-    "command": "${HOME}/Documents/Cline/MCP/.venv_mcp/bin/python",
-    "args": ["${HOME}/Documents/Cline/MCP/memvid-enhanced-memory-mcp/server.py"],
+    "command": "/Users/marc/Documents/Cline/MCP/.venv_mcp/bin/python",
+    "args": ["/Users/marc/Documents/Cline/MCP/memvid-enhanced-memory-mcp/server.py"],
     "env": {
       "PYTHONUNBUFFERED": "1"
     }

@@ -119,7 +119,7 @@ result = mcp__enhanced-memory__resolve_conflict(
 
 ### Test 5: Database Verification
 ```bash
-sqlite3 ${HOME}/.claude/enhanced_memories/memory.db <<EOF
+sqlite3 /Users/marc/.claude/enhanced_memories/memory.db <<EOF
 SELECT COUNT(*) FROM entities WHERE source_session LIKE 'integration-test%';
 SELECT COUNT(*) FROM conflicts WHERE resolution_status = 'resolved';
 EOF
@@ -178,7 +178,7 @@ async def execute_code(code: str, context_vars: Optional[Dict[str, Any]] = None)
 
 **Database Verification**:
 ```bash
-$ sqlite3 ${HOME}/.claude/enhanced_memories/memory.db "SELECT source_session, extraction_method, relevance_score FROM entities WHERE id = 20119"
+$ sqlite3 /Users/marc/.claude/enhanced_memories/memory.db "SELECT source_session, extraction_method, relevance_score FROM entities WHERE id = 20119"
 test-session-001|auto|0.95
 ```
 

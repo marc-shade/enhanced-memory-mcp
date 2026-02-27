@@ -15,6 +15,7 @@ Research basis:
 - Latent Visual Reasoning (LVR) - arxiv:2509.24251
 - Manifold hypothesis for visual concept organization
 """
+import platform
 
 import logging
 import sys
@@ -25,7 +26,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # Add perception module to path
-PERCEPTION_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "intelligent-agents/perception"))
+PERCEPTION_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", str(_STORAGE_BASE)), "intelligent-agents/perception"))
 sys.path.insert(0, str(PERCEPTION_PATH))
 
 
@@ -527,6 +528,29 @@ def register_visual_memory_tools(app, use_tpu: bool = True):
         if gpu_extractor is None:
             try:
                 from gpu_visual_features import GPUVisualFeatureExtractor
+
+def _get_storage_base() -> Path:
+    """Detect storage base path based on platform."""
+    env_path = os.environ.get("AGENTIC_SYSTEM_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    elif system == "Linux":
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    return Path(__file__).parent.parent
+
+
+_STORAGE_BASE = _get_storage_base()
+
                 gpu_extractor = GPUVisualFeatureExtractor()
                 logger.info("GPU visual feature extractor initialized")
             except Exception as e:

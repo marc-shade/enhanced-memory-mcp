@@ -38,11 +38,15 @@ python3 test_agi_phase4.py  # Meta-cognition & self-improvement
 
 ### Core Components
 
-**server.py** (~1566 lines) - Main FastMCP server. Architecture:
+**server.py** (~1213 lines) - Main FastMCP server. Architecture:
 - Uses `memory_client.py` to connect to memory-db Unix socket service for concurrent access
 - Core operations (create_entities, search_nodes) delegated to memory-db service
-- Tools registered modularly via `register_*_tools()` functions (lines 1355-1566)
-- TPU importance scoring at entity creation time (lines 36-50)
+- Tools registered modularly via `register_*_tools()` functions
+- **TPU importance scoring at entity creation** (lines 35-56, 482-559):
+  - Imports `tpu_importance` module from hooks (with fallback heuristics)
+  - `_score_and_tier_entities()` scores each entity via TPU Warm Service (port 8780)
+  - Auto-assigns tiers: score ≥0.8 → long_term, ≥0.6 → episodic, <0.6 → working
+  - Called automatically in `create_entities()` after contextual enrichment
 
 **memory_db_service.py** - Unix socket service providing centralized SQLite access. Enables multiple Claude Code instances to share memory without corruption.
 
@@ -73,6 +77,7 @@ All RAG strategies are registered in `server.py` main block (lines 1441-1562):
 | 4.1+4.3 | Agentic + Self-Reflective RAG | ✅ | `agentic_retrieve`, `analyze_query`, `evaluate_results` | `agentic_rag_tools.py` |
 | 4 | GraphRAG | ✅ | `graph_enhanced_search`, `get_entity_neighbors` | `graphrag_tools.py` |
 | 4 | Visual Memory | ✅ | `store_visual_episode`, `find_similar_visual` | `visual_memory_tools.py` |
+| - | Semantic Cache | ✅ | `semantic_cache_get`, `semantic_cache_store`, `agi_cached_reasoning` | `semantic_cache_tools.py` |
 
 ### Tool Registration Pattern
 
@@ -110,6 +115,7 @@ register_query_expansion_tools(app, nmf_instance)
 ├── reranking_tools.py     # Tier 1: Cross-encoder re-ranking
 ├── safla_tools.py         # SAFLA 4-tier memory
 ├── sleeptime_tools.py     # Letta sleeptime compute
+├── semantic_cache_tools.py # LLM reasoning result caching (30-40% hit rate)
 ├── tool_search.py         # Progressive tool discovery
 └── visual_memory_tools.py # LVR-style visual embeddings
 
@@ -162,7 +168,7 @@ Critical dependencies (from requirements.txt):
 
 ### TPU Integration
 
-Real-time importance scoring via Google Coral TPU (when available on builder):
+Real-time importance scoring via Google Coral TPU (when available on macpro51):
 - Entities scored at creation time in `create_entities()`
 - Auto-assigned to tier (working/episodic/long_term) based on score
 - Graceful fallback to heuristic scoring when TPU unavailable

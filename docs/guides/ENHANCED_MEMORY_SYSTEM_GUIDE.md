@@ -69,8 +69,8 @@ recent_projects = mcp__memory__search_nodes(query="project_context last_7_days")
 ```json
 {
   "enhanced-memory-mcp": {
-    "command": "${HOME}/Documents/Cline/MCP/.venv_mcp/bin/python",
-    "args": ["${HOME}/Documents/Cline/MCP/enhanced-memory-mcp/server.py"],
+    "command": "/Users/marc/Documents/Cline/MCP/.venv_mcp/bin/python",
+    "args": ["/Users/marc/Documents/Cline/MCP/enhanced-memory-mcp/server.py"],
     "env": {
       "PYTHONUNBUFFERED": "1"
     }
@@ -102,7 +102,7 @@ recent_projects = mcp__memory__search_nodes(query="project_context last_7_days")
 
 Run comprehensive tests:
 ```bash
-cd ${HOME}/Documents/Cline/MCP/enhanced-memory-mcp
+cd /Users/marc/Documents/Cline/MCP/enhanced-memory-mcp
 ../.venv_mcp/bin/python comprehensive_test.py
 ../.venv_mcp/bin/python orchestrator_integration_test.py
 ../.venv_mcp/bin/python performance_test.py

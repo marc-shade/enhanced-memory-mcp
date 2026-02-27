@@ -1,348 +1,443 @@
-<img align="center" width="300" height="300" alt="Enhanced Memory MCP Server" src="https://github.com/user-attachments/assets/43639aae-da9b-4bb5-8fb9-3943d623a667" />
-
 # Enhanced Memory MCP Server
 
+A high-performance memory management system for AI agents built on the [Model Context Protocol](https://modelcontextprotocol.io/). Provides 200+ tools across compressed SQLite storage, 4-tier memory architecture, Git-like versioning, multi-strategy RAG, AGI cognitive phases, and modular tool loading with profile-based scaling.
 
-[![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
-[![Python](https://img.shields.io/badge/Python-3.11+-green)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Claude Code](https://img.shields.io/badge/Claude_Code-Ready-purple)](https://claude.ai/code)
-[![Part of Agentic System](https://img.shields.io/badge/Part_of-Agentic_System-brightgreen)](https://github.com/marc-shade/agentic-system-oss)
+## Features
 
-> **Give your AI agents persistent memory that survives sessions, learns patterns, and actually remembers what you worked on.**
+- **4-Tier Memory Architecture**: Core, Working, Reference, and Archive tiers with automatic promotion/demotion
+- **200+ MCP Tools**: Modular registration system with profile-based loading (full vs orchestrator mode)
+- **Advanced RAG Pipeline**: 4-tier retrieval strategy — hybrid search, re-ranking, query expansion, agentic RAG, GraphRAG
+- **Neural Memory Fabric (NMF)**: Letta-style memory blocks with open/edit/close semantics
+- **Git-Like Versioning**: Branch, diff, and restore memory states across sessions
+- **Real Compression**: 2.4x data reduction with zlib level 9, SHA256 checksums
+- **AGI Cognitive Phases**: Identity, temporal reasoning, emotional tagging, meta-cognition (4 phases)
+- **Intelligent Router**: Multi-provider LLM routing with uncertainty scoring
+- **Anti-Hallucination Engine**: Causal inference, strange loop detection, continuous learning
+- **Code Execution Sandbox**: RestrictedPython-based secure execution with PII tokenization
+- **Semantic Cache**: LLM reasoning result caching (30-40% hit rate in production)
+- **Manifold Working Memory**: High-dimensional working memory with trajectory compression
+- **Triple-Signal Search**: Three-way ranking combining BM25, vector similarity, and graph proximity
+- **Entropy Scoring**: Information-theoretic importance scoring for memory prioritization
+- **Tool Usage Analytics**: Track which tools are invoked to optimize profile loading
+- **Cluster Intelligence**: Multi-node coordination via cluster brain and SAFLA remote integration
 
-A production-grade memory system for Claude Code and MCP-compatible AI agents. Used by 200+ developers building agentic systems.
+## Performance
 
-## Why Enhanced Memory?
+Based on production testing:
+- **Write Speed**: ~0.04ms per entity
+- **Read Speed**: ~0.01ms per query
+- **Compression**: 2.4x average reduction
+- **Semantic Cache Hit Rate**: 30-40%
+- **Storage**: SQLite database at `~/.claude/enhanced_memories/memory.db`
 
-| Feature | Enhanced Memory | Basic File Storage | Vector DB Only |
-|---------|----------------|-------------------|----------------|
-| Cross-session persistence | Yes | Manual | Yes |
-| Sub-millisecond access | Yes (~0.01ms) | No | No |
-| 2.4x compression | Yes | No | No |
-| Semantic search | Yes | No | Yes |
-| Memory tiers (working/archive) | Yes | No | No |
-| Causal chains & patterns | Yes | No | No |
-| Zero external dependencies | Yes | Yes | No (needs DB) |
-| Works offline | Yes | Yes | Sometimes |
+## Installation
 
-## Quick Start (Claude Code)
+### Prerequisites
 
-### 1. Install
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+
+### Quick Start
 
 ```bash
-# Clone the repo
 git clone https://github.com/marc-shade/enhanced-memory-mcp.git
 cd enhanced-memory-mcp
-
-# Install with uv (recommended)
-uv venv && uv pip install -r requirements.txt
-
-# Or with pip
-pip install -r requirements.txt
+uv venv --python 3.11 .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
-### 2. Configure Claude Code
+### Configure in Claude Code
 
 Add to your `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
-    "enhanced-memory-mcp": {
-      "command": "python",
-      "args": ["/path/to/enhanced-memory-mcp/server.py"],
-      "env": {}
+    "enhanced-memory": {
+      "command": "python3",
+      "args": ["/path/to/enhanced-memory-mcp/server.py"]
     }
   }
 }
 ```
 
-### 3. Use It
+### Configure in Claude Desktop
 
-```
-You: Remember that I prefer TypeScript over JavaScript for new projects
+Add to your Claude Desktop MCP configuration:
 
-Claude: I'll store that preference in memory.
-[Uses create_entities tool]
-
---- Next session ---
-
-You: What language should we use for this new API?
-
-Claude: Based on your stored preferences, you prefer TypeScript over JavaScript
-for new projects. I'll use TypeScript.
-```
-
-## Features
-
-### Core Capabilities
-- **Persistent Memory**: Survives sessions, restarts, even system reboots
-- **Blazing Fast**: ~0.01ms reads, ~0.04ms writes
-- **Smart Compression**: 2.4x data reduction with zlib level 9
-- **Data Integrity**: SHA256 checksums on all stored data
-- **Memory Tiers**: Working, Reference, Archive - automatic lifecycle management
-
-### Advanced Features (100+ MCP Tools)
-- **Semantic Search**: Find memories by meaning, not just keywords
-- **Causal Chains**: Track cause-effect relationships
-- **Pattern Learning**: Automatic pattern extraction from experiences
-- **Memory Consolidation**: Sleep-inspired consolidation cycles
-- **Episodic Memory**: Time-bound experiences and events
-- **Procedural Memory**: Skills that improve with use
-- **Theory of Mind**: Model other agents' beliefs and intentions
-
-### NEW: Production-Grade AGI Features
-
-| Feature | Description | Documentation |
-|---------|-------------|---------------|
-| **Holographic Memory** | Spreading activation across related memories | [docs/HOLOGRAPHIC_MEMORY.md](docs/HOLOGRAPHIC_MEMORY.md) |
-| **Anti-Hallucination** | L-Score provenance, shadow vector search, citation validation | [docs/ANTI_HALLUCINATION.md](docs/ANTI_HALLUCINATION.md) |
-| **Continuous Learning** | EWC++ to prevent catastrophic forgetting | [docs/CONTINUOUS_LEARNING.md](docs/CONTINUOUS_LEARNING.md) |
-| **Advanced Features** | Causal inference, strange loops, ReasoningBank, caching | [docs/ADVANCED_FEATURES.md](docs/ADVANCED_FEATURES.md) |
-
-**Holographic Memory** - 4-phase cognitive architecture:
-- Activation Field (spreading activation)
-- Memory-Influenced Routing
-- Procedural Evolution
-- Routing Learning
-
-**Anti-Hallucination System**:
-- Pattern detection for common hallucination indicators
-- L-Score provenance tracking (confidence × relevance / depth)
-- Shadow vector search for contradicting evidence
-- Citation validation and trusted source management
-
-**Continuous Learning (EWC++)**:
-- Elastic Weight Consolidation prevents forgetting
-- Pattern recognition from corrections
-- Source reliability tracking
-- Self-improvement cycles with meta-cognition
-
-**Additional Advanced Capabilities**:
-- Causal Inference Engine with DAG validation
-- Strange Loops Detector (circular reasoning, contradictions)
-- ReasoningBank for experience-based learning
-- Semantic Cache and FACT Cache for performance
-- Hybrid Search with cross-encoder reranking
-- Multi-Query RAG and query expansion
-- ART (Adaptive Resonance Theory) online learning
-
-## Use Cases
-
-### Personal AI Assistant
-```python
-# Store user preferences
-create_entities([{
-    "name": "user_preferences",
-    "entityType": "preferences",
-    "observations": ["Prefers dark mode", "TypeScript > JavaScript", "Uses vim keybindings"]
-}])
-```
-
-### Multi-Agent Coordination
-```python
-# Share context between agents
-send_coordination_message(
-    sender="researcher",
-    recipient="coder",
-    subject="Found solution",
-    content={"approach": "Use connection pooling", "source": "arxiv:2024.12345"}
-)
-```
-
-### Learning from Experience
-```python
-# Record action outcomes
-add_episode(
-    event_type="code_generation",
-    episode_data={"task": "API endpoint", "approach": "FastAPI", "result": "success"},
-    significance_score=0.8
-)
-
-# Later: patterns extracted automatically during consolidation
+```json
+{
+  "mcpServers": {
+    "enhanced-memory": {
+      "command": "/path/to/enhanced-memory-mcp/.venv/bin/python3",
+      "args": ["/path/to/enhanced-memory-mcp/server.py"]
+    }
+  }
+}
 ```
 
 ## Architecture
 
 ### Memory Tiers
 
-| Tier | Purpose | Access Pattern | Compression |
-|------|---------|----------------|-------------|
-| **Core** | System roles, critical config | Always loaded | Medium |
-| **Working** | Active context, current session | High frequency | Low |
-| **Reference** | Documentation, patterns | On-demand | Medium |
-| **Archive** | Historical data, old sessions | Rare | Maximum |
+| Tier | Purpose | Access Pattern |
+|------|---------|----------------|
+| **Core** | System roles, AI agent library, execution patterns | Pre-loaded on startup, sub-ms access |
+| **Working** | Active projects, current context, agent assignments | Session-scoped, frequent read/write |
+| **Reference** | Documentation, code patterns, error solutions | Full-text search, lazy loaded |
+| **Archive** | Historical data, metrics, decision logs | Maximum compression, date-partitioned |
 
-### Database
+### Module Architecture
 
-Single SQLite file at `~/.claude/enhanced_memories/memory.db` - no external services required.
+```
+server.py                    # Main FastMCP entry point
+├── server/                  # Core server modules
+│   ├── config.py            # Configuration and logging
+│   ├── database.py          # SQLite connection management
+│   ├── compression.py       # zlib compression engine
+│   ├── compaction.py        # Entity compaction and cleanup
+│   ├── integrity.py         # SHA256 integrity verification
+│   ├── versioning.py        # Git-like memory versioning
+│   └── modules.py           # Profile-based module loader
+├── router/                  # Intelligent LLM routing
+│   ├── router.py            # Multi-provider router
+│   ├── intelligent_router.py # Uncertainty-aware routing
+│   ├── uncertainty.py       # Uncertainty scoring
+│   └── providers/           # Provider implementations
+├── sandbox/                 # Code execution sandbox
+│   ├── executor.py          # RestrictedPython execution
+│   ├── security.py          # Safety checks
+│   ├── pii_tokenizer.py     # PII detection and tokenization
+│   ├── lazy_loader.py       # Deferred module loading
+│   └── tool_discovery.py    # Dynamic tool discovery
+├── agi/                     # AGI cognitive modules (22 files)
+│   ├── consolidation.py     # Sleep-like memory consolidation
+│   ├── metacognition.py     # Self-awareness tracking
+│   ├── belief_tracking.py   # Probabilistic belief states
+│   ├── temporal_reasoning.py # Causal chains
+│   ├── emotional_memory.py  # Emotional tagging
+│   └── ...
+├── *_tools.py (31 files)    # MCP tool modules
+└── test_*.py (67 files)     # Test suite
+```
+
+### RAG Strategy Pipeline
+
+| Tier | Strategy | Tools | File |
+|------|----------|-------|------|
+| 1 | Hybrid Search (BM25 + Vector) | `search_hybrid` | `hybrid_search_tools_nmf.py` |
+| 1 | Re-ranking (Cross-Encoder) | `search_with_reranking` | `reranking_tools_nmf.py` |
+| 2 | Query Expansion | `search_with_query_expansion` | `query_expansion_tools.py` |
+| 2 | Multi-Query RAG | `search_with_multi_query` | `multi_query_rag_tools.py` |
+| 3.1 | Contextual Retrieval | `generate_context_for_chunk` | `contextual_retrieval_tools.py` |
+| 3.2 | Context-Aware Chunking | `chunk_document_semantic` | `context_aware_chunking.py` |
+| 3.3 | Hierarchical RAG | `search_hierarchical` | `hierarchical_rag_tools.py` |
+| 4.1 | Agentic + Self-Reflective RAG | `agentic_retrieve` | `agentic_rag_tools.py` |
+| 4.2 | GraphRAG | `graph_enhanced_search` | `graphrag_tools.py` |
+| 4.3 | Visual Memory | `store_visual_episode` | `visual_memory_tools.py` |
+| -- | Triple-Signal Search | `triple_signal_search` | `triple_signal_tools.py` |
+| -- | Semantic Cache | `semantic_cache_get`, `agi_cached_reasoning` | `semantic_cache_tools.py` |
+| -- | FACT Cache | `fact_search` | `fact_integration.py` |
+| -- | Unified Search | `unified_search` | `unified_search_api.py` |
+
+### Memory Profiles
+
+Control tool loading via the `MEMORY_PROFILE` environment variable:
+
+```bash
+# Full mode (default): All 200+ tools loaded
+MEMORY_PROFILE=full python3 server.py
+
+# Orchestrator mode: ~15 essential tools for coordination
+MEMORY_PROFILE=orchestrator python3 server.py
+```
+
+Orchestrator mode loads only: `nmf_tools`, `safla_remote_integration`, `fact_integration`, `unified_search_api`, `semantic_cache_tools`, `reasoning_bank`.
+
+### Database Schema
+
+Primary tables in `~/.claude/enhanced_memories/memory.db`:
 
 ```sql
--- Core schema (simplified)
-entities(id, name, type, tier, compressed_data, checksum, created_at, accessed_at)
-relations(from_entity, to_entity, relation_type)
-episodes(event_type, data, significance, emotional_valence)
-concepts(name, type, definition, confidence)
-skills(name, category, steps, success_rate)
+-- Core memory storage with compression and versioning
+CREATE TABLE entities (
+    id INTEGER PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    entity_type TEXT NOT NULL,
+    tier TEXT DEFAULT 'working',
+    compressed_data BLOB,
+    original_size INTEGER,
+    compressed_size INTEGER,
+    compression_ratio REAL,
+    checksum TEXT,
+    created_at TIMESTAMP,
+    accessed_at TIMESTAMP,
+    access_count INTEGER DEFAULT 0
+);
+
+-- Entity relationships with causal tracking
+CREATE TABLE relations (
+    id INTEGER PRIMARY KEY,
+    from_entity TEXT NOT NULL,
+    to_entity TEXT NOT NULL,
+    relation_type TEXT NOT NULL,
+    weight REAL DEFAULT 1.0,
+    causal INTEGER DEFAULT 0,
+    created_at TIMESTAMP,
+    UNIQUE(from_entity, to_entity, relation_type)
+);
+
+-- Git-like version history
+CREATE TABLE entity_versions (
+    id INTEGER PRIMARY KEY,
+    entity_name TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    branch TEXT DEFAULT 'main',
+    compressed_data BLOB,
+    checksum TEXT,
+    created_at TIMESTAMP
+);
 ```
 
-## Performance
+Additional tables: `observations`, `entity_branches`, `working_memory`, `episodic_memory`, `semantic_memory`, `procedural_memory`, `visual_episodes`.
 
-Benchmarked on production workloads:
+## API Examples
 
-| Operation | Latency | Throughput |
-|-----------|---------|------------|
-| Create entity | 0.04ms | 25,000/sec |
-| Search nodes | 0.01ms | 100,000/sec |
-| Semantic search | 5ms | 200/sec |
-| Consolidation cycle | 2-5s | - |
+### Create Entities
+```python
+await create_entities({
+    "entities": [
+        {
+            "name": "project_alpha",
+            "entityType": "project",
+            "observations": ["Architecture uses microservices", "Deployed on Kubernetes"]
+        }
+    ]
+})
+```
 
-Storage: ~1KB per entity after compression (varies with content).
+### Search Nodes
+```python
+await search_nodes({
+    "query": "microservices architecture",
+    "entity_types": ["project"],
+    "limit": 10
+})
+```
 
-## Advanced: Memory Consolidation
+### Unified Search (Intelligent Routing)
+```python
+await unified_search({
+    "query": "How does authentication work?",
+    "strategy": "auto"  # Automatically selects best RAG strategy
+})
+```
 
-Inspired by sleep research on memory consolidation:
+### Agentic RAG (Self-Reflective Retrieval)
+```python
+await agentic_retrieve({
+    "query": "memory consolidation patterns",
+    "max_iterations": 3,
+    "quality_threshold": 0.7
+})
+```
+
+### Neural Memory Fabric
+```python
+# Open a memory block for editing
+await nmf_open_block({"block_id": "working_context"})
+
+# Edit the block
+await nmf_edit_block({
+    "block_id": "working_context",
+    "content": "Current focus: implementing authentication module"
+})
+
+# Recall related memories
+await nmf_recall({"query": "authentication patterns"})
+
+# Close the block
+await nmf_close_block({"block_id": "working_context"})
+```
+
+### Semantic Cache
+```python
+# Cache an LLM reasoning result
+await semantic_cache_store({
+    "query": "Explain transformer attention mechanisms",
+    "result": "Transformers use self-attention to...",
+    "ttl_hours": 24
+})
+
+# Retrieve cached result (fuzzy match)
+await semantic_cache_get({
+    "query": "How do transformer attention heads work?"
+})
+```
+
+### Memory Versioning
+```python
+# Create a branch
+await memory_branch({"branch_name": "experiment-v2"})
+
+# Make changes, then diff
+await memory_diff({"branch": "experiment-v2", "base": "main"})
+
+# Revert if needed
+await memory_revert({"entity_name": "project_alpha", "version": 3})
+```
+
+## Tool Modules
+
+### Core Tools (always loaded)
+
+| Module | Tools | Description |
+|--------|-------|-------------|
+| `server/` | `create_entities`, `search_nodes`, `get_memory_status` | Core CRUD + versioning |
+
+### AGI Cognitive Tools
+
+| Module | Phase | Description |
+|--------|-------|-------------|
+| `agi_tools.py` | Phase 1 | Identity, action tracking, agent registry |
+| `agi_tools_phase2.py` | Phase 2 | Temporal reasoning, sleep-like consolidation |
+| `agi_tools_phase3.py` | Phase 3 | Emotional tagging, associative networks |
+| `agi_tools_phase4.py` | Phase 4 | Meta-cognition, self-improvement cycles |
+
+### RAG & Search Tools
+
+| Module | Description |
+|--------|-------------|
+| `hybrid_search_tools_nmf.py` | BM25 + vector hybrid search |
+| `reranking_tools_nmf.py` | Cross-encoder re-ranking (ms-marco-MiniLM) |
+| `query_expansion_tools.py` | LLM-powered query expansion |
+| `multi_query_rag_tools.py` | Multi-perspective query generation |
+| `contextual_retrieval_tools.py` | Context-enhanced chunk retrieval |
+| `hierarchical_rag_tools.py` | Multi-level document indexing |
+| `agentic_rag_tools.py` | Autonomous self-reflective retrieval |
+| `graphrag_tools.py` | Graph-enhanced search |
+| `triple_signal_tools.py` | Three-way ranking (BM25 + vector + graph) |
+| `visual_memory_tools.py` | Visual episode storage and similarity search |
+
+### Memory Management Tools
+
+| Module | Description |
+|--------|-------------|
+| `nmf_tools.py` | Neural Memory Fabric (Letta-style blocks) |
+| `reasoning_tools.py` | 75/15 rule prioritization |
+| `semantic_cache_tools.py` | LLM reasoning result caching |
+| `fact_integration.py` | Fast cache-first fact retrieval |
+| `unified_search_api.py` | Intelligent search strategy routing |
+| `reasoning_bank.py` | Persistent learning from reasoning outcomes |
+| `manifold_working_memory_tools.py` | High-dimensional working memory |
+| `trajectory_compression.py` | Memory trajectory compression |
+| `entropy_scoring.py` | Information-theoretic importance scoring |
+| `lru_cache_layer.py` | LRU caching for hot entities |
+
+### Intelligence Tools
+
+| Module | Description |
+|--------|-------------|
+| `anti_hallucination.py` | Hallucination detection and prevention |
+| `causal_inference.py` | Causal relationship discovery |
+| `strange_loops.py` | Self-referential loop detection |
+| `continuous_learning.py` | Online learning from interactions |
+| `model_router.py` | Multi-provider LLM routing |
+| `activation_field_tools.py` | Memory activation field dynamics |
+| `procedural_evolution_tools.py` | Procedural memory evolution |
+| `routing_learning_tools.py` | Learned query routing optimization |
+| `surprise_consolidation_tools.py` | Surprise-based memory consolidation |
+| `provenance.py` | Provenance tracking and L-Score validation |
+
+### Integration Tools
+
+| Module | Description |
+|--------|-------------|
+| `safla_tools.py` | SAFLA 4-tier memory integration |
+| `safla_remote_integration.py` | Remote SAFLA cluster bridge |
+| `cluster_brain_tools.py` | Multi-node cluster intelligence |
+| `sleeptime_tools.py` | Letta sleeptime compute integration |
+| `tool_usage_logger.py` | Tool invocation analytics |
+
+## Testing
 
 ```bash
-# Run consolidation (extracts patterns, compresses old memories)
-# Automatic: runs every 6 hours or 10 Claude sessions
-# Manual:
-python -c "from server import run_full_consolidation; run_full_consolidation()"
+# Run comprehensive test suite
+python3 comprehensive_test.py
+
+# RAG integration tests (22 tests)
+python3 test_rag_integration_comprehensive.py
+
+# Test specific subsystems
+python3 test_graphrag_integration.py
+python3 test_manifold_working_memory.py
+python3 test_triple_signal_search.py
+python3 test_surprise_consolidation.py
+python3 test_trajectory_compression.py
+python3 test_anti_hallucination.py
+python3 test_causal_inference.py
+
+# AGI phase tests
+python3 test_agi_phase1.py
+python3 test_agi_phase2.py
+python3 test_agi_phase3.py
+python3 test_agi_phase4.py
+
+# Code execution sandbox
+python3 test_advanced_tool_use.py
 ```
 
-What consolidation does:
-1. **Pattern Extraction**: Recurring episodic patterns → semantic concepts
-2. **Causal Discovery**: Learns cause-effect from action outcomes
-3. **Memory Compression**: Archives old, low-access memories
-4. **Skill Refinement**: Updates procedural memory from execution stats
+## Adding New Tools
 
-## API Reference
-
-See [API_REFERENCE.md](API_REFERENCE.md) for complete documentation of all 40+ tools.
-
-### Most Used Tools
-
-| Tool | Purpose |
-|------|---------|
-| `create_entities` | Store new memories |
-| `search_nodes` | Find memories by query |
-| `add_episode` | Record experiences |
-| `get_memory_status` | Check system health |
-| `run_full_consolidation` | Trigger learning cycle |
-
-## Integration Examples
-
-### With Claude Code Hooks
-
-```yaml
-# .claude/hooks/post-task.yaml
-- name: "Record task outcome"
-  command: |
-    curl -X POST http://localhost:8080/record_outcome \
-      -d '{"task": "$TASK", "result": "$RESULT"}'
-```
-
-### With Other MCP Servers
+1. Create `{feature}_tools.py` with the registration pattern:
 
 ```python
-# Combine with research-paper-mcp
-papers = research_paper_search("transformer attention")
-for paper in papers:
-    create_entities([{
-        "name": f"paper_{paper.id}",
-        "entityType": "research",
-        "observations": [paper.abstract]
-    }])
+def register_{feature}_tools(app, *args):
+    @app.tool()
+    async def my_new_tool(param: str) -> str:
+        """Tool description shown in MCP."""
+        return result
 ```
 
-## Troubleshooting
+2. Register in `server/modules.py`:
 
-### Memory not persisting?
-```bash
-# Check database exists
-ls -la ~/.claude/enhanced_memories/memory.db
-
-# Check permissions
-chmod 644 ~/.claude/enhanced_memories/memory.db
+```python
+if should_load_module("{feature}_tools"):
+    try:
+        from {feature}_tools import register_{feature}_tools
+        register_{feature}_tools(app)
+    except Exception as e:
+        logger.warning(f"{feature} integration skipped: {e}")
 ```
 
-### Slow searches?
-```bash
-# Run optimization
-python -c "from server import optimize_database; optimize_database()"
-```
+3. Add to `tool_catalog.py` for progressive tool discovery.
+4. Write tests in `test_{feature}.py`.
 
-### Server not starting?
-```bash
-# Test standalone
-python server.py
-# Check logs for errors
-```
+## Environment Variables
 
-## Contributing
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MEMORY_PROFILE` | `full` | Tool loading profile (`full` or `orchestrator`) |
+| `TOOL_USAGE_LOGGING` | `true` | Enable tool invocation analytics |
+| `AGENTIC_SYSTEM_PATH` | `~/agentic-system` | Root path for agentic system |
+| `OLLAMA_HOST` | `localhost:11434` | Ollama server for LLM operations |
+| `QDRANT_HOST` | `localhost` | Qdrant vector database host |
+| `QDRANT_PORT` | `6333` | Qdrant vector database port |
+| `ANTHROPIC_API_KEY` | -- | For contextual prefix generation |
+| `OPENAI_API_KEY` | -- | For query expansion (optional) |
 
-PRs welcome! Areas of interest:
-- Additional embedding providers
-- Memory visualization tools
-- Performance optimizations
-- Documentation improvements
+## Dependencies
 
-## Part of the MCP Ecosystem
+Key dependencies (see `requirements.txt` for full list):
 
-This server is part of a comprehensive 24/7 autonomous AI framework. See [agentic-system-oss](https://github.com/marc-shade/agentic-system-oss) for the complete system with all MCP servers pre-configured.
-
-### Related MCP Servers
-
-**Core AGI Infrastructure**
-| Server | Purpose |
-|--------|---------|
-| [agent-runtime-mcp](https://github.com/marc-shade/agent-runtime-mcp) | Persistent task queues, goal decomposition, relay pipelines |
-| [agi-mcp](https://github.com/marc-shade/agi-mcp) | Production-ready AGI orchestration |
-| [voice-agi-mcp](https://github.com/marc-shade/voice-agi-mcp) | Stateful voice-controlled AGI with Letta-style memory |
-
-**Multi-Agent Coordination**
-| Server | Purpose |
-|--------|---------|
-| [cluster-execution-mcp](https://github.com/marc-shade/cluster-execution-mcp) | Distributed execution across clusters |
-| [node-chat-mcp](https://github.com/marc-shade/node-chat-mcp) | Inter-node AI communication |
-| [claude-flow-mcp](https://github.com/marc-shade/claude-flow-mcp) | Workflow orchestration and agent coordination |
-| [code-execution-mcp](https://github.com/marc-shade/code-execution-mcp) | Sandboxed code execution |
-
-**Knowledge Acquisition**
-| Server | Purpose |
-|--------|---------|
-| [research-paper-mcp](https://github.com/marc-shade/research-paper-mcp) | arXiv/Semantic Scholar paper search |
-| [video-transcript-mcp](https://github.com/marc-shade/video-transcript-mcp) | YouTube transcript extraction and concept mining |
-
-**Quality & Security**
-| Server | Purpose |
-|--------|---------|
-| [ember-mcp](https://github.com/marc-shade/ember-mcp) | Production-only policy enforcement |
-| [security-scanner-mcp](https://github.com/marc-shade/security-scanner-mcp) | Nuclei vulnerability scanning |
-| [security-auditor-mcp](https://github.com/marc-shade/security-auditor-mcp) | AI-powered security vulnerability scanning |
-
-**Visual & Media**
-| Server | Purpose |
-|--------|---------|
-| [image-gen-mcp](https://github.com/marc-shade/image-gen-mcp) | Multi-provider image generation |
-
-**Hardware Integration**
-| Server | Purpose |
-|--------|---------|
-| [coral-tpu-mcp](https://github.com/marc-shade/coral-tpu-mcp) | Coral TPU local ML inference |
-| [network-scanner-mcp](https://github.com/marc-shade/network-scanner-mcp) | Network device scanning |
-
-### Other Projects
-
-- [Ollama-Workbench](https://github.com/marc-shade/Ollama-Workbench) - Local LLM management and testing
-- [Ollama-Workbench-2](https://github.com/marc-shade/Ollama-Workbench-2) - v2.0 with SvelteKit + Tauri
-- [TeamForgeAI](https://github.com/marc-shade/TeamForgeAI) - Multi-agent team collaboration
+- `fastmcp` — MCP protocol implementation
+- `sentence-transformers` — Cross-encoder re-ranking (ms-marco-MiniLM-L-6-v2)
+- `qdrant-client` — Hybrid search with BM25 + vector
+- `RestrictedPython` — Secure sandbox code execution
+- `anthropic` — Claude API for contextual retrieval
+- `numpy` — Vector operations and entropy scoring
 
 ## License
 
-MIT License - Use freely in personal and commercial projects.
-
----
-
-**Built for the agentic AI era.** If this helps your project, consider giving it a star!
+MIT

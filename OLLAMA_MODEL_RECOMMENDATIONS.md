@@ -338,7 +338,7 @@ Recommendation: ❌ DO NOT USE
 ### Phase 1: Update Enhanced Memory (Immediate)
 
 ```bash
-cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memory-mcp
+cd /Volumes/SSDRAID0/agentic-system/mcp-servers/enhanced-memory-mcp
 
 # Update server.py
 # Line 842: model="gpt-oss:120b" → model="gpt-oss:20b"
@@ -354,7 +354,7 @@ cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/mcp-servers/enhanced-memo
 ### Phase 2: Update Code Evolution Protector
 
 ```bash
-cd ${AGENTIC_SYSTEM_PATH:-/opt/agentic}/agentic-system/intelligent-agents/specialized
+cd /Volumes/SSDRAID0/agentic-system/intelligent-agents/specialized
 
 # Update code_evolution_protector.py
 # Line 65: cli_tool="ollama:gpt-oss:20b-cloud"

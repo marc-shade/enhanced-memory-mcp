@@ -15,6 +15,7 @@ Architecture:
 - Node-specific working memory: Local to each node
 - Sync daemon: Pushes important learnings to cluster brain
 """
+import platform
 
 import sqlite3
 import json
@@ -25,10 +26,33 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import logging
 
+def _get_storage_base() -> Path:
+    """Detect storage base path based on platform."""
+    env_path = os.environ.get("AGENTIC_SYSTEM_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    elif system == "Linux":
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    return Path(__file__).parent.parent
+
+
+_STORAGE_BASE = _get_storage_base()
+
+
 logger = logging.getLogger(__name__)
 
 # Cluster brain database - shared location accessible by all nodes
-CLUSTER_DB_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "databases/cluster/cluster_brain.db"))
+CLUSTER_DB_PATH = Path(os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", str(_STORAGE_BASE)), "databases/cluster/cluster_brain.db"))
 
 # Node roles and their specialties - loaded from config
 def _load_node_roles() -> dict:

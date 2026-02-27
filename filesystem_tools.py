@@ -11,6 +11,7 @@ Features:
 - Semantic file search using Qdrant
 - Simple filename matching fallback
 """
+import platform
 
 import logging
 import sqlite3
@@ -117,7 +118,7 @@ def register_filesystem_tools(app, db_path, nmf=None):
             create_agent_folder(
                 agent_id="my_agent",
                 folder_name="architecture_docs",
-                folder_path=os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", "${AGENTIC_SYSTEM_PATH:-/opt/agentic}"), "docs"),
+                folder_path=os.path.join(os.environ.get("AGENTIC_SYSTEM_PATH", str(_STORAGE_BASE)), "docs"),
                 description="System architecture documentation"
             )
         """
@@ -641,6 +642,29 @@ def register_filesystem_tools(app, db_path, nmf=None):
         total_vectors = 0
         try:
             from qdrant_client import QdrantClient
+
+def _get_storage_base() -> Path:
+    """Detect storage base path based on platform."""
+    env_path = os.environ.get("AGENTIC_SYSTEM_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    elif system == "Linux":
+        if Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+        elif Path(str(_STORAGE_BASE)).exists():
+            return Path(str(_STORAGE_BASE))
+    return Path(__file__).parent.parent
+
+
+_STORAGE_BASE = _get_storage_base()
+
             client = QdrantClient(url=QDRANT_URL)
             collections = client.get_collections().collections
             collection_names = [c.name for c in collections]
