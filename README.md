@@ -1,5 +1,10 @@
 # Enhanced Memory MCP Server
 
+[![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![Tools](https://img.shields.io/badge/MCP_Tools-200%2B-informational)]()
+
 A high-performance memory management system for AI agents built on the [Model Context Protocol](https://modelcontextprotocol.io/). Provides 200+ tools across compressed SQLite storage, 4-tier memory architecture, Git-like versioning, multi-strategy RAG, AGI cognitive phases, and modular tool loading with profile-based scaling.
 
 ## Features
