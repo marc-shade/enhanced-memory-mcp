@@ -768,11 +768,29 @@ operator-directed, both exit 0**, a delta of exactly 4.
 Worth recording how that was established, because the first explanation was
 wrong. Two runs disagreed (97 vs 102) and the difference was attributed to which
 optional backends were importable — plausible, and false. It was the run mode.
-Had it been backends, coverage would have been silently varying with the
-environment, which is a far worse property; the guess was not only incorrect but
-would have masked a real defect had one existed. The suite now prints its mode,
-names the checks it skipped and why, and states that the count is not comparable
-between modes.
+
+The control that settles it, run afterwards rather than assumed:
+
+| Configuration | Assertions |
+|---|---|
+| core-only venv, isolated mode | 106 |
+| full optional venv, isolated mode | 106 |
+
+Installing every optional backend moves the count by zero. Had it been the
+backends, coverage would have been silently varying with the environment — a far
+worse property than an uncomparable total — so the wrong guess would have
+masked a real defect rather than merely mis-explaining a harmless one.
+
+Note that this is the *third* count in this release whose difference was blamed
+on optional backends and turned out to be something else; the tool surface was
+`AGENTIC_SYSTEM_PATH` and the pytest total was `HOME`. In all three the correct
+answer cost one extra run: change the suspected variable, measure again. None of
+the three was checked that way until someone else measured first. If you find a
+number here you cannot reproduce, suspect your environment before the code, and
+suspect the stated cause before either.
+
+The suite now prints its mode, names the checks it skipped and why, and states
+that the count is not comparable between modes.
 
 Stale `76/76` counts for that suite were removed from
 `ENHANCED_MEMORY_SYSTEM_GUIDE.md` (both copies), `MEMVID_CLEANUP_COMPLETE.md`
