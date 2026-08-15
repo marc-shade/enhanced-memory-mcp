@@ -498,10 +498,28 @@ virtualenv holding the core requirements only, each run under an isolated `HOME`
 | `python comprehensive_test.py` | **exit 0**, 106 of 106 assertions, isolated sandbox mode |
 | `python -m pytest tests/ -q` | **exit 0**, 137 passed, 1 skipped |
 
-The skip is the difference from the 138-passed figure recorded below: one test
-skips in an environment without the optional backends installed. Same tree, same
-commit, different install mode, which is exactly the property the count-versus-
-exit-code warning below is about.
+The skip is the difference from the 138-passed figure recorded below, and the
+cause is **not** the optional backends — that was the first explanation offered
+and it is wrong. Measured on one machine, one commit, three configurations:
+
+| Configuration | Result |
+|---|---|
+| core-only venv, real `HOME` | 138 passed, 0 skipped |
+| core-only venv, isolated `HOME` | 137 passed, **1 skipped** |
+| full optional venv, real `HOME` | 138 passed, 0 skipped |
+
+Installing the optional backends changes the count by zero. What changes it is
+`HOME`. The test states its own condition: it exercises the isolation guard
+against a *resolved* symlink target, and skips with "home memory directory is
+not a symlink on this machine" when `~/.claude/enhanced_memories` is a real
+directory. On a developer machine where that path is a symlink to another
+volume the test runs; under a fresh `HOME` it has nothing to resolve.
+
+**137 passed / 1 skipped is what a new installation sees.** 138 is what a
+machine with a symlinked memory directory sees. Same tree, same commit — which
+is exactly the count-versus-exit-code point the warning below makes, and the
+second time in this release that a number differed because of state on the
+measuring machine rather than anything in the code.
 
 Two gates ship, and they answer different questions.
 
