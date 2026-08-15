@@ -265,6 +265,12 @@ installation runs, so it claims nothing. Servers are declared by pointing
 deleting them alone would not have worked, because `init_tool_registry()`
 regenerated them from the dict.
 
+`tool_registry/` is now in `.gitignore`. It is per-install state written at
+runtime, and committing it is precisely how this repository came to make claims
+on behalf of every future clone — `list_servers()` reports whatever directory
+names it finds there. Verified that a regenerated tree containing a real
+declaration is ignored rather than picked up by `git add`.
+
 Measured on a clean tree with no declaration:
 
 ```

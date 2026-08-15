@@ -69,6 +69,14 @@ Thumbs.db
 *.log
 logs/
 
+# Runtime-generated tool registry. sandbox/tool_discovery.py writes this tree
+# from whatever the installation declares via MEMORY_TOOL_REGISTRY_FILE, so it
+# is per-install state, not source. Committing it is how this repository came
+# to advertise five MCP servers that did not exist: list_servers() reports the
+# directory names it finds here, so a checked-in tree makes claims on behalf of
+# every future clone.
+tool_registry/
+
 # Scratch data directory used by local verification runs. Its contents are
 # already covered by *.db / *.log, but only incidentally -- name it so a stray
 # file of another type cannot slip in.
