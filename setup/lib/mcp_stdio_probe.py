@@ -122,6 +122,31 @@ class Server:
         except OSError:
             return "(stderr unavailable)"
 
+    def startup_warnings(self) -> List[str]:
+        """Distinct WARNING lines the server wrote while starting.
+
+        The server sends WARNING and above to stderr (MEMORY_LOG_STDERR, on by
+        default) precisely so that a skipped tool group is visible instead of
+        buried in a log file under /tmp. Reporting only on failure would put it
+        straight back in a hole: a core install skips several optional groups,
+        the tool count still looks plausible, and nothing says which features
+        are absent. So these surface on success too.
+        """
+        self.stderr_file.flush()
+        seen: List[str] = []
+        try:
+            with open(self.stderr_file.name, "r", errors="replace") as handle:
+                for line in handle:
+                    line = line.rstrip()
+                    if not line.startswith("WARNING: "):
+                        continue
+                    text = line[len("WARNING: ") :].strip()
+                    if text and text not in seen:
+                        seen.append(text)
+        except OSError:
+            return []
+        return seen
+
     def close(self) -> None:
         try:
             if self.proc.stdin:
@@ -235,6 +260,23 @@ def main() -> int:
                 "mcp-tools",
                 f"{detail}, below the minimum of {args.min}",
             )
+
+        warnings = server.startup_warnings()
+        if warnings:
+            shown = warnings[:8]
+            result(
+                "WARN",
+                "mcp-startup",
+                f"the server logged {len(warnings)} distinct startup warning(s). "
+                "Each one names a feature that did NOT load; on a core install "
+                "that is expected, but read them before assuming otherwise.",
+            )
+            for text in shown:
+                print(f"  - {text}", flush=True)
+            if len(warnings) > len(shown):
+                print(f"  - ... and {len(warnings) - len(shown)} more", flush=True)
+        else:
+            result("PASS", "mcp-startup", "no startup warnings; every group loaded")
 
         if server.stdout_pollution:
             result(

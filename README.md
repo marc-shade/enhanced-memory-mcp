@@ -176,6 +176,8 @@ MEMORY_DB_SOCKET_PATH=/tmp/other.sock ./healthcheck.sh
 | `MEMORY_EMBED_MODEL` | `embeddinggemma` | Embedding model to pull and use. |
 | `MEMORY_LOW_CONF_THRESHOLD` | `0.50` | Score under which a result is flagged low confidence. |
 | `MEMORY_TOOL_REGISTRY_FILE` | (unset) | JSON file declaring which *other* MCP servers code inside `execute_code` may call. Unset means none are declared, which is the honest default for a package that cannot know what your machine runs. |
+| `MEMORY_LOG_STDERR` | `1` | Send `WARNING` and above to stderr as well as the log file, so skipped tool groups are visible. Set `0` if your MCP client treats stderr as errors. |
+| `AGENTIC_SYSTEM_PATH` | (unset) | Only enables GraphRAG, whose implementation is not shipped here. Setting it takes the tool count from 186 to 193, or 204 to 211 with the optional backends. |
 | `EXPECTED_TOOL_COUNT` | (unset) | Pins the tool count `./healthcheck.sh` requires. |
 
 `ENHANCED_MEMORY_SURFACE` and `MEMORY_PROFILE` both change how many tools
@@ -331,16 +333,24 @@ pin the count, `--require-optional` to demand the vector stack.
 
 `/tmp/enhanced-memory-mcp.log`, always, for every install on the host.
 
-The MCP server clears every logging handler at startup and sends all output to
+The MCP server clears every logging handler at startup and sends everything to
 that one rotating file (50 MB, two backups), because on the stdio transport
-anything on stdout corrupts the protocol and anything on stderr is read as an
-error by some clients. Two consequences worth knowing before you go looking:
+anything on stdout corrupts the protocol. Routine `INFO` lives only there, and
+the path is fixed, so two checkouts on one machine interleave into the same
+file with timestamps and pids as your only separator.
 
-- The path is fixed, so two checkouts on one machine interleave into the same
-  file. Timestamps and pids are your only separator.
-- Every `... integration skipped: <reason>` message lands there and nowhere
-  else. If a tool you expected is missing, that log says why, and it is the only
-  place that does.
+`WARNING` and above additionally go to **stderr**, unless you set
+`MEMORY_LOG_STDERR=0`. That is deliberate: every `... integration skipped:
+<reason>` line is a feature that did not load, and routing those only to a file
+under `/tmp` meant nobody ever read them. If your MCP client treats any stderr
+output as an error, set the variable to 0 and read the file instead.
+
+`./healthcheck.sh` reports these too, as a `WARN mcp-startup` line listing the
+distinct warnings, so a missing feature shows up in the gate rather than only in
+a log. Measured on this branch: a core install produces 11 of them (numpy,
+qdrant-client, sentence-transformers, redis, neo4j and so on), a full install
+3. None of them fail the gate. They are the inventory of what your install does
+not have, which is worth reading once and then ignoring.
 
 ### Verifying the signatures on this release
 
