@@ -17,9 +17,8 @@ Token Optimization:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional
 from enum import Enum
-import json
 
 class ToolTier(Enum):
     HOT = "hot"      # Always loaded - most critical/common

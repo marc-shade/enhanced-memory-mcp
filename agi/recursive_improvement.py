@@ -16,10 +16,9 @@ This module:
 import sqlite3
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger("recursive_improvement")
 

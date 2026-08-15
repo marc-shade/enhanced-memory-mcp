@@ -5,9 +5,7 @@ Filters out TTS commands and verbose system logs from session context loading
 """
 
 import re
-import json
 from typing import Dict, List, Any, Optional
-from pathlib import Path
 
 class ContextCompressionFilter:
     """Filters and compresses context for session loading"""
@@ -127,7 +125,6 @@ class ContextCompressionFilter:
         """Create a compressed summary of session entries"""
         tool_counts = {}
         user_requests = []
-        outcomes = []
         
         for entry in entries:
             if entry.get("type") == "user":

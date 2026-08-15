@@ -10,6 +10,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+
 def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Create one or more memory entities.
@@ -33,15 +34,19 @@ def create_entities(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     from memory_client import MemoryClient
 
+    # *_sync, not the async method: this API is called from RestrictedPython
+    # inside execute_code, which has no event loop and cannot await. Returning
+    # the coroutine made every memory call fail with
+    # "'coroutine' object has no attribute 'get'".
     client = MemoryClient()
-    return client.create_entities(entities)
+    return client.create_entities_sync(entities)
 
 
 def search_nodes(
     query: str,
     limit: int = 10,
     entity_type: Optional[str] = None,
-    min_confidence: float = 0.0
+    min_confidence: float = 0.0,
 ) -> List[Dict[str, Any]]:
     """
     Search memory entities by query.
@@ -64,13 +69,25 @@ def search_nodes(
     from memory_client import MemoryClient
 
     client = MemoryClient()
-    results = client.search_nodes(query, limit)
+    response = client.search_nodes_sync(query, limit)
+
+    # The daemon answers with an envelope, not a bare list. Filtering the
+    # envelope directly would iterate its KEYS and raise on r.get(), so unwrap
+    # first and keep this function's documented List return type honest.
+    if isinstance(response, dict):
+        if not response.get("success", True):
+            raise RuntimeError(
+                f"search_nodes failed: {response.get('error', 'unknown error')}"
+            )
+        results = response.get("results", [])
+    else:
+        results = response
 
     # Local filtering if specified
     if entity_type:
-        results = [r for r in results if r.get('entityType') == entity_type]
+        results = [r for r in results if r.get("entityType") == entity_type]
     if min_confidence > 0:
-        results = [r for r in results if r.get('confidence', 0) >= min_confidence]
+        results = [r for r in results if r.get("confidence", 0) >= min_confidence]
 
     return results
 
@@ -94,13 +111,11 @@ def get_status() -> Dict[str, Any]:
     from memory_client import MemoryClient
 
     client = MemoryClient()
-    return client.get_memory_status()
+    return client.get_memory_status_sync()
 
 
 def update_entity(
-    name: str,
-    observations: List[str],
-    commit_message: Optional[str] = None
+    name: str, observations: List[str], commit_message: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Update existing entity with new observations.
@@ -122,15 +137,20 @@ def update_entity(
         # Returns: {"entity_id": 45, "version": 3}
     """
     import sqlite3
-    from pathlib import Path
 
-    DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+    # Opens SQLite directly rather than going through the daemon socket, so the
+    # socket configuration does not contain it. The path must therefore be
+    # resolved through the shared resolver: an inline default here would write to
+    # the operator's real database whatever the server was configured to use.
+    from memory_paths import get_db_path
+
+    DB_PATH = get_db_path()
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get entity ID
-    cursor.execute('SELECT id FROM entities WHERE name = ?', (name,))
+    cursor.execute("SELECT id FROM entities WHERE name = ?", (name,))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -141,15 +161,18 @@ def update_entity(
     # Add observations
     for obs in observations:
         cursor.execute(
-            'INSERT INTO observations (entity_id, content) VALUES (?, ?)',
-            (entity_id, obs)
+            "INSERT INTO observations (entity_id, content) VALUES (?, ?)",
+            (entity_id, obs),
         )
 
     # Create version (import from server module)
     try:
         import server
-        version_id = server.create_version(entity_id, {"observations": observations}, commit_message)
-    except Exception as e:
+
+        version_id = server.create_version(
+            entity_id, {"observations": observations}, commit_message
+        )
+    except Exception:
         # Fallback: Just return entity info without versioning
         version_id = None
 
@@ -159,5 +182,5 @@ def update_entity(
     return {
         "entity_id": entity_id,
         "version_id": version_id,
-        "observations_added": len(observations)
+        "observations_added": len(observations),
     }

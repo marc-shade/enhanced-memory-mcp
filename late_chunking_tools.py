@@ -22,7 +22,6 @@ Research basis:
 
 import asyncio
 import hashlib
-import json
 import logging
 import os
 import re
@@ -33,26 +32,26 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Ollama inference node (M4 Max with 128GB unified memory)
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://completeu-server.local:11434")
+# Ollama inference node (auto-detect local or cluster)
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 # Long-context embedding models available on inference node
 LONG_CONTEXT_MODELS = {
     "qwen3-embedding:8b-fp16": {
         "max_tokens": 8192,
         "dimensions": 4096,  # Qwen3 embeddings are 4096-dim
-        "description": "Qwen3 8B embedding model with 8k context"
+        "description": "Qwen3 8B embedding model with 8k context",
     },
     "bge-m3:latest": {
         "max_tokens": 8192,
         "dimensions": 1024,
-        "description": "BGE-M3 multilingual model with 8k context"
+        "description": "BGE-M3 multilingual model with 8k context",
     },
     "snowflake-arctic-embed2:latest": {
         "max_tokens": 8192,
         "dimensions": 1024,
-        "description": "Snowflake Arctic Embed2 with 8k context"
-    }
+        "description": "Snowflake Arctic Embed2 with 8k context",
+    },
 }
 
 DEFAULT_MODEL = "bge-m3:latest"  # Best balance of quality and speed
@@ -61,6 +60,7 @@ DEFAULT_MODEL = "bge-m3:latest"  # Best balance of quality and speed
 @dataclass
 class ChunkWithContext:
     """A chunk with document-aware embedding"""
+
     chunk_id: str
     text: str
     start_pos: int
@@ -76,6 +76,7 @@ class ChunkWithContext:
 @dataclass
 class LateChunkingResult:
     """Result from late chunking operation"""
+
     document_id: str
     chunks: List[ChunkWithContext]
     model: str
@@ -102,7 +103,7 @@ class LateChunkingProcessor:
         ollama_host: str = OLLAMA_HOST,
         chunk_size: int = 512,
         chunk_overlap: int = 50,
-        context_window: int = 200  # Extra context around each chunk
+        context_window: int = 200,  # Extra context around each chunk
     ):
         self.model = model
         self.ollama_host = ollama_host
@@ -112,13 +113,14 @@ class LateChunkingProcessor:
 
         # Validate model
         if model not in LONG_CONTEXT_MODELS:
-            logger.warning(f"Model {model} not in known long-context models, using anyway")
+            logger.warning(
+                f"Model {model} not in known long-context models, using anyway"
+            )
 
-        self.model_info = LONG_CONTEXT_MODELS.get(model, {
-            "max_tokens": 8192,
-            "dimensions": 1024,
-            "description": "Unknown model"
-        })
+        self.model_info = LONG_CONTEXT_MODELS.get(
+            model,
+            {"max_tokens": 8192, "dimensions": 1024, "description": "Unknown model"},
+        )
 
     async def _get_embedding(self, text: str) -> Optional[List[float]]:
         """Get embedding from Ollama inference node"""
@@ -128,14 +130,13 @@ class LateChunkingProcessor:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     f"{self.ollama_host}/api/embeddings",
-                    json={
-                        "model": self.model,
-                        "prompt": text
-                    }
+                    json={"model": self.model, "prompt": text},
                 )
 
                 if response.status_code != 200:
-                    logger.error(f"Ollama returned {response.status_code}: {response.text[:200]}")
+                    logger.error(
+                        f"Ollama returned {response.status_code}: {response.text[:200]}"
+                    )
                     return None
 
                 data = response.json()
@@ -149,10 +150,7 @@ class LateChunkingProcessor:
         """Rough token estimation (4 chars per token average)"""
         return len(text) // 4
 
-    def _create_chunks_with_boundaries(
-        self,
-        text: str
-    ) -> List[Tuple[int, int, str]]:
+    def _create_chunks_with_boundaries(self, text: str) -> List[Tuple[int, int, str]]:
         """
         Create chunks with their character boundaries.
 
@@ -161,7 +159,7 @@ class LateChunkingProcessor:
         chunks = []
 
         # Split on sentence boundaries when possible
-        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = re.split(r"(?<=[.!?])\s+", text)
 
         current_chunk = []
         current_length = 0
@@ -173,7 +171,7 @@ class LateChunkingProcessor:
 
             # If adding this sentence exceeds chunk size, finalize current chunk
             if current_length + sentence_length > self.chunk_size * 4 and current_chunk:
-                chunk_text = ' '.join(current_chunk)
+                chunk_text = " ".join(current_chunk)
                 chunks.append((current_start, position, chunk_text))
 
                 # Start new chunk with overlap
@@ -188,17 +186,12 @@ class LateChunkingProcessor:
 
         # Don't forget the last chunk
         if current_chunk:
-            chunk_text = ' '.join(current_chunk)
+            chunk_text = " ".join(current_chunk)
             chunks.append((current_start, position, chunk_text))
 
         return chunks
 
-    def _get_context_window(
-        self,
-        full_text: str,
-        start_pos: int,
-        end_pos: int
-    ) -> str:
+    def _get_context_window(self, full_text: str, start_pos: int, end_pos: int) -> str:
         """Get chunk with surrounding context"""
         context_start = max(0, start_pos - self.context_window)
         context_end = min(len(full_text), end_pos + self.context_window)
@@ -208,7 +201,7 @@ class LateChunkingProcessor:
         self,
         text: str,
         document_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> LateChunkingResult:
         """
         Process a document using late chunking strategy.
@@ -225,7 +218,7 @@ class LateChunkingProcessor:
 
         # Generate document ID if not provided
         if document_id is None:
-            document_id = hashlib.md5(text[:1000].encode(), usedforsecurity=False).hexdigest()[:12]
+            document_id = hashlib.md5(text[:1000].encode()).hexdigest()[:12]
 
         # Estimate tokens
         total_tokens = self._estimate_tokens(text)
@@ -238,7 +231,7 @@ class LateChunkingProcessor:
                 f"Truncating to fit."
             )
             # Truncate to approximately max_tokens
-            text = text[:max_tokens * 4]
+            text = text[: max_tokens * 4]
             total_tokens = max_tokens
 
         # Create chunks with boundaries
@@ -267,7 +260,7 @@ class LateChunkingProcessor:
                 chunk_index=idx,
                 total_chunks=len(chunk_boundaries),
                 context_window=context_text,
-                metadata=metadata or {}
+                metadata=metadata or {},
             )
             chunks.append(chunk)
 
@@ -280,13 +273,11 @@ class LateChunkingProcessor:
             total_tokens=total_tokens,
             processing_time_ms=processing_time,
             embedding_dimensions=self.model_info["dimensions"],
-            strategy="late_chunking"
+            strategy="late_chunking",
         )
 
     async def process_documents_batch(
-        self,
-        documents: List[Dict[str, Any]],
-        max_concurrent: int = 3
+        self, documents: List[Dict[str, Any]], max_concurrent: int = 3
     ) -> List[LateChunkingResult]:
         """
         Process multiple documents with concurrency control.
@@ -305,7 +296,7 @@ class LateChunkingProcessor:
                 return await self.process_document(
                     text=doc.get("text", ""),
                     document_id=doc.get("id"),
-                    metadata=doc.get("metadata")
+                    metadata=doc.get("metadata"),
                 )
 
         tasks = [process_with_semaphore(doc) for doc in documents]
@@ -335,7 +326,7 @@ def register_late_chunking_tools(app, db_path: Path = None):
         document_id: Optional[str] = None,
         model: str = DEFAULT_MODEL,
         chunk_size: int = 512,
-        context_window: int = 200
+        context_window: int = 200,
     ) -> Dict[str, Any]:
         """
         Process document using Late Chunking strategy.
@@ -365,9 +356,7 @@ def register_late_chunking_tools(app, db_path: Path = None):
             # Use custom processor if model differs
             if model != processor.model:
                 custom_processor = LateChunkingProcessor(
-                    model=model,
-                    chunk_size=chunk_size,
-                    context_window=context_window
+                    model=model, chunk_size=chunk_size, context_window=context_window
                 )
                 result = await custom_processor.process_document(text, document_id)
             else:
@@ -376,14 +365,18 @@ def register_late_chunking_tools(app, db_path: Path = None):
             # Format chunks for response (exclude large embeddings from display)
             chunks_summary = []
             for chunk in result.chunks:
-                chunks_summary.append({
-                    "chunk_id": chunk.chunk_id,
-                    "text_preview": chunk.text[:200] + "..." if len(chunk.text) > 200 else chunk.text,
-                    "start_pos": chunk.start_pos,
-                    "end_pos": chunk.end_pos,
-                    "chunk_index": chunk.chunk_index,
-                    "embedding_dims": len(chunk.embedding)
-                })
+                chunks_summary.append(
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "text_preview": chunk.text[:200] + "..."
+                        if len(chunk.text) > 200
+                        else chunk.text,
+                        "start_pos": chunk.start_pos,
+                        "end_pos": chunk.end_pos,
+                        "chunk_index": chunk.chunk_index,
+                        "embedding_dims": len(chunk.embedding),
+                    }
+                )
 
             return {
                 "success": True,
@@ -394,15 +387,12 @@ def register_late_chunking_tools(app, db_path: Path = None):
                 "total_tokens": result.total_tokens,
                 "embedding_dimensions": result.embedding_dimensions,
                 "processing_time_ms": round(result.processing_time_ms, 2),
-                "strategy": result.strategy
+                "strategy": result.strategy,
             }
 
         except Exception as e:
             logger.error(f"Late chunking failed: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def late_chunk_and_store(
@@ -410,7 +400,7 @@ def register_late_chunking_tools(app, db_path: Path = None):
         entity_name: str,
         entity_type: str = "document",
         model: str = DEFAULT_MODEL,
-        chunk_size: int = 512
+        chunk_size: int = 512,
     ) -> Dict[str, Any]:
         """
         Late chunk a document and store chunks as memory entities.
@@ -442,18 +432,23 @@ def register_late_chunking_tools(app, db_path: Path = None):
 
             # Store parent document entity
             from memory_client import MemoryClient
+
             client = MemoryClient()
 
             # Create parent document entity
-            parent_response = client.create_entities([{
-                "name": entity_name,
-                "entityType": entity_type,
-                "observations": [
-                    f"Document with {len(result.chunks)} late-chunked sections",
-                    f"Processed with {result.model}",
-                    f"Total tokens: {result.total_tokens}"
+            parent_response = client.create_entities(
+                [
+                    {
+                        "name": entity_name,
+                        "entityType": entity_type,
+                        "observations": [
+                            f"Document with {len(result.chunks)} late-chunked sections",
+                            f"Processed with {result.model}",
+                            f"Total tokens: {result.total_tokens}",
+                        ],
+                    }
                 ]
-            }])
+            )
 
             parent_id = None
             if parent_response.get("created"):
@@ -468,8 +463,8 @@ def register_late_chunking_tools(app, db_path: Path = None):
                     "observations": [
                         chunk.text,
                         f"Chunk {chunk.chunk_index + 1} of {chunk.total_chunks}",
-                        f"Late chunking with {result.model}"
-                    ]
+                        f"Late chunking with {result.model}",
+                    ],
                 }
                 chunk_entities.append(chunk_entity)
 
@@ -495,8 +490,8 @@ def register_late_chunking_tools(app, db_path: Path = None):
                             "entity_name": entity_name,
                             "chunk_index": chunk.chunk_index,
                             "text": chunk.text[:500],
-                            "strategy": "late_chunking"
-                        }
+                            "strategy": "late_chunking",
+                        },
                     )
                     points.append(point)
 
@@ -506,12 +501,12 @@ def register_late_chunking_tools(app, db_path: Path = None):
 
                 if "late_chunks" not in collection_names:
                     from qdrant_client.models import VectorParams, Distance
+
                     qdrant.create_collection(
                         collection_name="late_chunks",
                         vectors_config=VectorParams(
-                            size=result.embedding_dimensions,
-                            distance=Distance.COSINE
-                        )
+                            size=result.embedding_dimensions, distance=Distance.COSINE
+                        ),
                     )
 
                 qdrant.upsert(collection_name="late_chunks", points=points)
@@ -528,21 +523,16 @@ def register_late_chunking_tools(app, db_path: Path = None):
                 "chunks_created": len(chunks_response.get("created", [])),
                 "embeddings_stored": stored_embeddings,
                 "model": result.model,
-                "processing_time_ms": round(result.processing_time_ms, 2)
+                "processing_time_ms": round(result.processing_time_ms, 2),
             }
 
         except Exception as e:
             logger.error(f"Late chunk and store failed: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def search_late_chunks(
-        query: str,
-        limit: int = 10,
-        min_score: float = 0.5
+        query: str, limit: int = 10, min_score: float = 0.5
     ) -> Dict[str, Any]:
         """
         Search late-chunked documents using context-aware embeddings.
@@ -569,10 +559,7 @@ def register_late_chunking_tools(app, db_path: Path = None):
             query_embedding = await processor._get_embedding(query)
 
             if not query_embedding:
-                return {
-                    "success": False,
-                    "error": "Failed to generate query embedding"
-                }
+                return {"success": False, "error": "Failed to generate query embedding"}
 
             # Search Qdrant
             from qdrant_client import QdrantClient
@@ -583,36 +570,35 @@ def register_late_chunking_tools(app, db_path: Path = None):
                 collection_name="late_chunks",
                 query_vector=query_embedding,
                 limit=limit,
-                score_threshold=min_score
+                score_threshold=min_score,
             )
 
             # Format results
             matches = []
             for hit in results:
-                matches.append({
-                    "chunk_id": hit.payload.get("chunk_id"),
-                    "document_id": hit.payload.get("document_id"),
-                    "entity_name": hit.payload.get("entity_name"),
-                    "chunk_index": hit.payload.get("chunk_index"),
-                    "text": hit.payload.get("text"),
-                    "score": round(hit.score, 4),
-                    "strategy": hit.payload.get("strategy", "late_chunking")
-                })
+                matches.append(
+                    {
+                        "chunk_id": hit.payload.get("chunk_id"),
+                        "document_id": hit.payload.get("document_id"),
+                        "entity_name": hit.payload.get("entity_name"),
+                        "chunk_index": hit.payload.get("chunk_index"),
+                        "text": hit.payload.get("text"),
+                        "score": round(hit.score, 4),
+                        "strategy": hit.payload.get("strategy", "late_chunking"),
+                    }
+                )
 
             return {
                 "success": True,
                 "query": query,
                 "result_count": len(matches),
                 "results": matches,
-                "model": processor.model
+                "model": processor.model,
             }
 
         except Exception as e:
             logger.error(f"Late chunk search failed: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def get_late_chunking_models() -> Dict[str, Any]:
@@ -632,14 +618,11 @@ def register_late_chunking_tools(app, db_path: Path = None):
             "current_model": processor.model,
             "ollama_host": processor.ollama_host,
             "default_chunk_size": processor.chunk_size,
-            "default_context_window": processor.context_window
+            "default_context_window": processor.context_window,
         }
 
     @app.tool()
-    async def compare_chunking_strategies(
-        text: str,
-        query: str
-    ) -> Dict[str, Any]:
+    async def compare_chunking_strategies(text: str, query: str) -> Dict[str, Any]:
         """
         Compare traditional chunking vs late chunking for a document.
 
@@ -665,13 +648,12 @@ def register_late_chunking_tools(app, db_path: Path = None):
             traditional_chunks = []
             chunk_size = 500 * 4  # ~500 tokens in chars
             for i in range(0, len(text), chunk_size):
-                chunk_text = text[i:i + chunk_size]
+                chunk_text = text[i : i + chunk_size]
                 embedding = await processor._get_embedding(chunk_text)
                 if embedding:
-                    traditional_chunks.append({
-                        "text": chunk_text[:200],
-                        "embedding": embedding
-                    })
+                    traditional_chunks.append(
+                        {"text": chunk_text[:200], "embedding": embedding}
+                    )
 
             # Late chunking
             late_result = await processor.process_document(text, "comparison_doc")
@@ -685,6 +667,7 @@ def register_late_chunking_tools(app, db_path: Path = None):
             # Calculate similarities
             def cosine_similarity(a, b):
                 import math
+
                 dot = sum(x * y for x, y in zip(a, b))
                 norm_a = math.sqrt(sum(x * x for x in a))
                 norm_b = math.sqrt(sum(y * y for y in b))
@@ -693,7 +676,9 @@ def register_late_chunking_tools(app, db_path: Path = None):
             traditional_scores = [
                 {
                     "text_preview": c["text"],
-                    "score": round(cosine_similarity(query_embedding, c["embedding"]), 4)
+                    "score": round(
+                        cosine_similarity(query_embedding, c["embedding"]), 4
+                    ),
                 }
                 for c in traditional_chunks
             ]
@@ -702,7 +687,7 @@ def register_late_chunking_tools(app, db_path: Path = None):
             late_scores = [
                 {
                     "text_preview": c.text[:200],
-                    "score": round(cosine_similarity(query_embedding, c.embedding), 4)
+                    "score": round(cosine_similarity(query_embedding, c.embedding), 4),
                 }
                 for c in late_result.chunks
             ]
@@ -716,30 +701,29 @@ def register_late_chunking_tools(app, db_path: Path = None):
                 "traditional_chunking": {
                     "chunk_count": len(traditional_chunks),
                     "top_results": traditional_scores[:3],
-                    "max_score": traditional_scores[0]["score"] if traditional_scores else 0
+                    "max_score": traditional_scores[0]["score"]
+                    if traditional_scores
+                    else 0,
                 },
                 "late_chunking": {
                     "chunk_count": len(late_result.chunks),
                     "top_results": late_scores[:3],
-                    "max_score": late_scores[0]["score"] if late_scores else 0
+                    "max_score": late_scores[0]["score"] if late_scores else 0,
                 },
                 "improvement": {
                     "score_diff": round(
-                        (late_scores[0]["score"] if late_scores else 0) -
-                        (traditional_scores[0]["score"] if traditional_scores else 0),
-                        4
+                        (late_scores[0]["score"] if late_scores else 0)
+                        - (traditional_scores[0]["score"] if traditional_scores else 0),
+                        4,
                     ),
-                    "note": "Positive means late chunking found better match"
+                    "note": "Positive means late chunking found better match",
                 },
-                "processing_time_ms": round(processing_time, 2)
+                "processing_time_ms": round(processing_time, 2),
             }
 
         except Exception as e:
             logger.error(f"Chunking comparison failed: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     logger.info("✅ Late Chunking tools registered successfully")
     return processor
@@ -790,5 +774,5 @@ Performance Notes
 - Late chunking requires ~2x processing time but improves retrieval
 - Use for documents where context matters (research, technical docs)
 - Traditional chunking still fine for simple content
-- Ollama inference happens on GPU node (completeu-server)
+- Ollama inference happens on GPU node (fedora)
 """

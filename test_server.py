@@ -2,7 +2,6 @@
 """
 Test script to diagnose enhanced memory MCP server issues
 """
-import sys
 import json
 import subprocess
 import time

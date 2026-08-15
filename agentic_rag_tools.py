@@ -18,9 +18,7 @@ Expected improvement: +30-40% adaptability, +20-30% for complex queries
 """
 
 import logging
-import asyncio
 import re
-import json
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum

@@ -16,18 +16,20 @@ Research basis:
 - "You're Doing Memory All Wrong" (Zapai): Graph traversal patterns
 - Anthropic Contextual Retrieval: Context-aware chunk enhancement
 """
-import platform
 
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Get agentic system path from environment
-AGENTIC_SYSTEM_PATH = os.environ.get("AGENTIC_SYSTEM_PATH", str(_STORAGE_BASE))
+AGENTIC_SYSTEM_PATH = os.environ.get(
+    "AGENTIC_SYSTEM_PATH",
+    str(Path(__file__).resolve().parent.parent.parent),
+)
 
 
 def register_graphrag_tools(app, db_path: Path = None):
@@ -44,31 +46,8 @@ def register_graphrag_tools(app, db_path: Path = None):
     # Import using importlib to handle hyphenated filename
     import importlib.util
 
-def _get_storage_base() -> Path:
-    """Detect storage base path based on platform."""
-    env_path = os.environ.get("AGENTIC_SYSTEM_PATH")
-    if env_path and Path(env_path).exists():
-        return Path(env_path)
-
-    system = platform.system()
-    if system == "Darwin":  # macOS
-        if Path(str(_STORAGE_BASE)).exists():
-            return Path(str(_STORAGE_BASE))
-        elif Path(str(_STORAGE_BASE)).exists():
-            return Path(str(_STORAGE_BASE))
-    elif system == "Linux":
-        if Path(str(_STORAGE_BASE)).exists():
-            return Path(str(_STORAGE_BASE))
-        elif Path(str(_STORAGE_BASE)).exists():
-            return Path(str(_STORAGE_BASE))
-    return Path(__file__).parent.parent
-
-
-_STORAGE_BASE = _get_storage_base()
-
     spec = importlib.util.spec_from_file_location(
-        "graph_rag",
-        os.path.join(AGENTIC_SYSTEM_PATH, "scripts", "graph-rag.py")
+        "graph_rag", os.path.join(AGENTIC_SYSTEM_PATH, "scripts", "graph-rag.py")
     )
     graph_rag_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(graph_rag_module)
@@ -88,8 +67,8 @@ _STORAGE_BASE = _get_storage_base()
         limit: int = 10,
         include_neighbors: bool = True,
         vector_weight: float = 0.6,
-        graph_weight: float = 0.4
-    ) -> Dict[str, Any]:
+        graph_weight: float = 0.4,
+    ) -> dict[str, Any]:
         """
         Search memories with graph relationship expansion.
 
@@ -138,54 +117,61 @@ _STORAGE_BASE = _get_storage_base()
                 depth=depth,
                 vector_weight=vector_weight,
                 graph_weight=graph_weight,
-                limit=limit
+                limit=limit,
             )
 
             # Format results for MCP
             formatted_results = []
             for result in results:
-                formatted_results.append({
-                    'entity_id': result.entity_id,
-                    'entity_name': result.entity_name,
-                    'entity_type': result.entity_type,
-                    'content': result.content,
-                    'vector_score': round(result.vector_score, 3),
-                    'graph_score': round(result.graph_score, 3),
-                    'combined_score': round(result.combined_score, 3),
-                    'neighbors': result.neighbors if include_neighbors else [],
-                    'neighbor_count': len(result.neighbors) if result.neighbors else 0
-                })
+                formatted_results.append(
+                    {
+                        "entity_id": result.entity_id,
+                        "entity_name": result.entity_name,
+                        "entity_type": result.entity_type,
+                        "content": result.content,
+                        "vector_score": round(result.vector_score, 3),
+                        "graph_score": round(result.graph_score, 3),
+                        "combined_score": round(result.combined_score, 3),
+                        "neighbors": result.neighbors if include_neighbors else [],
+                        "neighbor_count": len(result.neighbors)
+                        if result.neighbors
+                        else 0,
+                    }
+                )
 
+            top_score = (
+                max(r["combined_score"] for r in formatted_results)
+                if formatted_results
+                else 0.0
+            )
             return {
-                'success': True,
-                'query': query,
-                'result_count': len(formatted_results),
-                'results': formatted_results,
-                'search_params': {
-                    'depth': depth,
-                    'vector_weight': vector_weight,
-                    'graph_weight': graph_weight,
-                    'include_neighbors': include_neighbors
-                }
+                "success": True,
+                "query": query,
+                "result_count": len(formatted_results),
+                "confidence": round(top_score, 3),
+                "low_confidence": top_score < 0.45,
+                "results": formatted_results,
+                "search_params": {
+                    "depth": depth,
+                    "vector_weight": vector_weight,
+                    "graph_weight": graph_weight,
+                    "include_neighbors": include_neighbors,
+                },
             }
 
         except Exception as e:
             logger.error(f"Graph-enhanced search failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e),
-                'query': query
-            }
+            return {"success": False, "error": str(e), "query": query}
 
     @app.tool()
     async def get_entity_neighbors(
         entity_id: int,
-        relation_type: Optional[str] = None,
+        relation_type: str | None = None,
         direction: str = "both",
         depth: int = 1,
         limit: int = 50,
-        min_weight: float = 0.0
-    ) -> Dict[str, Any]:
+        min_weight: float = 0.0,
+    ) -> dict[str, Any]:
         """
         Get entities connected to a given entity through relationships.
 
@@ -223,45 +209,41 @@ _STORAGE_BASE = _get_storage_base()
                     entity_id=entity_id,
                     rel_type=relation_type,
                     direction=direction,
-                    min_weight=min_weight
+                    min_weight=min_weight,
                 )
                 neighbors = neighbors[:limit]
 
             else:
                 # Multi-hop traversal
                 context_map = rag.expand_graph_context(
-                    entity_ids=[entity_id],
-                    depth=depth,
-                    min_weight=min_weight
+                    entity_ids=[entity_id], depth=depth, min_weight=min_weight
                 )
                 neighbors = context_map.get(entity_id, [])
 
                 # Filter by relation type if specified
                 if relation_type:
-                    neighbors = [n for n in neighbors if n.get('relation') == relation_type]
+                    neighbors = [
+                        n for n in neighbors if n.get("relation") == relation_type
+                    ]
 
                 neighbors = neighbors[:limit]
 
             return {
-                'success': True,
-                'entity_id': entity_id,
-                'neighbor_count': len(neighbors),
-                'neighbors': neighbors,
-                'search_params': {
-                    'relation_type': relation_type,
-                    'direction': direction,
-                    'depth': depth,
-                    'min_weight': min_weight
-                }
+                "success": True,
+                "entity_id": entity_id,
+                "neighbor_count": len(neighbors),
+                "neighbors": neighbors,
+                "search_params": {
+                    "relation_type": relation_type,
+                    "direction": direction,
+                    "depth": depth,
+                    "min_weight": min_weight,
+                },
             }
 
         except Exception as e:
             logger.error(f"Get entity neighbors failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e),
-                'entity_id': entity_id
-            }
+            return {"success": False, "error": str(e), "entity_id": entity_id}
 
     @app.tool()
     async def add_entity_relationship(
@@ -270,8 +252,8 @@ _STORAGE_BASE = _get_storage_base()
         relation_type: str,
         weight: float = 1.0,
         is_causal: bool = False,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create a relationship between two entities.
 
@@ -308,30 +290,30 @@ _STORAGE_BASE = _get_storage_base()
                 rel_type=relation_type,
                 weight=weight,
                 is_causal=is_causal,
-                context=context
+                context=context,
             )
 
             return {
-                'success': True,
-                'relationship_id': rel_id,
-                'source_id': source_id,
-                'target_id': target_id,
-                'relation_type': relation_type,
-                'weight': weight,
-                'is_causal': is_causal
+                "success": True,
+                "relationship_id": rel_id,
+                "source_id": source_id,
+                "target_id": target_id,
+                "relation_type": relation_type,
+                "weight": weight,
+                "is_causal": is_causal,
             }
 
         except Exception as e:
             logger.error(f"Add entity relationship failed: {e}", exc_info=True)
             return {
-                'success': False,
-                'error': str(e),
-                'source_id': source_id,
-                'target_id': target_id
+                "success": False,
+                "error": str(e),
+                "source_id": source_id,
+                "target_id": target_id,
             }
 
     @app.tool()
-    async def get_graph_statistics() -> Dict[str, Any]:
+    async def get_graph_statistics() -> dict[str, Any]:
         """
         Get knowledge graph statistics.
 
@@ -347,28 +329,27 @@ _STORAGE_BASE = _get_storage_base()
             stats = rag.get_statistics()
 
             return {
-                'success': True,
-                'statistics': stats,
-                'health': {
-                    'entities': stats['entities'],
-                    'relationships': stats['relationships'],
-                    'avg_relationships_per_entity': stats['avg_relationships_per_entity'],
-                    'causal_relationships': stats['causal_relationships'],
-                    'qdrant_status': 'connected' if stats['qdrant_connected'] else 'disconnected'
-                }
+                "success": True,
+                "statistics": stats,
+                "health": {
+                    "entities": stats["entities"],
+                    "relationships": stats["relationships"],
+                    "avg_relationships_per_entity": stats[
+                        "avg_relationships_per_entity"
+                    ],
+                    "causal_relationships": stats["causal_relationships"],
+                    "qdrant_status": "connected"
+                    if stats["qdrant_connected"]
+                    else "disconnected",
+                },
             }
 
         except Exception as e:
             logger.error(f"Get graph statistics failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
-    async def extract_entity_relationships(
-        entity_id: int
-    ) -> Dict[str, Any]:
+    async def extract_entity_relationships(entity_id: int) -> dict[str, Any]:
         """
         Extract and store relationships from an entity's observations.
 
@@ -393,23 +374,17 @@ _STORAGE_BASE = _get_storage_base()
             count = rag.extract_relationships_from_entity(entity_id)
 
             return {
-                'success': True,
-                'entity_id': entity_id,
-                'relationships_found': count
+                "success": True,
+                "entity_id": entity_id,
+                "relationships_found": count,
             }
 
         except Exception as e:
             logger.error(f"Extract entity relationships failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e),
-                'entity_id': entity_id
-            }
+            return {"success": False, "error": str(e), "entity_id": entity_id}
 
     @app.tool()
-    async def extract_all_relationships(
-        limit: Optional[int] = None
-    ) -> Dict[str, Any]:
+    async def extract_all_relationships(limit: int | None = None) -> dict[str, Any]:
         """
         Extract relationships from all entities that haven't been processed yet.
 
@@ -431,24 +406,19 @@ _STORAGE_BASE = _get_storage_base()
             stats = rag.extract_all_relationships(limit=limit)
 
             return {
-                'success': True,
-                'statistics': stats,
-                'summary': f"Processed {stats['total_processed']} entities, "
-                          f"found {stats['total_relationships']} relationships in "
-                          f"{stats['entities_with_relationships']} entities"
+                "success": True,
+                "statistics": stats,
+                "summary": f"Processed {stats['total_processed']} entities, "
+                f"found {stats['total_relationships']} relationships in "
+                f"{stats['entities_with_relationships']} entities",
             }
 
         except Exception as e:
             logger.error(f"Extract all relationships failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
-    async def build_local_graph(
-        entity_ids: List[int]
-    ) -> Dict[str, Any]:
+    async def build_local_graph(entity_ids: list[int]) -> dict[str, Any]:
         """
         Build a subgraph for a set of entities.
 
@@ -469,19 +439,15 @@ _STORAGE_BASE = _get_storage_base()
             graph = rag.build_local_graph(entity_ids)
 
             return {
-                'success': True,
-                'graph': graph,
-                'node_count': graph['node_count'],
-                'edge_count': graph['edge_count']
+                "success": True,
+                "graph": graph,
+                "node_count": graph["node_count"],
+                "edge_count": graph["edge_count"],
             }
 
         except Exception as e:
             logger.error(f"Build local graph failed: {e}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e),
-                'entity_ids': entity_ids
-            }
+            return {"success": False, "error": str(e), "entity_ids": entity_ids}
 
     logger.info("✅ GraphRAG tools registered successfully")
     return rag  # Return instance for potential reuse

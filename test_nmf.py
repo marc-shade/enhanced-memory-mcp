@@ -10,7 +10,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from neural_memory_fabric import NeuralMemoryFabric, get_nmf
+from neural_memory_fabric import get_nmf
 
 
 async def test_nmf_phase1():
@@ -40,7 +40,7 @@ async def test_nmf_phase1():
             agent_id="test_agent"
         )
         print(f"✅ Memory stored: {result['memory_id']}")
-        memory_id_1 = result['memory_id']
+        result['memory_id']
     except Exception as e:
         print(f"❌ Storage failed: {e}")
         return False
@@ -57,7 +57,7 @@ async def test_nmf_phase1():
             agent_id="test_agent"
         )
         print(f"✅ Second memory stored: {result['memory_id']}")
-        memory_id_2 = result['memory_id']
+        result['memory_id']
     except Exception as e:
         print(f"❌ Second storage failed: {e}")
         return False

@@ -22,7 +22,7 @@ import json
 import logging
 import math
 import sqlite3
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -30,7 +30,7 @@ from enum import Enum
 
 try:
     from qdrant_client import QdrantClient
-    from qdrant_client.models import Filter, FieldCondition, MatchValue
+    from qdrant_client.models import Filter, FieldCondition, MatchValue  # noqa: F401
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False

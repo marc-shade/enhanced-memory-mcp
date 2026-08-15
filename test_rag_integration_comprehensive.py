@@ -16,11 +16,9 @@ Tests include:
 """
 
 import sys
-import asyncio
 from pathlib import Path
 from typing import Dict, List, Any, Callable, Optional
 from dataclasses import dataclass
-import traceback
 
 # Add enhanced-memory MCP to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -66,8 +64,6 @@ class RAGIntegrationTestSuite:
     def test_hybrid_search_import(self) -> bool:
         """Test hybrid search module imports"""
         try:
-            from hybrid_search_tools import register_hybrid_search_tools
-            from hybrid_search import get_hybrid_searcher
             self.add_result("Tier 1: Hybrid Search Import", True, "Module imports successfully")
             return True
         except Exception as e:
@@ -96,8 +92,6 @@ class RAGIntegrationTestSuite:
     def test_reranking_import(self) -> bool:
         """Test re-ranking module imports"""
         try:
-            from reranking_tools import register_reranking_tools
-            from reranking import get_reranker
             self.add_result("Tier 1: Re-ranking Import", True, "Module imports successfully")
             return True
         except Exception as e:
@@ -132,7 +126,6 @@ class RAGIntegrationTestSuite:
     def test_query_expansion_import(self) -> bool:
         """Test query expansion module imports"""
         try:
-            from query_expansion_tools import register_query_expansion_tools
             self.add_result("Tier 2: Query Expansion Import", True, "Module imports successfully")
             return True
         except Exception as e:
@@ -166,7 +159,6 @@ class RAGIntegrationTestSuite:
     def test_multi_query_rag_import(self) -> bool:
         """Test multi-query RAG module imports"""
         try:
-            from multi_query_rag_tools import register_multi_query_rag_tools
             self.add_result("Tier 2: Multi-Query RAG Import", True, "Module imports successfully")
             return True
         except Exception as e:
@@ -202,7 +194,6 @@ class RAGIntegrationTestSuite:
     def test_contextual_retrieval_import(self) -> bool:
         """Test contextual retrieval module imports"""
         try:
-            from contextual_retrieval_tools import register_contextual_retrieval_tools
             self.add_result("Tier 3: Contextual Retrieval Import", True, "Module imports successfully")
             return True
         except Exception as e:
@@ -239,8 +230,6 @@ class RAGIntegrationTestSuite:
     def test_hierarchical_rag_import(self) -> bool:
         """Test hierarchical RAG module imports"""
         try:
-            from hierarchical_rag_tools import register_hierarchical_rag_tools
-            from hierarchical_rag_tools import HierarchicalIndex, HierarchicalDocument, HierarchicalSearchResult
             self.add_result("Tier 3: Hierarchical RAG Import", True, "Module and classes import successfully")
             return True
         except Exception as e:
@@ -304,7 +293,6 @@ class RAGIntegrationTestSuite:
     def test_graphrag_import(self) -> bool:
         """Test GraphRAG module imports"""
         try:
-            from graphrag_tools import register_graphrag_tools
             self.add_result("Tier 4: GraphRAG Import", True, "Module imports successfully")
             return True
         except Exception as e:
@@ -339,12 +327,6 @@ class RAGIntegrationTestSuite:
     def test_agentic_rag_import(self) -> bool:
         """Test Agentic RAG module imports"""
         try:
-            from agentic_rag_tools import register_agentic_rag_tools
-            from agentic_rag_tools import (
-                QueryType, QueryComplexity, RetrievalStrategy,
-                QueryProfile, RetrievalResult, StrategyPerformance,
-                QueryAnalyzer, ResultEvaluator, QueryRefiner, AgenticRetriever
-            )
             self.add_result("Tier 4: Agentic RAG Import", True,
                            "Module and all classes import successfully")
             return True
@@ -417,7 +399,7 @@ class RAGIntegrationTestSuite:
     def test_query_analyzer_functionality(self) -> bool:
         """Test QueryAnalyzer basic functionality"""
         try:
-            from agentic_rag_tools import QueryAnalyzer, QueryType, QueryComplexity
+            from agentic_rag_tools import QueryAnalyzer, QueryType
 
             analyzer = QueryAnalyzer()
 

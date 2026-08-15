@@ -12,12 +12,10 @@ Also implements Meta-Rewarding for alignment self-improvement.
 """
 
 import sqlite3
-import json
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger("sharpening_engine")

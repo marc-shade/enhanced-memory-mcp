@@ -103,7 +103,7 @@ def test_emotional_tagging(entity_ids):
 
     try:
         # Tag happy memory
-        tag_id = emotional.tag_entity(
+        emotional.tag_entity(
             entity_id=entity_ids["test_happy_memory"],
             valence=0.8,  # Positive
             arousal=0.6,  # Moderately excited

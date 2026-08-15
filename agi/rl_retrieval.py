@@ -20,8 +20,8 @@ import logging
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger("rl_retrieval")
 

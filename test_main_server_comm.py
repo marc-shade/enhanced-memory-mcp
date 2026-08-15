@@ -5,7 +5,6 @@ Test main enhanced memory server communication using fixed threading approach
 import subprocess
 import json
 import time
-import sys
 import threading
 import queue
 import os

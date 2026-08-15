@@ -5,8 +5,6 @@ Validates that TTS commands are properly filtered during context loading
 """
 
 import sys
-import json
-from pathlib import Path
 from context_compression_filter import ContextCompressionFilter
 
 def test_tts_filtering():

@@ -7,10 +7,9 @@ Integrates with the existing Enhanced-Memory-MCP architecture.
 
 import json
 import sqlite3
-import hashlib
 import statistics
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Any
 from pathlib import Path
 import logging
 
@@ -525,8 +524,8 @@ class CloneSuccessTracker:
         
         try:
             clone_type = clone_context.get("clone_type", "")
-            design_category = clone_context.get("design_category", "")
-            complexity_level = clone_context.get("complexity_level", "medium")
+            clone_context.get("design_category", "")
+            clone_context.get("complexity_level", "medium")
             
             # Get techniques that have worked well for similar contexts
             cursor.execute('''

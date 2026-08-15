@@ -8,7 +8,6 @@ sys.path.insert(0, '.')
 
 from memory_client import MemoryClient
 import asyncio
-import json
 
 async def test_pipeline():
     """Test the complete auto-extraction and conflict resolution pipeline"""

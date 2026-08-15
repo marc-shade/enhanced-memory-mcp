@@ -9,7 +9,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict
 
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -73,7 +73,7 @@ class EmbeddingIntegrationTest:
 
         for provider in manager.get_available_providers():
             print(f"\n🧪 Testing {provider}...")
-            start = time.time()
+            time.time()
 
             try:
                 result = await manager.generate_embedding(test_text, provider=provider)

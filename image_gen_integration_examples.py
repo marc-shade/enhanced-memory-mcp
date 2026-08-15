@@ -161,7 +161,7 @@ async def clone_website_with_learning(url: str):
     
     if similar_patterns['patterns']:
         # 3. Use the best matching pattern as a template
-        best_pattern = similar_patterns['patterns'][0]
+        similar_patterns['patterns'][0]
         
         # 4. Generate hero image using stored pattern knowledge
         hero_result = await mcp__image-gen__generate_design_system_asset(
@@ -195,7 +195,7 @@ async def clone_website_with_learning(url: str):
     icon_list = ["search", "menu", "user", "settings"]
     
     # Check for similar icon patterns
-    icon_patterns = await mcp__enhanced-memory-mcp__get_best_patterns_for_asset_type(
+    await mcp__enhanced-memory-mcp__get_best_patterns_for_asset_type(
         asset_type="icon",
         design_tokens=design_tokens['design_tokens'],
         max_results=5
@@ -261,7 +261,7 @@ def optimize_assets_with_memory(asset_paths: list, context: dict):
         
         # 4. Store successful optimization pattern
         if optimization_result['success']:
-            new_preset_data = {
+            {
                 "preset_name": f"custom_{context.get('asset_type', 'general')}_{int(time.time())}",
                 "preset_type": context.get('target_format', 'web'),
                 "configuration": best_preset.get('configuration', {}),

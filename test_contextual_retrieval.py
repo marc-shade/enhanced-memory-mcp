@@ -21,17 +21,14 @@ import asyncio
 import json
 import tempfile
 import os
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 
 # Import components to test
 from contextual_retrieval_tools import (
     ContextualChunk,
     QualityScore,
     ReindexingProgress,
-    LLMProvider,
     OllamaProvider,
     OpenAIProvider,
     ContextQualityValidator,
@@ -621,7 +618,7 @@ async def test_parallel_processing_concurrency():
 
         # Patch _process_entity to use our tracking version
         with patch.object(engine, '_process_entity', side_effect=mock_process_entity):
-            result = await engine.reindex_all(resume=False)
+            await engine.reindex_all(resume=False)
 
     # Verify max concurrent workers respected
     assert max_concurrent <= 10
@@ -1047,7 +1044,7 @@ def test_performance_quality_validation_speed():
     # Validate 1000 times
     start_time = time.time()
     for _ in range(1000):
-        score = validator.validate(context, chunk)
+        validator.validate(context, chunk)
     elapsed_time = time.time() - start_time
 
     # Should validate 1000 contexts in under 1 second

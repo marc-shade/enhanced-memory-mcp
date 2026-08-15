@@ -6,7 +6,6 @@ Comprehensive testing of autonomous memory learning patterns and enhanced operat
 
 import asyncio
 import json
-import time
 import subprocess
 import sys
 import os
@@ -59,7 +58,7 @@ class SAFLAMemoryPhase2Tester:
         print("=" * 40)
         
         try:
-            from server import safla_orchestrator, SAFLA_MEMORY_CONFIG
+            from server import safla_orchestrator
             
             # Test 1: Memory pattern analysis
             try:
@@ -268,7 +267,7 @@ class SAFLAMemoryPhase2Tester:
         print("=" * 32)
         
         try:
-            from server import SAFLA_MEMORY_CONFIG, safla_orchestrator
+            from server import SAFLA_MEMORY_CONFIG
             
             # Test configuration completeness
             required_config = [

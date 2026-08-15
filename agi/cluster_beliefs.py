@@ -12,7 +12,7 @@ Implements:
 import sqlite3
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -163,7 +163,7 @@ class ClusterBeliefManager:
         threshold = block['consensus_threshold']
 
         old_probability = beliefs.get(belief_statement, 0.5)
-        probability_delta = proposed_probability - old_probability
+        proposed_probability - old_probability
 
         # Create proposal
         proposal = {

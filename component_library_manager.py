@@ -9,12 +9,10 @@ import json
 import sqlite3
 import hashlib
 import zlib
-import base64
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Any
 from pathlib import Path
 import logging
-import re
 
 logger = logging.getLogger("enhanced-memory.component-library")
 
@@ -578,9 +576,9 @@ class ComponentLibraryManager:
         
         try:
             framework = project_context.get("framework", "")
-            project_type = project_context.get("project_type", "")
-            required_features = project_context.get("required_features", [])
-            complexity_preference = project_context.get("complexity_preference", "medium")
+            project_context.get("project_type", "")
+            project_context.get("required_features", [])
+            project_context.get("complexity_preference", "medium")
             
             # Base query for components
             base_conditions = []

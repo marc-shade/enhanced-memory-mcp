@@ -15,7 +15,7 @@ import logging
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field, asdict
 
 logger = logging.getLogger("probability-reversal-task")
@@ -784,7 +784,6 @@ def run_quick_calibration(agent_id: str = "default_agent") -> Dict[str, Any]:
 
     # For self-testing, we simulate responses with some noise
     # In production, agent provides actual responses
-    simulated_results = []
 
     for trial in session.trials:
         # Simulate an agent response with some rigidity

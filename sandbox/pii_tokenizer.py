@@ -13,9 +13,8 @@ This provides privacy while maintaining tool functionality.
 """
 
 import re
-import hashlib
 import secrets
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 import logging

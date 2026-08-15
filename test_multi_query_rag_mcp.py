@@ -9,8 +9,6 @@ Tests the full MCP tool integration including:
 """
 
 import pytest
-import asyncio
-from typing import Dict, Any
 
 
 # ============================================================================

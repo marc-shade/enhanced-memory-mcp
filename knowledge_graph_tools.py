@@ -11,12 +11,11 @@ import sqlite3
 import json
 import logging
 from typing import Dict, List, Any, Optional
-from datetime import datetime
 from pathlib import Path
 
 from ontology_schema import (
-    EntitySchema, RelationshipSchema, OntologyValidator,
-    OntologyRegistry, EntityType, RelationType
+    OntologyValidator,
+    OntologyRegistry
 )
 from graph_traversal import GraphTraversal, TraversalDirection, TraversalStrategy
 

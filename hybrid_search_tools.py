@@ -6,7 +6,7 @@ Integrates BM25 + Vector hybrid search into the MCP server.
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Dict, Any
 from hybrid_search import get_hybrid_searcher
 
 logger = logging.getLogger(__name__)

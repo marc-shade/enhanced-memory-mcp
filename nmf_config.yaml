@@ -4,7 +4,8 @@
 storage:
   # SQLite for metadata and core storage
   sqlite:
-    path: "/mnt/agentic-system/databases/mcp/enhanced_memories.db"
+    # Override with NMF_SQLITE_PATH.
+    path: "~/.claude/enhanced_memories/nmf.db"
     wal_mode: true
     cache_size: 10000
 
@@ -21,7 +22,8 @@ storage:
 
   # File-based portable storage
   files:
-    root: "/mnt/agentic-system/agent-memory/nmf_files"
+    # Override with NMF_FILES_ROOT.
+    root: "~/.claude/enhanced_memories/nmf_files"
     compression: true
     max_file_size: "10MB"
 
@@ -29,10 +31,15 @@ storage:
 # Supports multiple providers for comparison and failover
 embeddings:
   # Primary provider (can be: google, openai, mlx, ollama)
-  primary: "google"
+  # 2026-06-07: switched to ollama (fedora node, nomic-embed-text 768d). Google
+  # text-embedding-004 is deprecated (404 via the EOL google.generativeai pkg) and
+  # the OPENAI_API_KEY is invalid; fedora ollama is the working 768d provider.
+  primary: "ollama"
 
-  # Fallback chain
-  fallback: ["openai", "ollama", "mlx"]
+  # Fallback chain — DELIBERATELY EMPTY. The only other local option (mlx) is
+  # 384d and would silently corrupt the 768d Qdrant collection / break query
+  # consistency. Fail-closed (no embedding) is safer than wrong-dim embedding.
+  fallback: []
 
   # Provider-specific configurations
   providers:
@@ -60,7 +67,8 @@ embeddings:
     ollama:
       model: "nomic-embed-text"
       dimensions: 768
-      base_url: "http://localhost:11434"
+      # Override with MEMORY_OLLAMA_URL for a remote ollama host.
+      base_url: "http://127.0.0.1:11434"
       local: true
 
     # Additional experimental providers
@@ -198,13 +206,13 @@ benchmarking:
     - "ollama"
 
   # Output
-  results_path: "/mnt/agentic-system/logs/nmf_benchmark_results.json"
+  results_path: "~/.claude/enhanced_memories/logs/nmf_benchmark_results.json"
 
 # Logging
 logging:
   level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "/mnt/agentic-system/logs/nmf.log"
+  file: "~/.claude/enhanced_memories/logs/nmf.log"
   max_size_mb: 100
   backup_count: 3
 

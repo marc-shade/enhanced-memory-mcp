@@ -12,7 +12,6 @@ sys.path.insert(0, '.')
 
 from memory_client import MemoryClient
 import asyncio
-import json
 
 async def test_source_attribution():
     """Test source attribution in entity creation"""

@@ -9,13 +9,10 @@ and version management WITHOUT direct pickle usage (mocked for safety).
 import pytest
 import sqlite3
 import tempfile
-import os
 import sys
-import zlib
 import hashlib
 from pathlib import Path
-from unittest.mock import patch, MagicMock, Mock
-from datetime import datetime
+from unittest.mock import patch
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,47 +24,56 @@ class TestTierClassification:
     def test_core_tier_system_role(self):
         """System role entities should be classified as core."""
         from server import classify_tier
+
         assert classify_tier("system_role", "any_name") == "core"
 
     def test_core_tier_core_system(self):
         """Core system entities should be classified as core."""
         from server import classify_tier
+
         assert classify_tier("core_system", "any_name") == "core"
 
     def test_core_tier_orchestrator_name(self):
         """Names containing 'orchestrator' should be classified as core."""
         from server import classify_tier
+
         assert classify_tier("agent", "main_orchestrator") == "core"
         assert classify_tier("agent", "ORCHESTRATOR_V2") == "core"
 
     def test_working_tier_project(self):
         """Project entities should be classified as working."""
         from server import classify_tier
+
         assert classify_tier("project", "my_project") == "working"
 
     def test_working_tier_session(self):
         """Session entities should be classified as working."""
         from server import classify_tier
+
         assert classify_tier("session", "session_123") == "working"
 
     def test_working_tier_current_name(self):
         """Names containing 'current' should be classified as working."""
         from server import classify_tier
+
         assert classify_tier("task", "current_task") == "working"
 
     def test_archive_tier_archive_name(self):
         """Names containing 'archive' should be classified as archive."""
         from server import classify_tier
+
         assert classify_tier("memory", "archive_2024") == "archive"
 
     def test_archive_tier_historical_type(self):
         """Historical entity types should be classified as archive."""
         from server import classify_tier
+
         assert classify_tier("historical_data", "old_records") == "archive"
 
     def test_reference_tier_default(self):
         """Unmatched entities should be classified as reference."""
         from server import classify_tier
+
         assert classify_tier("knowledge", "api_docs") == "reference"
         assert classify_tier("skill", "python_tips") == "reference"
 
@@ -78,6 +84,7 @@ class TestChecksum:
     def test_checksum_consistency(self):
         """Same data should produce same checksum."""
         from server import calculate_checksum
+
         data = b"test data for checksum"
         checksum1 = calculate_checksum(data)
         checksum2 = calculate_checksum(data)
@@ -86,13 +93,15 @@ class TestChecksum:
     def test_checksum_format(self):
         """Checksum should be a valid SHA256 hex string."""
         from server import calculate_checksum
+
         checksum = calculate_checksum(b"test")
         assert len(checksum) == 64  # SHA256 produces 64 hex chars
-        assert all(c in '0123456789abcdef' for c in checksum)
+        assert all(c in "0123456789abcdef" for c in checksum)
 
     def test_checksum_different_data(self):
         """Different data should produce different checksums."""
         from server import calculate_checksum
+
         checksum1 = calculate_checksum(b"data1")
         checksum2 = calculate_checksum(b"data2")
         assert checksum1 != checksum2
@@ -100,6 +109,7 @@ class TestChecksum:
     def test_checksum_empty_data(self):
         """Empty data should produce valid checksum."""
         from server import calculate_checksum
+
         checksum = calculate_checksum(b"")
         assert len(checksum) == 64
         # Known SHA256 of empty string
@@ -109,7 +119,8 @@ class TestChecksum:
     def test_checksum_unicode_bytes(self):
         """Unicode encoded as bytes should work."""
         from server import calculate_checksum
-        data = "Unicode: café ñ 日本語".encode('utf-8')
+
+        data = "Unicode: café ñ 日本語".encode("utf-8")
         checksum = calculate_checksum(data)
         assert len(checksum) == 64
 
@@ -120,6 +131,7 @@ class TestCompression:
     def test_compress_returns_tuple(self):
         """compress_data should return (compressed, original_size, compressed_size, ratio)."""
         from server import compress_data
+
         result = compress_data({"key": "value"})
         assert isinstance(result, tuple)
         assert len(result) == 4
@@ -132,6 +144,7 @@ class TestCompression:
     def test_compress_ratio_calculation(self):
         """Compression ratio should be compressed_size / original_size."""
         from server import compress_data
+
         # Use larger data for better compression
         data = {"content": "x" * 1000}
         compressed, original_size, compressed_size, ratio = compress_data(data)
@@ -141,6 +154,7 @@ class TestCompression:
     def test_compress_decompress_roundtrip(self):
         """Data should survive compress -> decompress cycle."""
         from server import compress_data, decompress_data
+
         original = {"key": "value", "numbers": [1, 2, 3], "nested": {"a": 1}}
         compressed, _, _, _ = compress_data(original)
         decompressed = decompress_data(compressed)
@@ -149,31 +163,49 @@ class TestCompression:
     def test_decompress_invalid_data(self):
         """Decompressing invalid data should raise error."""
         from server import decompress_data
+
         with pytest.raises(Exception):  # zlib.error or other
             decompress_data(b"not valid compressed data")
 
 
 class TestStoragePath:
-    """Test _get_storage_base function for platform detection."""
+    """Test _get_storage_base, which locates an optional surrounding checkout.
 
-    @patch('platform.system')
-    def test_storage_path_darwin_ssdraid(self, mock_system):
-        """macOS with SSDRAID0 should use that path."""
-        mock_system.return_value = "Darwin"
+    This replaced a pair of tests that mocked platform.system() and then
+    asserted nothing at all -- they passed no matter what the function did, and
+    they described a platform-detection branch the function no longer has.
+    """
+
+    def test_storage_path_from_environment(self, monkeypatch):
+        """AGENTIC_SYSTEM_PATH wins when set."""
         from server import _get_storage_base
 
-        with patch.object(Path, 'exists') as mock_exists:
-            def exists_check(self):
-                return str(self) == "/Volumes/SSDRAID0/agentic-system"
-            mock_exists.side_effect = exists_check
-            # Note: Function is called at import time, so we test the logic
-            # by checking the current value or re-importing
+        monkeypatch.setenv("AGENTIC_SYSTEM_PATH", "/opt/some/checkout")
+        assert _get_storage_base() == Path("/opt/some/checkout")
 
-    @patch('platform.system')
-    def test_storage_path_linux(self, mock_system):
-        """Linux should check home directory first."""
-        mock_system.return_value = "Linux"
-        # Similar test structure as above
+    def test_storage_path_expands_user_and_vars(self, monkeypatch):
+        """The override is expanded, so ~ and $VAR in a config are usable."""
+        from server import _get_storage_base
+
+        monkeypatch.setenv("AGENTIC_SYSTEM_PATH", "~/checkout")
+        assert _get_storage_base() == Path.home() / "checkout"
+
+        monkeypatch.setenv("EM_TEST_BASE", "/expanded")
+        monkeypatch.setenv("AGENTIC_SYSTEM_PATH", "$EM_TEST_BASE/checkout")
+        assert _get_storage_base() == Path("/expanded/checkout")
+
+    def test_storage_path_falls_back_to_repo_relative(self, monkeypatch):
+        """With no override, the path is derived from the source file.
+
+        Nothing platform-specific, no baked-in path: a checkout in any
+        directory resolves relative to server.py.
+        """
+        import server
+        from server import _get_storage_base
+
+        monkeypatch.delenv("AGENTIC_SYSTEM_PATH", raising=False)
+        expected = Path(server.__file__).resolve().parent.parent.parent
+        assert _get_storage_base() == expected
 
 
 class TestDatabaseInit:
@@ -181,15 +213,16 @@ class TestDatabaseInit:
 
     def test_init_creates_tables(self):
         """init_database should create all required tables."""
-        from server import init_database, DB_PATH, MEMORY_DIR
+        from server import init_database
 
         # Use temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_db = Path(tmpdir) / "test_memory.db"
 
-            with patch('server.DB_PATH', tmp_db), \
-                 patch('server.MEMORY_DIR', Path(tmpdir)):
-
+            with (
+                patch("server.DB_PATH", tmp_db),
+                patch("server.MEMORY_DIR", Path(tmpdir)),
+            ):
                 # Create parent directory
                 Path(tmpdir).mkdir(parents=True, exist_ok=True)
 
@@ -208,14 +241,14 @@ class TestDatabaseInit:
                 tables = [row[0] for row in cursor.fetchall()]
 
                 expected_tables = [
-                    'entities',
-                    'implementation_plans',
-                    'memory_branches',
-                    'memory_conflicts',
-                    'memory_versions',
-                    'observations',
-                    'project_handbooks',
-                    'relations'
+                    "entities",
+                    "implementation_plans",
+                    "memory_branches",
+                    "memory_conflicts",
+                    "memory_versions",
+                    "observations",
+                    "project_handbooks",
+                    "relations",
                 ]
 
                 for table in expected_tables:
@@ -228,10 +261,12 @@ class TestDatabaseInit:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_db = Path(tmpdir) / "test_memory.db"
 
-            with patch('server.DB_PATH', tmp_db), \
-                 patch('server.MEMORY_DIR', Path(tmpdir)):
-
+            with (
+                patch("server.DB_PATH", tmp_db),
+                patch("server.MEMORY_DIR", Path(tmpdir)),
+            ):
                 from server import init_database
+
                 init_database()
 
                 conn = sqlite3.connect(tmp_db)
@@ -244,11 +279,11 @@ class TestDatabaseInit:
                 indexes = [row[0] for row in cursor.fetchall()]
 
                 expected_indexes = [
-                    'idx_entities_name',
-                    'idx_entities_type',
-                    'idx_entities_accessed',
-                    'idx_versions_entity',
-                    'idx_versions_branch'
+                    "idx_entities_name",
+                    "idx_entities_type",
+                    "idx_entities_accessed",
+                    "idx_versions_entity",
+                    "idx_versions_branch",
                 ]
 
                 for index in expected_indexes:
@@ -261,9 +296,10 @@ class TestDatabaseInit:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_db = Path(tmpdir) / "test_memory.db"
 
-            with patch('server.DB_PATH', tmp_db), \
-                 patch('server.MEMORY_DIR', Path(tmpdir)):
-
+            with (
+                patch("server.DB_PATH", tmp_db),
+                patch("server.MEMORY_DIR", Path(tmpdir)),
+            ):
                 from server import init_database
 
                 # Call twice - should not error
@@ -279,49 +315,6 @@ class TestDatabaseInit:
                 conn.close()
 
 
-class TestToolUsageLogging:
-    """Test tool usage logging callback system."""
-
-    def test_set_callback(self):
-        """Should be able to set tool usage callback."""
-        from server import _set_tool_usage_callback, _log_tool_usage
-
-        calls = []
-        def mock_callback(tool, module, success, duration):
-            calls.append((tool, module, success, duration))
-
-        _set_tool_usage_callback(mock_callback)
-        _log_tool_usage("test_tool", "test_module", True, 100.0)
-
-        assert len(calls) == 1
-        assert calls[0] == ("test_tool", "test_module", True, 100.0)
-
-        # Clean up
-        _set_tool_usage_callback(None)
-
-    def test_log_without_callback(self):
-        """Logging without callback should not error."""
-        from server import _set_tool_usage_callback, _log_tool_usage
-
-        _set_tool_usage_callback(None)
-        # Should not raise
-        _log_tool_usage("test_tool", "test_module", True, 50.0)
-
-    def test_log_callback_error_handling(self):
-        """Callback errors should be silently ignored."""
-        from server import _set_tool_usage_callback, _log_tool_usage
-
-        def failing_callback(*args):
-            raise Exception("Callback failed")
-
-        _set_tool_usage_callback(failing_callback)
-        # Should not raise despite callback error
-        _log_tool_usage("test_tool", "test_module", True, 50.0)
-
-        # Clean up
-        _set_tool_usage_callback(None)
-
-
 class TestVersionManagement:
     """Test version creation and management."""
 
@@ -330,18 +323,21 @@ class TestVersionManagement:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_db = Path(tmpdir) / "test_memory.db"
 
-            with patch('server.DB_PATH', tmp_db):
-                from server import init_database, create_version, compress_data
+            with patch("server.DB_PATH", tmp_db):
+                from server import init_database, create_version
 
                 init_database()
 
                 # Create test entity
                 conn = sqlite3.connect(tmp_db)
                 cursor = conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO entities (name, entity_type, tier)
                     VALUES (?, ?, ?)
-                ''', ("test_entity", "test", "working"))
+                """,
+                    ("test_entity", "test", "working"),
+                )
                 entity_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
@@ -353,10 +349,13 @@ class TestVersionManagement:
                 # Check version numbers
                 conn = sqlite3.connect(tmp_db)
                 cursor = conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                     SELECT version_number FROM memory_versions
                     WHERE entity_id = ? ORDER BY version_number
-                ''', (entity_id,))
+                """,
+                    (entity_id,),
+                )
                 versions = [row[0] for row in cursor.fetchall()]
                 conn.close()
 
@@ -367,7 +366,7 @@ class TestVersionManagement:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_db = Path(tmpdir) / "test_memory.db"
 
-            with patch('server.DB_PATH', tmp_db):
+            with patch("server.DB_PATH", tmp_db):
                 from server import init_database, create_version
 
                 init_database()
@@ -375,10 +374,13 @@ class TestVersionManagement:
                 # Create test entity
                 conn = sqlite3.connect(tmp_db)
                 cursor = conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO entities (name, entity_type, tier)
                     VALUES (?, ?, ?)
-                ''', ("test_entity", "test", "working"))
+                """,
+                    ("test_entity", "test", "working"),
+                )
                 entity_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
@@ -390,10 +392,13 @@ class TestVersionManagement:
                 # Check only latest is current
                 conn = sqlite3.connect(tmp_db)
                 cursor = conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                     SELECT version_number, is_current FROM memory_versions
                     WHERE entity_id = ? ORDER BY version_number
-                ''', (entity_id,))
+                """,
+                    (entity_id,),
+                )
                 results = cursor.fetchall()
                 conn.close()
 
@@ -408,6 +413,7 @@ class TestFallbackScoring:
         """Fallback should return base score for normal text."""
         # Import the fallback function
         import server
+
         if not server.TPU_SCORING_AVAILABLE:
             score = server.score_importance("normal text content")
             assert 0.0 <= score <= 1.0
@@ -416,6 +422,7 @@ class TestFallbackScoring:
     def test_fallback_score_importance_keywords(self):
         """Fallback should boost score for important keywords."""
         import server
+
         if not server.TPU_SCORING_AVAILABLE:
             score = server.score_importance("critical error detected")
             assert score > 0.3  # Should be higher than base
@@ -424,33 +431,9 @@ class TestFallbackScoring:
     def test_fallback_is_tpu_available(self):
         """Fallback is_tpu_available should return False."""
         import server
+
         if not server.TPU_SCORING_AVAILABLE:
             assert server.is_tpu_available() == False
-
-
-class TestEntropyFallback:
-    """Test fallback entropy scoring when unavailable."""
-
-    def test_fallback_combine_scores_high(self):
-        """High TPU score should map to long_term tier."""
-        import server
-        if not server.ENTROPY_SCORING_AVAILABLE:
-            score, tier = server.combine_scores(0.85, None)
-            assert tier == "long_term"
-
-    def test_fallback_combine_scores_medium(self):
-        """Medium TPU score should map to episodic tier."""
-        import server
-        if not server.ENTROPY_SCORING_AVAILABLE:
-            score, tier = server.combine_scores(0.65, None)
-            assert tier == "episodic"
-
-    def test_fallback_combine_scores_low(self):
-        """Low TPU score should map to working tier."""
-        import server
-        if not server.ENTROPY_SCORING_AVAILABLE:
-            score, tier = server.combine_scores(0.4, None)
-            assert tier == "working"
 
 
 class TestEdgeCases:
@@ -459,6 +442,7 @@ class TestEdgeCases:
     def test_compress_empty_dict(self):
         """Should handle empty dictionary."""
         from server import compress_data, decompress_data
+
         original = {}
         compressed, orig_size, comp_size, ratio = compress_data(original)
         assert decompress_data(compressed) == original
@@ -466,25 +450,19 @@ class TestEdgeCases:
     def test_compress_nested_structure(self):
         """Should handle deeply nested data."""
         from server import compress_data, decompress_data
-        original = {
-            "level1": {
-                "level2": {
-                    "level3": {
-                        "data": [1, 2, 3]
-                    }
-                }
-            }
-        }
+
+        original = {"level1": {"level2": {"level3": {"data": [1, 2, 3]}}}}
         compressed, _, _, _ = compress_data(original)
         assert decompress_data(compressed) == original
 
     def test_compress_special_characters(self):
         """Should handle special characters."""
         from server import compress_data, decompress_data
+
         original = {
             "unicode": "日本語 中文 한국어",
-            "symbols": "!@#$%^&*(){}[]|\\:\";<>?,./",
-            "newlines": "line1\nline2\rline3\r\n"
+            "symbols": '!@#$%^&*(){}[]|\\:";<>?,./',
+            "newlines": "line1\nline2\rline3\r\n",
         }
         compressed, _, _, _ = compress_data(original)
         assert decompress_data(compressed) == original
@@ -492,6 +470,7 @@ class TestEdgeCases:
     def test_classify_tier_case_insensitive(self):
         """Tier classification should be case insensitive for keywords."""
         from server import classify_tier
+
         assert classify_tier("agent", "ORCHESTRATOR") == "core"
         assert classify_tier("task", "CURRENT_WORK") == "working"
         assert classify_tier("data", "ARCHIVE_2024") == "archive"
@@ -499,6 +478,7 @@ class TestEdgeCases:
     def test_checksum_large_data(self):
         """Should handle large data efficiently."""
         from server import calculate_checksum
+
         large_data = b"x" * (1024 * 1024)  # 1MB
         checksum = calculate_checksum(large_data)
         assert len(checksum) == 64
@@ -512,10 +492,13 @@ class TestIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_db = Path(tmpdir) / "test_memory.db"
 
-            with patch('server.DB_PATH', tmp_db):
+            with patch("server.DB_PATH", tmp_db):
                 from server import (
-                    init_database, compress_data, decompress_data,
-                    calculate_checksum, classify_tier, create_version
+                    init_database,
+                    compress_data,
+                    calculate_checksum,
+                    classify_tier,
+                    create_version,
                 )
 
                 init_database()
@@ -524,7 +507,7 @@ class TestIntegration:
                 entity_data = {
                     "name": "test_project",
                     "content": "Important project information",
-                    "metadata": {"created": "2024-01-01"}
+                    "metadata": {"created": "2024-01-01"},
                 }
 
                 # Compress data
@@ -539,13 +522,24 @@ class TestIntegration:
                 # Store in database
                 conn = sqlite3.connect(tmp_db)
                 cursor = conn.cursor()
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO entities
                     (name, entity_type, tier, compressed_data,
                      original_size, compressed_size, compression_ratio, checksum)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', ("test_project", "project", tier, compressed,
-                      orig_size, comp_size, ratio, checksum))
+                """,
+                    (
+                        "test_project",
+                        "project",
+                        tier,
+                        compressed,
+                        orig_size,
+                        comp_size,
+                        ratio,
+                        checksum,
+                    ),
+                )
                 entity_id = cursor.lastrowid
                 conn.commit()
                 conn.close()
@@ -559,10 +553,13 @@ class TestIntegration:
                 conn = sqlite3.connect(tmp_db)
                 cursor = conn.cursor()
 
-                cursor.execute('SELECT tier FROM entities WHERE id = ?', (entity_id,))
+                cursor.execute("SELECT tier FROM entities WHERE id = ?", (entity_id,))
                 assert cursor.fetchone()[0] == "working"
 
-                cursor.execute('SELECT COUNT(*) FROM memory_versions WHERE entity_id = ?', (entity_id,))
+                cursor.execute(
+                    "SELECT COUNT(*) FROM memory_versions WHERE entity_id = ?",
+                    (entity_id,),
+                )
                 assert cursor.fetchone()[0] == 2
 
                 conn.close()

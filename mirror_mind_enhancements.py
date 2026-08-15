@@ -22,7 +22,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger("mirror-mind")
 
@@ -1036,7 +1036,7 @@ class DualManifoldArchitecture:
             WHERE individual_id IN (SELECT id FROM individual_manifold WHERE agent_id = ?)
         ''', (self.agent_id,))
 
-        intersection_count = cursor.fetchone()[0]
+        cursor.fetchone()[0]
 
         conn.close()
 

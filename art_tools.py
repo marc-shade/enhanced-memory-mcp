@@ -13,14 +13,13 @@ Key Insight: Vigilance (ρ) is THE KEY DIAL
 """
 
 import os
-import json
 import numpy as np
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pathlib import Path
 
 # Import core ART implementation
-from art_core import FuzzyART, ARTHybrid, ARTCategory
+from art_core import FuzzyART, ARTHybrid
 
 
 # Global ART instances (lazy initialization)
@@ -28,8 +27,10 @@ _art_instance: Optional[FuzzyART] = None
 _art_hybrid_instance: Optional[ARTHybrid] = None
 
 # Storage paths
-AGENTIC_PATH = os.environ.get('AGENTIC_SYSTEM_PATH', os.path.expanduser('~/agentic-system'))
-ART_STORAGE_DIR = Path(AGENTIC_PATH) / 'databases' / 'art'
+AGENTIC_PATH = os.environ.get(
+    "AGENTIC_SYSTEM_PATH", os.path.expanduser("~/agentic-system")
+)
+ART_STORAGE_DIR = Path(AGENTIC_PATH) / "databases" / "art"
 
 
 def get_art_instance(vigilance: float = 0.75) -> FuzzyART:
@@ -37,25 +38,24 @@ def get_art_instance(vigilance: float = 0.75) -> FuzzyART:
     global _art_instance
     if _art_instance is None:
         ART_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-        state_file = ART_STORAGE_DIR / 'fuzzy_art_state.json'
+        state_file = ART_STORAGE_DIR / "fuzzy_art_state.json"
 
         if state_file.exists():
             _art_instance = FuzzyART.load(str(state_file))
         else:
-            _art_instance = FuzzyART(
-                vigilance=vigilance,
-                learning_rate=1.0
-            )
+            _art_instance = FuzzyART(vigilance=vigilance, learning_rate=1.0)
             _art_instance.name = "enhanced_memory_art"
     return _art_instance
 
 
-def get_art_hybrid_instance(embedding_dim: int = 384, vigilance: float = 0.75) -> ARTHybrid:
+def get_art_hybrid_instance(
+    embedding_dim: int = 384, vigilance: float = 0.75
+) -> ARTHybrid:
     """Get or create the global ART Hybrid instance."""
     global _art_hybrid_instance
     if _art_hybrid_instance is None:
         ART_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-        state_file = ART_STORAGE_DIR / 'art_hybrid_state.json'
+        state_file = ART_STORAGE_DIR / "art_hybrid_state.json"
 
         if state_file.exists():
             _art_hybrid_instance = ARTHybrid.load(str(state_file))
@@ -64,8 +64,7 @@ def get_art_hybrid_instance(embedding_dim: int = 384, vigilance: float = 0.75) -
             art_network = FuzzyART(vigilance=vigilance, learning_rate=1.0)
             art_network.name = "enhanced_memory_art_hybrid"
             _art_hybrid_instance = ARTHybrid(
-                art_network=art_network,
-                embedding_dim=embedding_dim
+                art_network=art_network, embedding_dim=embedding_dim
             )
     return _art_hybrid_instance
 
@@ -76,10 +75,10 @@ def save_art_state() -> None:
     ART_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     if _art_instance is not None:
-        _art_instance.save(str(ART_STORAGE_DIR / 'fuzzy_art_state.json'))
+        _art_instance.save(str(ART_STORAGE_DIR / "fuzzy_art_state.json"))
 
     if _art_hybrid_instance is not None:
-        _art_hybrid_instance.save(str(ART_STORAGE_DIR / 'art_hybrid_state.json'))
+        _art_hybrid_instance.save(str(ART_STORAGE_DIR / "art_hybrid_state.json"))
 
 
 def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
@@ -96,7 +95,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
     async def art_learn(
         data: List[float],
         metadata: Optional[Dict[str, Any]] = None,
-        vigilance: Optional[float] = None
+        vigilance: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Learn a new pattern using Fuzzy ART.
@@ -136,17 +135,17 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 "match_score": float(match_score),
                 "vigilance_used": art.vigilance,
                 "total_categories": len(art.categories),
-                "total_patterns_learned": art.get_statistics().get("total_patterns_learned", 0)
+                # FuzzyART has no `.stats` attribute and no "total_patterns_learned"
+                # key; the real counter is get_statistics()["total_inputs"].
+                "total_patterns_learned": art.get_statistics().get("total_inputs", 0),
             }
         finally:
             if original_vigilance is not None:
                 art.adjust_vigilance(original_vigilance)
 
-
     @app.tool()
     async def art_classify(
-        data: List[float],
-        vigilance: Optional[float] = None
+        data: List[float], vigilance: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Classify a pattern without learning (inference only).
@@ -165,7 +164,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 "success": True,
                 "classified": False,
                 "reason": "No categories learned yet",
-                "total_categories": 0
+                "total_categories": 0,
             }
 
         input_array = np.array(data, dtype=np.float32)
@@ -191,7 +190,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 "match_score": float(best_score),
                 "vigilance_threshold": vig,
                 "category_metadata": best_match_cat.metadata,
-                "category_pattern_count": best_match_cat.match_count
+                "category_pattern_count": best_match_cat.match_count,
             }
         else:
             return {
@@ -200,14 +199,12 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 "best_match_id": best_match_cat.id if best_match_cat else None,
                 "best_match_score": float(best_score),
                 "vigilance_threshold": vig,
-                "reason": f"Best match ({best_score:.3f}) below vigilance ({vig})"
+                "reason": f"Best match ({best_score:.3f}) below vigilance ({vig})",
             }
-
 
     @app.tool()
     async def art_adjust_vigilance(
-        vigilance: float,
-        instance: str = "main"
+        vigilance: float, instance: str = "main"
     ) -> Dict[str, Any]:
         """
         Adjust THE KEY DIAL - vigilance parameter.
@@ -228,7 +225,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         if not 0.0 <= vigilance <= 1.0:
             return {
                 "success": False,
-                "error": f"Vigilance must be between 0.0 and 1.0, got {vigilance}"
+                "error": f"Vigilance must be between 0.0 and 1.0, got {vigilance}",
             }
 
         if instance == "main":
@@ -242,7 +239,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 "instance": "main",
                 "old_vigilance": old_vigilance,
                 "new_vigilance": vigilance,
-                "effect": _describe_vigilance_effect(vigilance)
+                "effect": _describe_vigilance_effect(vigilance),
             }
         elif instance == "hybrid":
             art_hybrid = get_art_hybrid_instance()
@@ -255,14 +252,13 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 "instance": "hybrid",
                 "old_vigilance": old_vigilance,
                 "new_vigilance": vigilance,
-                "effect": _describe_vigilance_effect(vigilance)
+                "effect": _describe_vigilance_effect(vigilance),
             }
         else:
             return {
                 "success": False,
-                "error": f"Unknown instance: {instance}. Use 'main' or 'hybrid'"
+                "error": f"Unknown instance: {instance}. Use 'main' or 'hybrid'",
             }
-
 
     @app.tool()
     async def art_get_categories() -> Dict[str, Any]:
@@ -276,29 +272,35 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
 
         categories = []
         for category in art.categories:
-            categories.append({
-                "category_id": category.id,
-                "match_count": category.match_count,
-                "created_at": category.created_at.isoformat() if hasattr(category.created_at, 'isoformat') else str(category.created_at),
-                "last_matched": category.last_matched.isoformat() if hasattr(category.last_matched, 'isoformat') else str(category.last_matched),
-                "metadata": category.metadata,
-                "prototype_norm": float(np.linalg.norm(category.prototype))
-            })
+            categories.append(
+                {
+                    "category_id": category.id,
+                    "match_count": category.match_count,
+                    "created_at": category.created_at.isoformat()
+                    if hasattr(category.created_at, "isoformat")
+                    else str(category.created_at),
+                    "last_matched": category.last_matched.isoformat()
+                    if hasattr(category.last_matched, "isoformat")
+                    else str(category.last_matched),
+                    "metadata": category.metadata,
+                    "prototype_norm": float(np.linalg.norm(category.prototype)),
+                }
+            )
 
         return {
             "success": True,
             "total_categories": len(categories),
             "categories": categories,
             "vigilance": art.vigilance,
-            "stats": art.get_statistics()
+            # FuzzyART exposes get_statistics(), not get_stats(). This tool raised
+            # AttributeError on every call until 2026-07-11; it went unnoticed
+            # because nothing was calling it.
+            "stats": art.get_statistics(),
         }
-
 
     @app.tool()
     async def art_hybrid_learn(
-        embedding: List[float],
-        content: str,
-        metadata: Optional[Dict[str, Any]] = None
+        embedding: List[float], content: str, metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Learn from a pre-computed embedding using ART Hybrid architecture.
@@ -324,8 +326,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         full_metadata["learned_at"] = datetime.now().isoformat()
 
         category_id, is_new, match_score = art_hybrid.art.learn(
-            embedding_array,
-            full_metadata
+            embedding_array, full_metadata
         )
 
         # Auto-save
@@ -345,16 +346,14 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
             "match_score": float(match_score),
             "cluster_info": {
                 "total_clusters": len(art_hybrid.art.categories),
-                "patterns_in_cluster": cat_match_count
+                "patterns_in_cluster": cat_match_count,
             },
-            "vigilance": art_hybrid.art.vigilance
+            "vigilance": art_hybrid.art.vigilance,
         }
-
 
     @app.tool()
     async def art_hybrid_find_similar(
-        embedding: List[float],
-        top_k: int = 5
+        embedding: List[float], top_k: int = 5
     ) -> Dict[str, Any]:
         """
         Find similar categories for an embedding without learning.
@@ -372,7 +371,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
             return {
                 "success": True,
                 "matches": [],
-                "message": "No categories learned yet"
+                "message": "No categories learned yet",
             }
 
         embedding_array = np.array(embedding, dtype=np.float32)
@@ -382,12 +381,14 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         scores = []
         for category in art_hybrid.art.categories:
             match_score = art_hybrid.art._match_function(coded, category.prototype)
-            scores.append({
-                "category_id": category.id,
-                "match_score": float(match_score),
-                "match_count": category.match_count,
-                "metadata": category.metadata
-            })
+            scores.append(
+                {
+                    "category_id": category.id,
+                    "match_score": float(match_score),
+                    "match_count": category.match_count,
+                    "metadata": category.metadata,
+                }
+            )
 
         # Sort by score descending
         scores.sort(key=lambda x: x["match_score"], reverse=True)
@@ -396,9 +397,8 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
             "success": True,
             "matches": scores[:top_k],
             "total_categories": len(art_hybrid.art.categories),
-            "vigilance": art_hybrid.art.vigilance
+            "vigilance": art_hybrid.art.vigilance,
         }
-
 
     @app.tool()
     async def art_get_stats() -> Dict[str, Any]:
@@ -408,52 +408,46 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         Returns:
             Dict with stats for both main and hybrid instances
         """
-        stats = {
-            "success": True,
-            "storage_path": str(ART_STORAGE_DIR),
-            "instances": {}
-        }
+        stats = {"success": True, "storage_path": str(ART_STORAGE_DIR), "instances": {}}
 
         # Main instance stats
         if _art_instance is not None:
             stats["instances"]["main"] = {
                 "initialized": True,
-                "name": getattr(_art_instance, 'name', 'fuzzy_art'),
+                "name": _art_instance.name,
                 "vigilance": _art_instance.vigilance,
                 "learning_rate": _art_instance.learning_rate,
                 "total_categories": len(_art_instance.categories),
-                "stats": _art_instance.get_statistics()
+                "stats": _art_instance.get_statistics(),
             }
         else:
-            state_file = ART_STORAGE_DIR / 'fuzzy_art_state.json'
+            state_file = ART_STORAGE_DIR / "fuzzy_art_state.json"
             stats["instances"]["main"] = {
                 "initialized": False,
-                "has_saved_state": state_file.exists()
+                "has_saved_state": state_file.exists(),
             }
 
         # Hybrid instance stats
         if _art_hybrid_instance is not None:
             stats["instances"]["hybrid"] = {
                 "initialized": True,
-                "name": getattr(_art_hybrid_instance, 'name', 'art_hybrid'),
+                "name": _art_hybrid_instance.name,
                 "vigilance": _art_hybrid_instance.art.vigilance,
                 "total_categories": len(_art_hybrid_instance.art.categories),
-                "stats": _art_hybrid_instance.get_statistics()
+                "stats": _art_hybrid_instance.art.get_statistics(),
             }
         else:
-            state_file = ART_STORAGE_DIR / 'art_hybrid_state.json'
+            state_file = ART_STORAGE_DIR / "art_hybrid_state.json"
             stats["instances"]["hybrid"] = {
                 "initialized": False,
-                "has_saved_state": state_file.exists()
+                "has_saved_state": state_file.exists(),
             }
 
         return stats
 
-
     @app.tool()
     async def art_reset(
-        instance: str = "main",
-        confirm: bool = False
+        instance: str = "main", confirm: bool = False
     ) -> Dict[str, Any]:
         """
         Reset an ART instance (clear all learned categories).
@@ -470,7 +464,7 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
         if not confirm:
             return {
                 "success": False,
-                "error": "Must set confirm=True to reset. This will delete all learned categories!"
+                "error": "Must set confirm=True to reset. This will delete all learned categories!",
             }
 
         global _art_instance, _art_hybrid_instance
@@ -483,16 +477,16 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 return {
                     "success": True,
                     "instance": "main",
-                    "categories_deleted": old_count
+                    "categories_deleted": old_count,
                 }
             else:
-                state_file = ART_STORAGE_DIR / 'fuzzy_art_state.json'
+                state_file = ART_STORAGE_DIR / "fuzzy_art_state.json"
                 if state_file.exists():
                     state_file.unlink()
                 return {
                     "success": True,
                     "instance": "main",
-                    "message": "Deleted saved state file"
+                    "message": "Deleted saved state file",
                 }
 
         elif instance == "hybrid":
@@ -503,22 +497,19 @@ def register_art_tools(app, nmf_instance=None, db_path: str = None) -> None:
                 return {
                     "success": True,
                     "instance": "hybrid",
-                    "categories_deleted": old_count
+                    "categories_deleted": old_count,
                 }
             else:
-                state_file = ART_STORAGE_DIR / 'art_hybrid_state.json'
+                state_file = ART_STORAGE_DIR / "art_hybrid_state.json"
                 if state_file.exists():
                     state_file.unlink()
                 return {
                     "success": True,
                     "instance": "hybrid",
-                    "message": "Deleted saved state file"
+                    "message": "Deleted saved state file",
                 }
 
-        return {
-            "success": False,
-            "error": f"Unknown instance: {instance}"
-        }
+        return {"success": False, "error": f"Unknown instance: {instance}"}
 
 
 def _describe_vigilance_effect(vigilance: float) -> str:
@@ -537,10 +528,10 @@ def _describe_vigilance_effect(vigilance: float) -> str:
 
 # Export for use in server.py
 __all__ = [
-    'register_art_tools',
-    'get_art_instance',
-    'get_art_hybrid_instance',
-    'save_art_state',
-    'FuzzyART',
-    'ARTHybrid'
+    "register_art_tools",
+    "get_art_instance",
+    "get_art_hybrid_instance",
+    "save_art_state",
+    "FuzzyART",
+    "ARTHybrid",
 ]

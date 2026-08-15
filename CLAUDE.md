@@ -15,15 +15,21 @@ source .venv/bin/activate
 # Run MCP server standalone (for testing)
 python3 server.py
 
-# Run comprehensive tests
-python3 comprehensive_test.py
-
-# Test all RAG tiers (22 tests)
+# Test all RAG tiers (22/22 — canonical integration suite)
 python3 test_rag_integration_comprehensive.py
 
-# Test specific RAG features
-python3 test_graphrag_integration.py
-python3 test_letta_integration.py
+# comprehensive_test.py is the post-install gate. Judge it by EXIT CODE, not by
+# a pass count. The suite runs in two modes and the totals are not comparable:
+# with no ENHANCED_MEMORY_* / MEMORY_DB_* variables set it generates its own
+# sandbox and runs every check; with them set it runs operator-directed and
+# skips the checks that describe a sandbox it did not create.
+# Measured on one machine at one commit: 106 isolated, 102 operator-directed,
+# both exit 0. The run prints its own mode and names what it skipped.
+# (An earlier version of this file called the suite OBSOLETE and told readers to
+# ignore it. That applied to a version written against a deprecated MCP contract
+# -- read_graph, create_relations, entities_created -- and does not apply to the
+# suite as shipped.)
+python3 comprehensive_test.py
 
 # Test code execution sandbox
 python3 test_advanced_tool_use.py

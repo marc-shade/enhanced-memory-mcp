@@ -12,22 +12,25 @@ This wires the existing semantic_cache_module.py into the MCP tool ecosystem.
 
 import logging
 import json
+import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
-# Add scripts path to access semantic cache module
-# Auto-detect storage base for cross-platform compatibility
-import platform
-if platform.system() == "Darwin":  # macOS
-    SCRIPTS_PATH = Path("/Volumes/SSDRAID0/agentic-system/scripts")
-else:  # Linux
-    SCRIPTS_PATH = Path("/mnt/agentic-system/scripts")
-    if not SCRIPTS_PATH.exists():
-        SCRIPTS_PATH = Path("/home/marc/agentic-system/scripts")
-
-if str(SCRIPTS_PATH) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_PATH))
+# Add the repo's scripts/ dir to the import path so the semantic cache modules
+# resolve on any host. Resolved relative to this file, with $STORAGE_BASE as a
+# fallback; an absolute path here would silently disable the cache elsewhere.
+_SCRIPTS_CANDIDATES = [
+    Path(__file__).resolve().parent.parent.parent
+    / "scripts",  # repo-relative (macOS + Linux)
+    Path(os.environ.get("STORAGE_BASE", "")) / "scripts",  # $STORAGE_BASE fallback
+]
+_SCRIPTS_PATH = next(
+    (p for p in _SCRIPTS_CANDIDATES if (p / "semantic_cache_module.py").exists()),
+    _SCRIPTS_CANDIDATES[0],
+)
+if str(_SCRIPTS_PATH) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_PATH))
 
 logger = logging.getLogger("semantic_cache_tools")
 
@@ -42,10 +45,9 @@ def _get_semantic_cache():
     if _cache_instance is None:
         try:
             from semantic_cache_module import SemanticCache
+
             _cache_instance = SemanticCache(
-                similarity_threshold=0.90,
-                ttl_hours=24,
-                model_name="all-MiniLM-L6-v2"
+                similarity_threshold=0.90, ttl_hours=24, model_name="all-MiniLM-L6-v2"
             )
             logger.info("SemanticCache initialized successfully")
         except Exception as e:
@@ -60,6 +62,7 @@ def _get_agi_cache(domain: str = "general"):
     if domain not in _agi_cache_instances:
         try:
             from agi_semantic_cache_integration import AGISemanticCache
+
             _agi_cache_instances[domain] = AGISemanticCache(cache_domain=domain)
             logger.info(f"AGISemanticCache[{domain}] initialized")
         except Exception as e:
@@ -73,8 +76,7 @@ def register_semantic_cache_tools(app):
 
     @app.tool()
     async def semantic_cache_get(
-        query: str,
-        context: Optional[str] = None
+        query: str, context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Check semantic cache for similar query.
@@ -90,6 +92,7 @@ def register_semantic_cache_tools(app):
             Dict with 'hit' (bool), 'response', 'similarity', 'latency_ms'
         """
         import time
+
         start = time.time()
 
         try:
@@ -104,7 +107,7 @@ def register_semantic_cache_tools(app):
                     "response": response,
                     "similarity": round(similarity, 4),
                     "latency_ms": round(latency, 1),
-                    "message": f"Cache HIT (similarity: {similarity:.4f})"
+                    "message": f"Cache HIT (similarity: {similarity:.4f})",
                 }
             else:
                 return {
@@ -112,13 +115,13 @@ def register_semantic_cache_tools(app):
                     "response": None,
                     "similarity": 0.0,
                     "latency_ms": round(latency, 1),
-                    "message": "Cache MISS - proceed with expensive operation"
+                    "message": "Cache MISS - proceed with expensive operation",
                 }
         except Exception as e:
             return {
                 "hit": False,
                 "error": str(e),
-                "message": "Cache lookup failed - proceed without caching"
+                "message": "Cache lookup failed - proceed without caching",
             }
 
     @app.tool()
@@ -126,7 +129,7 @@ def register_semantic_cache_tools(app):
         query: str,
         response: str,
         context: Optional[str] = None,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """
         Store query-response pair in semantic cache.
@@ -145,15 +148,12 @@ def register_semantic_cache_tools(app):
         try:
             cache = _get_semantic_cache()
             cache.store(query, response, context=context, metadata=metadata)
-            return {
-                "success": True,
-                "message": f"Stored in cache: {query[:60]}..."
-            }
+            return {"success": True, "message": f"Stored in cache: {query[:60]}..."}
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": "Failed to store in cache"
+                "message": "Failed to store in cache",
             }
 
     @app.tool()
@@ -170,22 +170,16 @@ def register_semantic_cache_tools(app):
         try:
             cache = _get_semantic_cache()
             stats = cache.get_stats()
-            return {
-                "success": True,
-                "stats": stats
-            }
+            return {"success": True, "stats": stats}
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": "Failed to get cache stats"
+                "message": "Failed to get cache stats",
             }
 
     @app.tool()
-    async def semantic_cache_search(
-        query: str,
-        top_k: int = 5
-    ) -> Dict[str, Any]:
+    async def semantic_cache_search(query: str, top_k: int = 5) -> Dict[str, Any]:
         """
         Search for top-k most similar cached queries.
 
@@ -210,21 +204,16 @@ def register_semantic_cache_tools(app):
                     {
                         "cached_query": q[:100],
                         "response_preview": r[:200] + "..." if len(r) > 200 else r,
-                        "similarity": round(sim, 4)
+                        "similarity": round(sim, 4),
                     }
                     for q, r, sim in results
-                ]
+                ],
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
-    async def semantic_cache_cleanup(
-        force: bool = False
-    ) -> Dict[str, Any]:
+    async def semantic_cache_cleanup(force: bool = False) -> Dict[str, Any]:
         """
         Clean up expired cache entries.
 
@@ -240,19 +229,15 @@ def register_semantic_cache_tools(app):
             return {
                 "success": True,
                 "deleted": deleted,
-                "message": f"Cleaned up {deleted} entries" + (" (FORCE: all entries)" if force else "")
+                "message": f"Cleaned up {deleted} entries"
+                + (" (FORCE: all entries)" if force else ""),
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def agi_cached_reasoning(
-        query: str,
-        domain: str = "reasoning",
-        context: Optional[str] = None
+        query: str, domain: str = "reasoning", context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         AGI-optimized cache check for reasoning tasks.
@@ -273,6 +258,7 @@ def register_semantic_cache_tools(app):
             Dict with 'hit', 'response', 'similarity', 'domain_config'
         """
         import time
+
         start = time.time()
 
         try:
@@ -299,7 +285,7 @@ def register_semantic_cache_tools(app):
                     "latency_ms": round(latency, 1),
                     "domain": domain,
                     "domain_config": agi_cache.DOMAINS.get(domain, {}),
-                    "message": f"AGI Cache HIT [{domain}] (similarity: {similarity:.4f})"
+                    "message": f"AGI Cache HIT [{domain}] (similarity: {similarity:.4f})",
                 }
             else:
                 agi_cache.metrics["cache_misses"] += 1
@@ -310,14 +296,14 @@ def register_semantic_cache_tools(app):
                     "latency_ms": round(latency, 1),
                     "domain": domain,
                     "domain_config": agi_cache.DOMAINS.get(domain, {}),
-                    "message": f"AGI Cache MISS [{domain}] - proceed with expensive operation"
+                    "message": f"AGI Cache MISS [{domain}] - proceed with expensive operation",
                 }
         except Exception as e:
             return {
                 "hit": False,
                 "error": str(e),
                 "domain": domain,
-                "message": "AGI cache lookup failed"
+                "message": "AGI cache lookup failed",
             }
 
     @app.tool()
@@ -325,7 +311,7 @@ def register_semantic_cache_tools(app):
         query: str,
         response: Any,
         domain: str = "reasoning",
-        context: Optional[str] = None
+        context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Store AGI reasoning result in domain-specific cache.
@@ -354,19 +340,13 @@ def register_semantic_cache_tools(app):
             return {
                 "success": True,
                 "domain": domain,
-                "message": f"Stored in AGI cache [{domain}]"
+                "message": f"Stored in AGI cache [{domain}]",
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "domain": domain
-            }
+            return {"success": False, "error": str(e), "domain": domain}
 
     @app.tool()
-    async def agi_cache_metrics(
-        domain: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def agi_cache_metrics(domain: Optional[str] = None) -> Dict[str, Any]:
         """
         Get AGI cache metrics for all or specific domain.
 
@@ -379,10 +359,7 @@ def register_semantic_cache_tools(app):
         try:
             if domain:
                 agi_cache = _get_agi_cache(domain)
-                return {
-                    "success": True,
-                    "metrics": agi_cache.get_metrics()
-                }
+                return {"success": True, "metrics": agi_cache.get_metrics()}
             else:
                 # Return all initialized domains
                 all_metrics = {}
@@ -397,13 +374,10 @@ def register_semantic_cache_tools(app):
                     "initialized_domains": list(_agi_cache_instances.keys()),
                     "available_domains": list(AGISemanticCache.DOMAINS.keys()),
                     "domain_configs": AGISemanticCache.DOMAINS,
-                    "metrics": all_metrics
+                    "metrics": all_metrics,
                 }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def semantic_cache_available() -> Dict[str, Any]:
@@ -418,12 +392,12 @@ def register_semantic_cache_tools(app):
             "agi_cache_available": False,
             "model_name": "all-MiniLM-L6-v2",
             "features": [],
-            "domains": []
+            "domains": [],
         }
 
         # Check basic cache
         try:
-            cache = _get_semantic_cache()
+            _get_semantic_cache()
             result["cache_available"] = True
             result["features"].append("basic_semantic_cache")
         except Exception as e:
@@ -432,6 +406,7 @@ def register_semantic_cache_tools(app):
         # Check AGI cache
         try:
             from agi_semantic_cache_integration import AGISemanticCache
+
             result["agi_cache_available"] = True
             result["features"].append("agi_domain_caching")
             result["domains"] = list(AGISemanticCache.DOMAINS.keys())

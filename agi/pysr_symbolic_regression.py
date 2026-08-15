@@ -17,11 +17,10 @@ Key Capabilities:
 import logging
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 import sqlite3
-import json
 
 logger = logging.getLogger("pysr-symbolic-regression")
 

@@ -12,7 +12,6 @@ Implements:
 import sqlite3
 import json
 import logging
-import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional

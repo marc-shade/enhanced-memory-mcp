@@ -7,7 +7,7 @@ Tests all 7 available models across different task types to find optimal model-t
 import os
 import json
 import time
-from typing import Dict, List, Any
+from typing import Dict, Any
 from datetime import datetime
 from ollama import Client
 

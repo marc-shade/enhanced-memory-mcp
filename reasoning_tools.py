@@ -3,10 +3,9 @@ Reasoning Prioritization Tools for Enhanced Memory MCP
 
 Integrates 75/15 rule from AI vision research into memory operations.
 """
+
 import sqlite3
-import json
 from typing import Dict, List, Any
-from datetime import datetime
 
 from reasoning_prioritizer import get_prioritizer, ContentCategory
 
@@ -40,17 +39,16 @@ def register_reasoning_tools(app, db_path):
             "confidence": priority.confidence,
             "interpretation": _interpret_priority(priority),
             "storage_recommendation": {
-                "should_prioritize": priority.category == ContentCategory.REASONING_CENTRIC,
+                "should_prioritize": priority.category
+                == ContentCategory.REASONING_CENTRIC,
                 "compression_level": prioritizer.get_compression_level(content),
-                "recommended_tier": prioritizer.calculate_tier_priority(content, 0)
-            }
+                "recommended_tier": prioritizer.calculate_tier_priority(content, 0),
+            },
         }
 
     @app.tool()
     async def search_with_reasoning_priority(
-        query: str,
-        limit: int = 10,
-        boost_reasoning: bool = True
+        query: str, limit: int = 10, boost_reasoning: bool = True
     ) -> Dict[str, Any]:
         """
         Search memories with reasoning-first prioritization.
@@ -70,13 +68,13 @@ def register_reasoning_tools(app, db_path):
         cursor = conn.cursor()
 
         # Get all entities
-        cursor.execute('''
+        cursor.execute("""
             SELECT e.id, e.name, e.entity_type, e.tier, e.access_count,
                    GROUP_CONCAT(o.content, ' ') as observations
             FROM entities e
             LEFT JOIN observations o ON e.id = o.entity_id
             GROUP BY e.id
-        ''')
+        """)
 
         results = cursor.fetchall()
         conn.close()
@@ -84,14 +82,16 @@ def register_reasoning_tools(app, db_path):
         # Convert to dictionaries
         memories = []
         for r in results:
-            memories.append({
-                "id": r[0],
-                "name": r[1],
-                "entityType": r[2],
-                "tier": r[3],
-                "access_count": r[4],
-                "observations": r[5] or ""
-            })
+            memories.append(
+                {
+                    "id": r[0],
+                    "name": r[1],
+                    "entityType": r[2],
+                    "tier": r[3],
+                    "access_count": r[4],
+                    "observations": r[5] or "",
+                }
+            )
 
         # Rank with reasoning prioritization
         ranked = prioritizer.rank_memories(memories, query, boost_reasoning)
@@ -103,19 +103,23 @@ def register_reasoning_tools(app, db_path):
             content = memory.get("observations", "")
             priority = prioritizer.classify_content(content)
 
-            formatted_results.append({
-                "entity": {
-                    "id": memory["id"],
-                    "name": memory["name"],
-                    "type": memory["entityType"],
-                    "tier": memory["tier"]
-                },
-                "relevance_score": score,
-                "content_category": priority.category.value,
-                "priority_weight": priority.weight,
-                "reasoning_score": priority.reasoning_score,
-                "observations_preview": content[:200] + "..." if len(content) > 200 else content
-            })
+            formatted_results.append(
+                {
+                    "entity": {
+                        "id": memory["id"],
+                        "name": memory["name"],
+                        "type": memory["entityType"],
+                        "tier": memory["tier"],
+                    },
+                    "relevance_score": score,
+                    "content_category": priority.category.value,
+                    "priority_weight": priority.weight,
+                    "reasoning_score": priority.reasoning_score,
+                    "observations_preview": content[:200] + "..."
+                    if len(content) > 200
+                    else content,
+                }
+            )
 
         # Analyze query
         query_priority = prioritizer.classify_content(query)
@@ -124,13 +128,40 @@ def register_reasoning_tools(app, db_path):
             "query_analysis": {
                 "category": query_priority.category.value,
                 "weight": query_priority.weight,
-                "reasoning_score": query_priority.reasoning_score
+                "reasoning_score": query_priority.reasoning_score,
             },
             "results": formatted_results,
             "total_results": len(formatted_results),
             "reasoning_boost_applied": boost_reasoning,
-            "summary": _generate_search_summary(formatted_results, query_priority)
+            "summary": _generate_search_summary(formatted_results, query_priority),
         }
+
+    def _load_distribution_targets() -> Dict[str, float]:
+        """Distribution targets from ~/.claude/agi/config.yaml (single source of
+        truth; operator-tunable). Falls back to the original built-in 75/15/10
+        if the config is unreadable so the tool never breaks on a config issue.
+        Keys map: reasoning_centric<-reasoning_centric, visual_centric<-
+        visual_centric, general<-general."""
+        fallback = {"reasoning_centric": 0.75, "visual_centric": 0.15, "general": 0.10}
+        try:
+            import yaml
+            from pathlib import Path
+
+            cfg = yaml.safe_load(
+                (Path.home() / ".claude" / "agi" / "config.yaml").read_text()
+            )
+            t = cfg["memory"]["distribution_targets"]
+            targets = {
+                "reasoning_centric": float(t["reasoning_centric"]),
+                "visual_centric": float(t["visual_centric"]),
+                "general": float(t["general"]),
+            }
+            # sanity: must sum to ~1.0, else fall back
+            if abs(sum(targets.values()) - 1.0) > 0.01:
+                return fallback
+            return targets
+        except Exception:
+            return fallback
 
     @app.tool()
     async def analyze_memory_distribution() -> Dict[str, Any]:
@@ -145,23 +176,26 @@ def register_reasoning_tools(app, db_path):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Get all entities with observations
-        cursor.execute('''
+        # Get all entities with observations. Archive/quarantine tiers are
+        # excluded (Phase 0, 2026-07-02): 6,301 archived legacy rows would
+        # otherwise dominate the distribution and hide the live store's shape.
+        cursor.execute("""
             SELECT GROUP_CONCAT(o.content, ' ') as observations
             FROM entities e
             LEFT JOIN observations o ON e.id = o.entity_id
+            WHERE COALESCE(e.tier,'') NOT IN ('archive','quarantine')
+              -- tier alone leaks rows archived via archived_at /
+              -- superseded_by without a tier change (measured
+              -- 2026-08-11: 32 such rows). Added same day.
+              AND e.archived_at IS NULL AND e.superseded_by IS NULL
             GROUP BY e.id
-        ''')
+        """)
 
         results = cursor.fetchall()
         conn.close()
 
         # Classify all memories
-        categories = {
-            "reasoning_centric": 0,
-            "visual_centric": 0,
-            "general": 0
-        }
+        categories = {"reasoning_centric": 0, "visual_centric": 0, "general": 0}
 
         total_memories = 0
         for r in results:
@@ -176,21 +210,17 @@ def register_reasoning_tools(app, db_path):
         if total_memories == 0:
             return {
                 "error": "No memories found",
-                "recommendation": "Add memories to analyze distribution"
+                "recommendation": "Add memories to analyze distribution",
             }
 
         # Calculate percentages
         current_distribution = {
             "reasoning_centric": categories["reasoning_centric"] / total_memories,
             "visual_centric": categories["visual_centric"] / total_memories,
-            "general": categories["general"] / total_memories
+            "general": categories["general"] / total_memories,
         }
 
-        optimal_distribution = {
-            "reasoning_centric": 0.75,
-            "visual_centric": 0.15,
-            "general": 0.10
-        }
+        optimal_distribution = _load_distribution_targets()
 
         # Calculate gaps
         gaps = {
@@ -201,19 +231,18 @@ def register_reasoning_tools(app, db_path):
         return {
             "total_memories": total_memories,
             "current_distribution": {
-                key: f"{value:.1%}"
-                for key, value in current_distribution.items()
+                key: f"{value:.1%}" for key, value in current_distribution.items()
             },
             "optimal_distribution": {
-                key: f"{value:.1%}"
-                for key, value in optimal_distribution.items()
+                key: f"{value:.1%}" for key, value in optimal_distribution.items()
             },
-            "gaps": {
-                key: f"{value:+.1%}"
-                for key, value in gaps.items()
-            },
-            "recommendations": _generate_distribution_recommendations(gaps, current_distribution),
-            "compliance_score": _calculate_compliance_score(current_distribution, optimal_distribution)
+            "gaps": {key: f"{value:+.1%}" for key, value in gaps.items()},
+            "recommendations": _generate_distribution_recommendations(
+                gaps, current_distribution
+            ),
+            "compliance_score": _calculate_compliance_score(
+                current_distribution, optimal_distribution
+            ),
         }
 
     @app.tool()
@@ -230,14 +259,22 @@ def register_reasoning_tools(app, db_path):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Get all entities
-        cursor.execute('''
+        # Get all live entities. Archive/quarantine are excluded (2026-07-02):
+        # calculate_tier_priority can only return core/working/reference, so
+        # without this filter a single run would silently un-archive all
+        # archived/quarantined rows and destroy the Phase-0 tier separation.
+        cursor.execute("""
             SELECT e.id, e.name, e.access_count, e.tier,
                    GROUP_CONCAT(o.content, ' ') as observations
             FROM entities e
             LEFT JOIN observations o ON e.id = o.entity_id
+            WHERE COALESCE(e.tier,'') NOT IN ('archive','quarantine')
+              -- tier alone leaks rows archived via archived_at /
+              -- superseded_by without a tier change (measured
+              -- 2026-08-11: 32 such rows). Added same day.
+              AND e.archived_at IS NULL AND e.superseded_by IS NULL
             GROUP BY e.id
-        ''')
+        """)
 
         results = cursor.fetchall()
 
@@ -251,23 +288,30 @@ def register_reasoning_tools(app, db_path):
 
             if optimal_tier != current_tier:
                 # Update tier
-                cursor.execute('''
+                cursor.execute(
+                    """
                     UPDATE entities
                     SET tier = ?
                     WHERE id = ?
-                ''', (optimal_tier, entity_id))
+                """,
+                    (optimal_tier, entity_id),
+                )
 
                 # Classify for reason
                 priority = prioritizer.classify_content(content)
 
-                changes.append({
-                    "entity_id": entity_id,
-                    "name": name,
-                    "from_tier": current_tier,
-                    "to_tier": optimal_tier,
-                    "category": priority.category.value,
-                    "reason": _explain_tier_change(current_tier, optimal_tier, priority, access_count)
-                })
+                changes.append(
+                    {
+                        "entity_id": entity_id,
+                        "name": name,
+                        "from_tier": current_tier,
+                        "to_tier": optimal_tier,
+                        "category": priority.category.value,
+                        "reason": _explain_tier_change(
+                            current_tier, optimal_tier, priority, access_count
+                        ),
+                    }
+                )
 
         conn.commit()
         conn.close()
@@ -275,7 +319,7 @@ def register_reasoning_tools(app, db_path):
         return {
             "total_changes": len(changes),
             "changes": changes,
-            "summary": f"Optimized {len(changes)} entities based on 75/15 rule"
+            "summary": f"Optimized {len(changes)} entities based on 75/15 rule",
         }
 
 
@@ -303,7 +347,9 @@ def _generate_search_summary(results: List[Dict], query_priority) -> str:
     if not results:
         return "No results found"
 
-    reasoning_count = sum(1 for r in results if r["content_category"] == "reasoning_centric")
+    reasoning_count = sum(
+        1 for r in results if r["content_category"] == "reasoning_centric"
+    )
     visual_count = sum(1 for r in results if r["content_category"] == "visual_centric")
 
     summary = f"Found {len(results)} results. "
@@ -348,10 +394,7 @@ def _generate_distribution_recommendations(gaps: Dict, current: Dict) -> List[st
 
 def _calculate_compliance_score(current: Dict, optimal: Dict) -> float:
     """Calculate compliance score (0-1) with optimal distribution."""
-    total_deviation = sum(
-        abs(optimal[key] - current[key])
-        for key in optimal
-    )
+    total_deviation = sum(abs(optimal[key] - current[key]) for key in optimal)
 
     # Perfect compliance = 0 deviation, score = 1.0
     # Maximum deviation = 2.0 (all in wrong categories), score = 0.0
@@ -359,7 +402,9 @@ def _calculate_compliance_score(current: Dict, optimal: Dict) -> float:
     return max(0.0, min(1.0, compliance))
 
 
-def _explain_tier_change(from_tier: str, to_tier: str, priority, access_count: int) -> str:
+def _explain_tier_change(
+    from_tier: str, to_tier: str, priority, access_count: int
+) -> str:
     """Explain why tier was changed."""
     if priority.category == ContentCategory.REASONING_CENTRIC:
         if to_tier == "core":

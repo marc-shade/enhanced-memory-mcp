@@ -2,7 +2,6 @@
 """
 Test script specifically for the minimal MCP server
 """
-import sys
 import json
 import subprocess
 import time

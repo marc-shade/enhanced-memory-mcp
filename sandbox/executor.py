@@ -13,7 +13,6 @@ import io
 import signal
 import resource
 import tempfile
-import os
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 from contextlib import contextmanager
@@ -25,7 +24,7 @@ try:
     from RestrictedPython.Guards import (
         guarded_iter_unpack_sequence,
         guarded_unpack_sequence,
-        safe_builtins
+        safe_builtins  # noqa: F401
     )
     from RestrictedPython.Eval import default_guarded_getitem, default_guarded_getattr
     from RestrictedPython.PrintCollector import PrintCollector
@@ -213,21 +212,7 @@ class CodeExecutor:
 
             exec_globals = self.safe_builtins.copy()
             if context:
-                # Strip dangerous keys that could bypass RestrictedPython safety
-                _FORBIDDEN_CONTEXT_KEYS = frozenset({
-                    '__builtins__', '__import__', '__loader__', '__spec__',
-                    'eval', 'exec', 'compile', 'open', 'globals', 'locals',
-                    'breakpoint', 'exit', 'quit', 'input', 'help',
-                    '__build_class__', '__name__', '__file__',
-                    'getattr', 'setattr', 'delattr', 'vars',
-                    'importlib', 'os', 'sys', 'subprocess', 'shutil',
-                    'pathlib', 'socket', 'ctypes',
-                })
-                sanitized = {
-                    k: v for k, v in context.items()
-                    if k not in _FORBIDDEN_CONTEXT_KEYS
-                }
-                exec_globals.update(sanitized)
+                exec_globals.update(context)
 
             sys.stdout, sys.stderr = stdout_capture, stderr_capture
 

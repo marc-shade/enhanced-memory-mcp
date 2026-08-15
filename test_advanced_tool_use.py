@@ -10,7 +10,6 @@ Validates:
 """
 
 import sys
-import json
 from pathlib import Path
 
 # Add parent to path
@@ -26,7 +25,6 @@ def test_tool_catalog():
         TOOL_CATALOG,
         ToolTier,
         get_tool_count_by_tier,
-        get_hot_tools,
         ALWAYS_LOAD,
     )
 
@@ -121,8 +119,6 @@ def test_deferred_loading():
     print("="*60)
 
     from deferred_loading import (
-        MODULE_CONFIGS,
-        LoadingStrategy,
         get_loading_stats,
         HOT_TOOL_DEFINITIONS,
     )
@@ -159,7 +155,7 @@ def test_execute_code_sandbox():
     print("="*60)
 
     try:
-        from sandbox.executor import CodeExecutor, create_api_context
+        from sandbox.executor import CodeExecutor, create_api_context  # noqa: F401
         from sandbox.security import comprehensive_safety_check
 
         # Test safety check
@@ -207,9 +203,7 @@ def test_integration():
 
     # Verify imports work
     try:
-        from tool_catalog import TOOL_CATALOG
-        from tool_search import search_tools, register_tool_search
-        from deferred_loading import MODULE_CONFIGS, get_loading_stats
+        from tool_search import search_tools
 
         print(f"✅ All modules import successfully")
 

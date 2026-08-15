@@ -8,7 +8,7 @@ Provides:
 """
 
 import re
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, List, Tuple
 
 
 PII_PATTERNS = {

@@ -33,7 +33,7 @@ async def test_compression_deployment():
             'name': 'compression_test_distributed_execution',
             'entityType': 'experience',
             'observations': [
-                'The distributed execution system was tested with seven different test cases to verify functionality across the cluster. All tests passed successfully, demonstrating that tasks can be routed to the appropriate nodes based on their requirements. The macpro51 builder node successfully executed Linux-specific commands.',
+                'The distributed execution system was tested with seven different test cases to verify functionality across the cluster. All tests passed successfully, demonstrating that tasks can be routed to the appropriate nodes based on their requirements. The fedora builder node successfully executed Linux-specific commands.',
                 'We observed approximately 0.5 seconds of routing overhead and 1-2 seconds of SSH connection time, which is acceptable for tasks with execution times greater than 5 seconds. The parallel execution test showed linear scaling up to the number of available nodes.',
                 'One interesting finding was that the task queue management handled concurrent submissions without any race conditions. This validates our distributed architecture design.'
             ]

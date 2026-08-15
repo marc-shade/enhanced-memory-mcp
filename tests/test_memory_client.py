@@ -13,7 +13,6 @@ Coverage:
 - Convenience wrapper functions
 """
 
-import asyncio
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -21,6 +20,7 @@ from pathlib import Path
 
 # Import the modules under test
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from memory_client import (
@@ -29,7 +29,6 @@ from memory_client import (
     create_entities,
     search_nodes,
     get_memory_status,
-    _client
 )
 import memory_client as memory_client_module
 
@@ -38,11 +37,17 @@ import memory_client as memory_client_module
 # MemoryClient Initialization Tests
 # ============================================================================
 
+
 class TestMemoryClientInit:
     """Tests for MemoryClient initialization."""
 
-    def test_default_socket_path(self):
-        """Test default socket path is set correctly."""
+    def test_default_socket_path(self, monkeypatch):
+        """With no socket configured, the client falls back to the shared socket.
+
+        The environment is cleared explicitly so this asserts the fallback
+        rather than whatever the developer happens to have exported.
+        """
+        monkeypatch.delenv("MEMORY_DB_SOCKET_PATH", raising=False)
         client = MemoryClient()
         assert client.socket_path == "/tmp/memory-db.sock"
 
@@ -50,6 +55,27 @@ class TestMemoryClientInit:
         """Test custom socket path is accepted."""
         client = MemoryClient(socket_path="/custom/path.sock")
         assert client.socket_path == "/custom/path.sock"
+
+    def test_environment_socket_path_is_honoured(self, monkeypatch):
+        """MEMORY_DB_SOCKET_PATH redirects a client built with no argument.
+
+        Callers that construct MemoryClient() with no path -- api/memory.py
+        does -- must still reach the configured daemon rather than the
+        built-in fallback.
+        """
+        monkeypatch.setenv("MEMORY_DB_SOCKET_PATH", "/run/configured/db.sock")
+        assert MemoryClient().socket_path == "/run/configured/db.sock"
+
+    def test_explicit_socket_path_beats_environment(self, monkeypatch):
+        """An explicitly passed socket always wins over the environment.
+
+        server.py resolves MEMORY_DB_SOCKET_PATH itself and passes the result
+        in, so an environment variable must never be able to redirect a client
+        that was given a path.
+        """
+        monkeypatch.setenv("MEMORY_DB_SOCKET_PATH", "/env/should-not-win.sock")
+        client = MemoryClient(socket_path="/explicit/wins.sock")
+        assert client.socket_path == "/explicit/wins.sock"
 
     def test_socket_path_types(self):
         """Test socket path accepts string."""
@@ -60,6 +86,7 @@ class TestMemoryClientInit:
 # ============================================================================
 # Request/Response Formatting Tests
 # ============================================================================
+
 
 class TestRequestFormatting:
     """Tests for request/response formatting."""
@@ -85,12 +112,16 @@ class TestRequestFormatting:
 
         # Set up response
         response = {"success": True, "result": "test"}
-        mock_reader.read = AsyncMock(side_effect=[
-            json.dumps(response).encode(),
-            b''  # EOF
-        ])
+        mock_reader.read = AsyncMock(
+            side_effect=[
+                json.dumps(response).encode(),
+                b"",  # EOF
+            ]
+        )
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client._send_request("test_method", {"key": "value"})
 
         # Verify request format
@@ -112,12 +143,11 @@ class TestRequestFormatting:
         mock_writer.wait_closed = AsyncMock()
 
         response = {"success": True}
-        mock_reader.read = AsyncMock(side_effect=[
-            json.dumps(response).encode(),
-            b''
-        ])
+        mock_reader.read = AsyncMock(side_effect=[json.dumps(response).encode(), b""])
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             await client._send_request("status_check")
 
         request = json.loads(written_data[0].decode())
@@ -137,14 +167,15 @@ class TestRequestFormatting:
         expected_response = {
             "success": True,
             "data": {"entities": [{"id": 1, "name": "test"}]},
-            "count": 1
+            "count": 1,
         }
-        mock_reader.read = AsyncMock(side_effect=[
-            json.dumps(expected_response).encode(),
-            b''
-        ])
+        mock_reader.read = AsyncMock(
+            side_effect=[json.dumps(expected_response).encode(), b""]
+        )
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client._send_request("get_data")
 
         assert result == expected_response
@@ -167,12 +198,17 @@ class TestRequestFormatting:
 
         # Split into chunks
         chunk_size = 1000
-        chunks = [response_bytes[i:i+chunk_size] for i in range(0, len(response_bytes), chunk_size)]
-        chunks.append(b'')  # EOF
+        chunks = [
+            response_bytes[i : i + chunk_size]
+            for i in range(0, len(response_bytes), chunk_size)
+        ]
+        chunks.append(b"")  # EOF
 
         mock_reader.read = AsyncMock(side_effect=chunks)
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client._send_request("get_large_data")
 
         assert result["success"] is True
@@ -182,6 +218,7 @@ class TestRequestFormatting:
 # ============================================================================
 # Async Method Tests
 # ============================================================================
+
 
 class TestAsyncMethods:
     """Tests for async client methods."""
@@ -198,28 +235,30 @@ class TestAsyncMethods:
         mock_writer.drain = AsyncMock()
         mock_writer.close = MagicMock()
         mock_writer.wait_closed = AsyncMock()
-        mock_reader.read = AsyncMock(side_effect=[
-            json.dumps(response_data).encode(),
-            b''
-        ])
+        mock_reader.read = AsyncMock(
+            side_effect=[json.dumps(response_data).encode(), b""]
+        )
         return mock_reader, mock_writer
 
     @pytest.mark.asyncio
     async def test_create_entities_async(self, client):
         """Test async create_entities method."""
-        mock_reader, mock_writer = self._setup_mock_connection({
-            "success": True,
-            "created": 2
-        })
+        mock_reader, mock_writer = self._setup_mock_connection(
+            {"success": True, "created": 2}
+        )
 
         written_data = []
         mock_writer.write = lambda d: written_data.append(d)
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
-            result = await client.create_entities([
-                {"name": "entity1", "entityType": "test"},
-                {"name": "entity2", "entityType": "test"}
-            ])
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
+            result = await client.create_entities(
+                [
+                    {"name": "entity1", "entityType": "test"},
+                    {"name": "entity2", "entityType": "test"},
+                ]
+            )
 
         assert result["success"] is True
         assert result["created"] == 2
@@ -232,16 +271,16 @@ class TestAsyncMethods:
     @pytest.mark.asyncio
     async def test_search_nodes_async(self, client):
         """Test async search_nodes method."""
-        mock_reader, mock_writer = self._setup_mock_connection({
-            "success": True,
-            "results": [{"id": 1, "name": "result1"}],
-            "count": 1
-        })
+        mock_reader, mock_writer = self._setup_mock_connection(
+            {"success": True, "results": [{"id": 1, "name": "result1"}], "count": 1}
+        )
 
         written_data = []
         mock_writer.write = lambda d: written_data.append(d)
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client.search_nodes("test query", limit=5)
 
         assert result["success"] is True
@@ -260,7 +299,9 @@ class TestAsyncMethods:
         written_data = []
         mock_writer.write = lambda d: written_data.append(d)
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             await client.search_nodes("query")
 
         request = json.loads(written_data[0].decode())
@@ -269,13 +310,13 @@ class TestAsyncMethods:
     @pytest.mark.asyncio
     async def test_get_memory_status_async(self, client):
         """Test async get_memory_status method."""
-        mock_reader, mock_writer = self._setup_mock_connection({
-            "success": True,
-            "entity_count": 100,
-            "compression_ratio": 0.8
-        })
+        mock_reader, mock_writer = self._setup_mock_connection(
+            {"success": True, "entity_count": 100, "compression_ratio": 0.8}
+        )
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client.get_memory_status()
 
         assert result["success"] is True
@@ -284,12 +325,13 @@ class TestAsyncMethods:
     @pytest.mark.asyncio
     async def test_ping_async(self, client):
         """Test async ping method."""
-        mock_reader, mock_writer = self._setup_mock_connection({
-            "success": True,
-            "pong": True
-        })
+        mock_reader, mock_writer = self._setup_mock_connection(
+            {"success": True, "pong": True}
+        )
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client.ping()
 
         assert result["success"] is True
@@ -299,6 +341,7 @@ class TestAsyncMethods:
 # ============================================================================
 # Sync Method Tests
 # ============================================================================
+
 
 class TestSyncMethods:
     """Tests for synchronous client methods."""
@@ -311,10 +354,10 @@ class TestSyncMethods:
         """Test sync create_entities method."""
         mock_response = {"success": True, "created": 1}
 
-        with patch.object(client, '_send_request', new_callable=AsyncMock) as mock_send:
+        with patch.object(client, "_send_request", new_callable=AsyncMock) as mock_send:
             mock_send.return_value = mock_response
 
-            with patch('asyncio.run') as mock_run:
+            with patch("asyncio.run") as mock_run:
                 mock_run.return_value = mock_response
                 result = client.create_entities_sync([{"name": "test"}])
 
@@ -324,17 +367,23 @@ class TestSyncMethods:
         """Test sync search_nodes method."""
         mock_response = {"success": True, "results": []}
 
-        with patch.object(client, '_send_request_sync') as mock_send:
+        with patch.object(client, "_send_request_sync") as mock_send:
             mock_send.return_value = mock_response
             result = client.search_nodes_sync("query", limit=20)
 
-        mock_send.assert_called_once_with("search_nodes", {"query": "query", "limit": 20})
+        # viewer_agent and scope are always sent, defaulting to None: the
+        # daemon distinguishes "no viewer given" (orchestrator view) from a
+        # named viewer, and omitting the keys would make the two identical.
+        mock_send.assert_called_once_with(
+            "search_nodes",
+            {"query": "query", "limit": 20, "viewer_agent": None, "scope": None},
+        )
 
     def test_get_memory_status_sync(self, client):
         """Test sync get_memory_status method."""
         mock_response = {"success": True, "status": "healthy"}
 
-        with patch.object(client, '_send_request_sync') as mock_send:
+        with patch.object(client, "_send_request_sync") as mock_send:
             mock_send.return_value = mock_response
             result = client.get_memory_status_sync()
 
@@ -344,7 +393,7 @@ class TestSyncMethods:
         """Test sync ping method."""
         mock_response = {"pong": True}
 
-        with patch.object(client, '_send_request_sync') as mock_send:
+        with patch.object(client, "_send_request_sync") as mock_send:
             mock_send.return_value = mock_response
             result = client.ping_sync()
 
@@ -354,6 +403,7 @@ class TestSyncMethods:
 # ============================================================================
 # Global Client Singleton Tests
 # ============================================================================
+
 
 class TestGlobalClient:
     """Tests for global client singleton."""
@@ -370,8 +420,10 @@ class TestGlobalClient:
         assert client1 is client2
         assert isinstance(client1, MemoryClient)
 
-    def test_get_client_default_path(self):
-        """Test singleton has default socket path."""
+    def test_get_client_default_path(self, monkeypatch):
+        """The singleton is built with no arguments, so it takes the fallback."""
+        monkeypatch.delenv("MEMORY_DB_SOCKET_PATH", raising=False)
+        memory_client_module._client = None
         client = get_client()
         assert client.socket_path == "/tmp/memory-db.sock"
 
@@ -390,6 +442,7 @@ class TestGlobalClient:
 # Convenience Wrapper Tests
 # ============================================================================
 
+
 class TestConvenienceWrappers:
     """Tests for module-level convenience functions."""
 
@@ -401,7 +454,9 @@ class TestConvenienceWrappers:
         """Test create_entities module function."""
         mock_response = {"success": True, "created": 1}
 
-        with patch.object(MemoryClient, 'create_entities_sync', return_value=mock_response) as mock_method:
+        with patch.object(
+            MemoryClient, "create_entities_sync", return_value=mock_response
+        ) as mock_method:
             result = create_entities([{"name": "test"}])
 
         assert result == mock_response
@@ -411,7 +466,9 @@ class TestConvenienceWrappers:
         """Test search_nodes module function."""
         mock_response = {"success": True, "results": []}
 
-        with patch.object(MemoryClient, 'search_nodes_sync', return_value=mock_response) as mock_method:
+        with patch.object(
+            MemoryClient, "search_nodes_sync", return_value=mock_response
+        ) as mock_method:
             result = search_nodes("query", limit=5)
 
         assert result == mock_response
@@ -419,7 +476,9 @@ class TestConvenienceWrappers:
 
     def test_search_nodes_wrapper_default_limit(self):
         """Test search_nodes wrapper uses default limit."""
-        with patch.object(MemoryClient, 'search_nodes_sync', return_value={}) as mock_method:
+        with patch.object(
+            MemoryClient, "search_nodes_sync", return_value={}
+        ) as mock_method:
             search_nodes("query")
 
         mock_method.assert_called_once_with("query", 10)
@@ -428,7 +487,9 @@ class TestConvenienceWrappers:
         """Test get_memory_status module function."""
         mock_response = {"success": True, "entity_count": 50}
 
-        with patch.object(MemoryClient, 'get_memory_status_sync', return_value=mock_response) as mock_method:
+        with patch.object(
+            MemoryClient, "get_memory_status_sync", return_value=mock_response
+        ) as mock_method:
             result = get_memory_status()
 
         assert result == mock_response
@@ -438,6 +499,7 @@ class TestConvenienceWrappers:
 # ============================================================================
 # Error Handling Tests
 # ============================================================================
+
 
 class TestErrorHandling:
     """Tests for error handling scenarios."""
@@ -449,7 +511,10 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_connection_error_propagates(self, client):
         """Test connection errors propagate correctly."""
-        with patch('asyncio.open_unix_connection', side_effect=ConnectionRefusedError("No server")):
+        with patch(
+            "asyncio.open_unix_connection",
+            side_effect=ConnectionRefusedError("No server"),
+        ):
             with pytest.raises(ConnectionRefusedError):
                 await client._send_request("test")
 
@@ -464,9 +529,11 @@ class TestErrorHandling:
         mock_writer.wait_closed = AsyncMock()
 
         # Return invalid JSON
-        mock_reader.read = AsyncMock(side_effect=[b'not valid json{', b''])
+        mock_reader.read = AsyncMock(side_effect=[b"not valid json{", b""])
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             with pytest.raises(json.JSONDecodeError):
                 await client._send_request("test")
 
@@ -483,7 +550,9 @@ class TestErrorHandling:
         # Cause error during read
         mock_reader.read = AsyncMock(side_effect=Exception("Read error"))
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             with pytest.raises(Exception, match="Read error"):
                 await client._send_request("test")
 
@@ -495,6 +564,7 @@ class TestErrorHandling:
 # ============================================================================
 # Edge Case Tests
 # ============================================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
@@ -514,9 +584,11 @@ class TestEdgeCases:
         mock_writer.wait_closed = AsyncMock()
 
         # Empty response then EOF
-        mock_reader.read = AsyncMock(side_effect=[b'{}', b''])
+        mock_reader.read = AsyncMock(side_effect=[b"{}", b""])
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client._send_request("test")
 
         assert result == {}
@@ -532,9 +604,11 @@ class TestEdgeCases:
         mock_writer.wait_closed = AsyncMock()
 
         # Immediate EOF
-        mock_reader.read = AsyncMock(return_value=b'')
+        mock_reader.read = AsyncMock(return_value=b"")
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             with pytest.raises(json.JSONDecodeError):
                 await client._send_request("test")
 
@@ -550,9 +624,11 @@ class TestEdgeCases:
         mock_writer.close = MagicMock()
         mock_writer.wait_closed = AsyncMock()
 
-        mock_reader.read = AsyncMock(side_effect=[b'{"success": true}', b''])
+        mock_reader.read = AsyncMock(side_effect=[b'{"success": true}', b""])
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             await client._send_request("search", {"query": "日本語テスト"})
 
         # Verify unicode was encoded correctly
@@ -570,12 +646,13 @@ class TestEdgeCases:
         mock_writer.wait_closed = AsyncMock()
 
         response = {"result": "日本語レスポンス", "emoji": "🎉"}
-        mock_reader.read = AsyncMock(side_effect=[
-            json.dumps(response).encode('utf-8'),
-            b''
-        ])
+        mock_reader.read = AsyncMock(
+            side_effect=[json.dumps(response).encode("utf-8"), b""]
+        )
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             result = await client._send_request("test")
 
         assert result["result"] == "日本語レスポンス"
@@ -593,9 +670,11 @@ class TestEdgeCases:
         mock_writer.close = MagicMock()
         mock_writer.wait_closed = AsyncMock()
 
-        mock_reader.read = AsyncMock(side_effect=[b'{}', b''])
+        mock_reader.read = AsyncMock(side_effect=[b"{}", b""])
 
-        with patch('asyncio.open_unix_connection', return_value=(mock_reader, mock_writer)):
+        with patch(
+            "asyncio.open_unix_connection", return_value=(mock_reader, mock_writer)
+        ):
             await client._send_request("test", None)
 
         request = json.loads(written_data[0].decode())
@@ -615,6 +694,7 @@ class TestEdgeCases:
 # Integration-Style Tests (with mocking)
 # ============================================================================
 
+
 class TestIntegrationPatterns:
     """Tests simulating real usage patterns."""
 
@@ -625,20 +705,28 @@ class TestIntegrationPatterns:
     def test_typical_entity_workflow(self):
         """Test typical create -> search -> status workflow."""
         # Mock all the sync methods
-        with patch.object(MemoryClient, 'create_entities_sync') as mock_create, \
-             patch.object(MemoryClient, 'search_nodes_sync') as mock_search, \
-             patch.object(MemoryClient, 'get_memory_status_sync') as mock_status:
-
+        with (
+            patch.object(MemoryClient, "create_entities_sync") as mock_create,
+            patch.object(MemoryClient, "search_nodes_sync") as mock_search,
+            patch.object(MemoryClient, "get_memory_status_sync") as mock_status,
+        ):
             mock_create.return_value = {"success": True, "created": 1, "entity_id": 123}
-            mock_search.return_value = {"success": True, "results": [{"id": 123, "name": "test"}]}
+            mock_search.return_value = {
+                "success": True,
+                "results": [{"id": 123, "name": "test"}],
+            }
             mock_status.return_value = {"success": True, "entity_count": 1}
 
             # Simulate workflow
-            create_result = create_entities([{
-                "name": "test_entity",
-                "entityType": "knowledge",
-                "observations": ["test observation"]
-            }])
+            create_result = create_entities(
+                [
+                    {
+                        "name": "test_entity",
+                        "entityType": "knowledge",
+                        "observations": ["test observation"],
+                    }
+                ]
+            )
 
             search_result = search_nodes("test_entity")
 

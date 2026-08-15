@@ -7,10 +7,8 @@ Integrates with the existing Enhanced-Memory-MCP architecture.
 
 import json
 import sqlite3
-import hashlib
-import statistics
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Any
 from pathlib import Path
 import logging
 
@@ -334,9 +332,9 @@ class DesignPatternStorage:
         cursor = conn.cursor()
         
         try:
-            project_type = context.get("project_type", "")
-            design_goals = context.get("design_goals", [])
-            target_audience = context.get("target_audience", "")
+            context.get("project_type", "")
+            context.get("design_goals", [])
+            context.get("target_audience", "")
             
             # Get top patterns by success score and recent usage
             cursor.execute('''

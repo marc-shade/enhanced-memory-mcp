@@ -23,7 +23,7 @@ Performance Impact:
 import json
 import logging
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from pathlib import Path
 
 logger = logging.getLogger("toon-fastmcp")

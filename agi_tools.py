@@ -20,12 +20,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     # AGENT IDENTITY TOOLS
     # ============================================================================
 
-    @app.tool(
-        outputSchema={
-            "type": "object",
-            "additionalProperties": True
-        }
-    )
+    @app.tool(output_schema={"type": "object", "additionalProperties": True})
     def get_agent_identity(agent_id: str = "default_agent") -> Dict[str, Any]:
         """
         Get persistent agent identity
@@ -37,8 +32,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def update_agent_skills(
-        skill_updates: Dict[str, float],
-        agent_id: str = "default_agent"
+        skill_updates: Dict[str, float], agent_id: str = "default_agent"
     ) -> Dict[str, str]:
         """
         Update agent skill levels (0.0 to 1.0)
@@ -53,8 +47,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def add_agent_belief(
-        belief: str,
-        agent_id: str = "default_agent"
+        belief: str, agent_id: str = "default_agent"
     ) -> Dict[str, str]:
         """
         Add a core belief/knowledge to agent identity
@@ -69,8 +62,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def update_agent_personality(
-        trait_updates: Dict[str, float],
-        agent_id: str = "default_agent"
+        trait_updates: Dict[str, float], agent_id: str = "default_agent"
     ) -> Dict[str, str]:
         """
         Update agent personality traits (0.0 to 1.0)
@@ -85,9 +77,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def set_agent_preference(
-        key: str,
-        value: Any,
-        agent_id: str = "default_agent"
+        key: str, value: Any, agent_id: str = "default_agent"
     ) -> Dict[str, str]:
         """
         Set an agent preference
@@ -106,8 +96,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def start_session(
-        context_summary: Optional[str] = None,
-        agent_id: str = "default_agent"
+        context_summary: Optional[str] = None, agent_id: str = "default_agent"
     ) -> Dict[str, str]:
         """
         Start a new session with context from previous session
@@ -118,18 +107,14 @@ def register_agi_tools(app: FastMCP, db_path: str):
         """
         manager = SessionManager(agent_id)
         session_id = manager.start_session(context_summary)
-        return {
-            "status": "success",
-            "session_id": session_id,
-            "agent_id": agent_id
-        }
+        return {"status": "success", "session_id": session_id, "agent_id": agent_id}
 
     @app.tool()
     def end_session(
         session_id: str,
         key_learnings: Optional[List[str]] = None,
         unfinished_work: Optional[Dict[str, Any]] = None,
-        performance_metrics: Optional[Dict[str, Any]] = None
+        performance_metrics: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, str]:
         """
         End a session and record outcomes
@@ -141,7 +126,9 @@ def register_agi_tools(app: FastMCP, db_path: str):
             performance_metrics: Success rates, error counts, etc.
         """
         manager = SessionManager()
-        manager.end_session(session_id, key_learnings, unfinished_work, performance_metrics)
+        manager.end_session(
+            session_id, key_learnings, unfinished_work, performance_metrics
+        )
         return {"status": "success", "session_id": session_id}
 
     @app.tool()
@@ -156,8 +143,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def get_recent_sessions(
-        limit: int = 10,
-        agent_id: str = "default_agent"
+        limit: int = 10, agent_id: str = "default_agent"
     ) -> List[Dict[str, Any]]:
         """
         Get recent sessions for continuity
@@ -168,10 +154,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
         return manager.get_recent_sessions(limit)
 
     @app.tool()
-    def get_session_chain(
-        session_id: str,
-        depth: int = 5
-    ) -> List[Dict[str, Any]]:
+    def get_session_chain(session_id: str, depth: int = 5) -> List[Dict[str, Any]]:
         """
         Get chain of linked sessions going backwards
 
@@ -184,12 +167,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     # ACTION OUTCOME TRACKING TOOLS
     # ============================================================================
 
-    @app.tool(
-        outputSchema={
-            "type": "object",
-            "additionalProperties": True
-        }
-    )
+    @app.tool(output_schema={"type": "object", "additionalProperties": True})
     def record_action_outcome(
         action_type: str,
         action_description: str,
@@ -200,7 +178,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
         entity_id: Optional[int] = None,
         action_context: Optional[str] = None,
         duration_ms: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Record an action and its outcome for learning
@@ -222,22 +200,26 @@ def register_agi_tools(app: FastMCP, db_path: str):
         """
         tracker = ActionTracker()
         action_id = tracker.record_action(
-            action_type, action_description,
-            expected_result, actual_result,
-            success_score, session_id, entity_id,
-            action_context, duration_ms, metadata
+            action_type,
+            action_description,
+            expected_result,
+            actual_result,
+            success_score,
+            session_id,
+            entity_id,
+            action_context,
+            duration_ms,
+            metadata,
         )
         return {
             "status": "success",
             "action_id": action_id,
-            "success_score": success_score
+            "success_score": success_score,
         }
 
     @app.tool()
     def get_similar_actions(
-        action_type: str,
-        context: Optional[str] = None,
-        limit: int = 10
+        action_type: str, context: Optional[str] = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Find similar past actions to learn from
@@ -251,8 +233,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def get_action_success_rate(
-        action_type: str,
-        time_window_hours: int = 24
+        action_type: str, time_window_hours: int = 24
     ) -> Dict[str, Any]:
         """
         Get success rate for an action type
@@ -273,10 +254,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
         return tracker.get_success_rate(action_type, time_window_hours)
 
     @app.tool()
-    def get_learnings_for_action(
-        action_type: str,
-        limit: int = 5
-    ) -> List[str]:
+    def get_learnings_for_action(action_type: str, limit: int = 5) -> List[str]:
         """
         Get key learnings from past actions
 
@@ -287,15 +265,9 @@ def register_agi_tools(app: FastMCP, db_path: str):
         tracker = ActionTracker()
         return tracker.get_learnings_for_action(action_type, limit)
 
-    @app.tool(
-        outputSchema={
-            "type": "object",
-            "additionalProperties": True
-        }
-    )
+    @app.tool(output_schema={"type": "object", "additionalProperties": True})
     def should_retry_action(
-        original_action_id: int,
-        proposed_changes: str
+        original_action_id: int, proposed_changes: str
     ) -> Dict[str, Any]:
         """
         Decide if an action should be retried with changes
@@ -313,12 +285,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
         tracker = ActionTracker()
         return tracker.should_retry_action(original_action_id, proposed_changes)
 
-    @app.tool(
-        outputSchema={
-            "type": "object",
-            "additionalProperties": True
-        }
-    )
+    @app.tool(output_schema={"type": "object", "additionalProperties": True})
     def get_action_statistics() -> Dict[str, Any]:
         """
         Get overall action outcome statistics

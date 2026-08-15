@@ -115,7 +115,7 @@ async def main():
 
     try:
         # Test stats
-        stats = test_stats_fixed()
+        test_stats_fixed()
 
         # Test hybrid search
         results_count = await test_hybrid_search_fixed()

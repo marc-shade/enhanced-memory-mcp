@@ -11,7 +11,7 @@ enhanced-memory-mcp/
 ├── server.py                           # Main MCP server (SQLite + zlib compression)
 ├── requirements.txt                     # Dependencies (uses only Python stdlib)
 ├── README.md                           # Technical documentation
-├── comprehensive_test.py               # Full test suite (76/76 tests)
+├── comprehensive_test.py               # post-install gate (judge by exit code)
 ├── orchestrator_integration_test.py    # Orchestrator boot sequence tests
 ├── performance_test.py                 # Performance benchmarking
 ├── TEST_RESULTS_SUMMARY.md            # Test results documentation
@@ -21,7 +21,9 @@ enhanced-memory-mcp/
 ## Key Features
 
 ### ✅ Production Ready
-- **100% test pass rate** (76/76 comprehensive tests)
+- **Post-install gate**: `python3 comprehensive_test.py` must exit 0. The check
+  count varies with which optional backends are installed, so no fixed number
+  is quoted here.
 - **46.6% compression** with zlib level 9
 - **Sub-millisecond** response times
 - **Real SQLite storage** with cross-session persistence

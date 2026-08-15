@@ -15,11 +15,9 @@ import sqlite3
 import tempfile
 import shutil
 from pathlib import Path
-from datetime import datetime, timedelta
 
 from ontology_schema import (
-    EntitySchema, ConceptEntity, EpisodeEntity, SkillEntity,
-    RelationshipSchema, OntologyValidator, EntityType, RelationType
+    OntologyValidator, EntityType, RelationType
 )
 from graph_traversal import GraphTraversal, TraversalDirection, TraversalStrategy
 from knowledge_graph_tools import KnowledgeGraphManager

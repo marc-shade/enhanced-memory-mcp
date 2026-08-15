@@ -4,7 +4,6 @@ Test Phase 2 Features: LLM Extraction, Semantic Search, Hybrid Search
 """
 
 import asyncio
-import json
 from datetime import datetime
 
 

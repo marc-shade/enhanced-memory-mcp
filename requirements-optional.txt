@@ -1,0 +1,47 @@
+# enhanced-memory-mcp — OPTIONAL backends.
+#
+# Install with:  pip install -r requirements.txt -r requirements-optional.txt
+#
+# None of these are required. Each corresponding tool group checks for its
+# dependency at startup and logs a specific reason when it is absent, e.g.
+#   "Hybrid search integration skipped: No module named 'qdrant_client'"
+# and semantic_recall returns a payload carrying `status: unavailable` plus the
+# exact pip command that would fix it. A missing optional backend never
+# silently returns empty results.
+#
+# MEASURED on Python 3.11: core alone registers 188 tools; core plus everything
+# below registers 206. Re-measure rather than quoting these numbers -- the count
+# moves with what is importable.
+
+# --- Vector search: hybrid search, OmniMEM N-hop, semantic_recall ------------
+# Also needs a reachable Qdrant (MEMORY_QDRANT_URL, default http://localhost:6333).
+qdrant-client==1.16.2
+
+# --- Cross-encoder re-ranking and the semantic cache embedding model ---------
+# Large: pulls torch (~2.5GB installed). torch 2.13.0 resolved cleanly on 3.11.
+sentence-transformers==5.2.0
+
+# Required by the re-ranking registration path specifically. Without it the
+# group logs "Re-ranking integration skipped: No module named 'requests'"
+# even when sentence-transformers is present.
+requests==2.32.5
+
+# --- Numeric paths: chunking, ART, vector math ------------------------------
+numpy==2.4.0
+
+# --- Embedding via a local/remote ollama host -------------------------------
+# Configure with MEMORY_OLLAMA_URL (default http://127.0.0.1:11434) and
+# MEMORY_EMBED_MODEL (default embeddinggemma).
+ollama==0.6.2
+
+# --- Contextual enrichment via the Anthropic API ----------------------------
+# OFF BY DEFAULT. contextual_llm.py only engages when an API key is present in
+# the environment; with no key the enrichment step reports using_llm: false and
+# entities are created without it. Costs money when enabled.
+anthropic==0.75.0
+
+# --- Lazily imported by individual tools; absent means those tools degrade ---
+# contextual_retrieval_tools.py (batch sync path)
+aiohttp
+# reliability_enhancements.py (graph analysis helpers)
+networkx

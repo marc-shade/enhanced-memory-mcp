@@ -9,7 +9,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import json
 import yaml
 from dataclasses import dataclass, asdict
@@ -17,7 +17,7 @@ from dataclasses import dataclass, asdict
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from embedding_providers import EmbeddingManager, EmbeddingResult
+from embedding_providers import EmbeddingManager
 
 # Configure logging
 logging.basicConfig(

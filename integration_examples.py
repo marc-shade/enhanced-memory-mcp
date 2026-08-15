@@ -8,7 +8,7 @@ with the new design pattern storage, component library, and clone success tracki
 import json
 import asyncio
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 # Example integration workflows showing how different MCPs use the enhanced memory capabilities
 
@@ -79,7 +79,7 @@ class DesignAnalysisMCPIntegration:
             print(f"✅ Stored design pattern: {design_pattern['pattern_name']}")
             
             # Track usage of the pattern
-            pattern_usage = {
+            {
                 "pattern_id": result.get("pattern_id"),
                 "usage_type": "analysis_discovery",
                 "project_context": f"Website analysis of {website_url}",
@@ -219,7 +219,7 @@ class CodeStructureMCPIntegration:
             print(f"✅ Stored component: {component_data['component_name']}")
             
             # Track component usage
-            usage_data = {
+            {
                 "usage_type": "code_analysis_discovery",
                 "project_context": f"Component analysis from {component_file_path}",
                 "performance_metrics": {
@@ -583,7 +583,7 @@ async def example_design_clone_workflow():
     )
     
     # Track design analysis iteration
-    design_iteration_result = await clone_integration.track_design_analysis_phase(
+    await clone_integration.track_design_analysis_phase(
         clone_operation_id,
         {
             "analysis_quality_score": 0.85,
@@ -654,7 +654,7 @@ export default ProductCard;
     )
     
     # Track code generation iteration
-    code_iteration_result = await clone_integration.track_code_generation_phase(
+    await clone_integration.track_code_generation_phase(
         clone_operation_id,
         {
             "code_quality_score": 0.8,
@@ -670,14 +670,14 @@ export default ProductCard;
     print("\n🔍 Step 4: Finding Similar Patterns and Components")
     
     # Get design inspiration
-    inspiration_result = await design_integration.get_similar_designs_for_inspiration({
+    await design_integration.get_similar_designs_for_inspiration({
         "style_preference": "modern_minimalist",
         "industry": "e_commerce",
         "complexity": "high"
     })
     
     # Find reusable components
-    component_suggestions = await code_integration.find_reusable_components_for_project({
+    await code_integration.find_reusable_components_for_project({
         "framework": "react",
         "category": "e_commerce",
         "features": "product display shopping cart"

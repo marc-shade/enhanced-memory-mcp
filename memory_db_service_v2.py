@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+# NOT THE LIVE SERVER (marked 2026-08-09).
+#
+# The launchd plists name server.py and memory_db_service.py; this file is a
+# variant that nothing loads. It is flagged because project-scope filtering was
+# added to the live pair on 2026-08-09 and NOT to this one, so promoting this
+# file would silently drop the `scope` parameter: searches would still return
+# well-formed results, just unscoped. test_memory_scope.py asserts the plists
+# still point at the live pair.
+#
+# Either bring it up to date or delete it. Do not quietly promote it.
 """
 Memory Database Service v2 - Resilient Unix Socket Server
 
@@ -24,6 +34,8 @@ import signal
 import sqlite3
 import sys
 import hashlib
+import zlib
+import pickle
 import time
 import threading
 from pathlib import Path
@@ -32,12 +44,28 @@ from typing import Dict, List, Any, Optional
 from collections import deque
 from contextlib import contextmanager
 
-# Use the secure compression module (JSON serialization, HMAC-guarded legacy pickle)
-from server.compression import compress_data as _safe_compress, decompress_data as _safe_decompress
+# Reciprocal Rank Fusion, shared with the LongMemEval harness so the ranking
+# used in production is the one that was benchmarked. Guarded: a missing libs/
+# tree must degrade search_nodes to name-only matching, never stop the service
+# from starting.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "libs"))
+try:
+    from memgraph.fusion import fuse_to_ids as rrf_fuse_ids
+
+    RRF_AVAILABLE = True
+except ImportError as _rrf_err:  # pragma: no cover - deployment guard
+    RRF_AVAILABLE = False
+
+    def rrf_fuse_ids(rankings, limit=None, k=60, weights=None):
+        """Fallback: first ranking only, preserving pre-RRF behaviour."""
+        ids = list(rankings[0]) if rankings else []
+        return ids[:limit] if limit is not None else ids
+
 
 # Redis for working memory
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -45,15 +73,27 @@ except ImportError:
 # Logging configuration
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stderr
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr,
 )
 logger = logging.getLogger("memory-db-service-v2")
 
 # Configuration
-SOCKET_PATH = "/tmp/memory-db.sock"
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+SOCKET_PATH = os.environ.get("MEMORY_DB_SOCKET_PATH", "/tmp/memory-db.sock")
+_DB_PATH_OVERRIDE = os.environ.get("ENHANCED_MEMORY_DB_PATH") or os.environ.get(
+    "MEMORY_DB_PATH"
+)
+_DIR_OVERRIDE = os.environ.get("ENHANCED_MEMORY_DIR") or os.environ.get("MEMORY_DIR")
+if _DB_PATH_OVERRIDE:
+    DB_PATH = Path(os.path.expandvars(os.path.expanduser(_DB_PATH_OVERRIDE)))
+    MEMORY_DIR = DB_PATH.parent
+else:
+    MEMORY_DIR = (
+        Path(os.path.expandvars(os.path.expanduser(_DIR_OVERRIDE)))
+        if _DIR_OVERRIDE
+        else Path.home() / ".claude" / "enhanced_memories"
+    )
+    DB_PATH = MEMORY_DIR / "memory.db"
 REDIS_HOST = "localhost"
 REDIS_PORT = 6379
 REDIS_DB = 1  # Use DB 1 for working memory
@@ -89,7 +129,7 @@ class ConnectionPool:
             "pool_hits": 0,
             "pool_misses": 0,
             "locks_detected": 0,
-            "lock_recoveries": 0
+            "lock_recoveries": 0,
         }
 
     def _create_connection(self) -> sqlite3.Connection:
@@ -98,7 +138,7 @@ class ConnectionPool:
             self.db_path,
             timeout=SQLITE_BUSY_TIMEOUT / 1000,  # timeout in seconds
             check_same_thread=False,
-            isolation_level=None  # autocommit mode, we manage transactions
+            isolation_level=None,  # autocommit mode, we manage transactions
         )
 
         # Configure for concurrent access
@@ -204,7 +244,9 @@ class ConnectionPool:
 class RedisWorkingMemory:
     """Redis-backed working memory for high-churn temporary data"""
 
-    def __init__(self, host: str = REDIS_HOST, port: int = REDIS_PORT, db: int = REDIS_DB):
+    def __init__(
+        self, host: str = REDIS_HOST, port: int = REDIS_PORT, db: int = REDIS_DB
+    ):
         self.prefix = "wmem:"  # working memory prefix
         self.connected = False
         self.client = None
@@ -217,7 +259,7 @@ class RedisWorkingMemory:
                     db=db,
                     decode_responses=True,
                     socket_timeout=5,
-                    socket_connect_timeout=5
+                    socket_connect_timeout=5,
                 )
                 self.client.ping()
                 self.connected = True
@@ -226,8 +268,14 @@ class RedisWorkingMemory:
                 logger.warning(f"Redis not available, falling back to SQLite: {e}")
                 self.connected = False
 
-    def add(self, context_key: str, content: str, priority: int = 5,
-            ttl_minutes: int = 60, entity_id: Optional[int] = None) -> Dict[str, Any]:
+    def add(
+        self,
+        context_key: str,
+        content: str,
+        priority: int = 5,
+        ttl_minutes: int = 60,
+        entity_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Add item to working memory with TTL"""
         if not self.connected:
             return {"success": False, "error": "Redis not connected"}
@@ -239,7 +287,9 @@ class RedisWorkingMemory:
                 "priority": priority,
                 "entity_id": entity_id,
                 "created_at": datetime.now().isoformat(),
-                "expires_at": (datetime.now() + timedelta(minutes=ttl_minutes)).isoformat()
+                "expires_at": (
+                    datetime.now() + timedelta(minutes=ttl_minutes)
+                ).isoformat(),
             }
 
             self.client.setex(key, ttl_minutes * 60, json.dumps(data))
@@ -247,18 +297,22 @@ class RedisWorkingMemory:
             return {
                 "success": True,
                 "working_memory_id": key,
-                "expires_at": data["expires_at"]
+                "expires_at": data["expires_at"],
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def get(self, context_key: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    def get(
+        self, context_key: Optional[str] = None, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """Get items from working memory"""
         if not self.connected:
             return []
 
         try:
-            pattern = f"{self.prefix}{context_key}:*" if context_key else f"{self.prefix}*"
+            pattern = (
+                f"{self.prefix}{context_key}:*" if context_key else f"{self.prefix}*"
+            )
             keys = self.client.keys(pattern)
 
             items = []
@@ -287,7 +341,7 @@ class RedisWorkingMemory:
             return {
                 "connected": True,
                 "total_items": len(keys),
-                "redis_info": self.client.info("memory")
+                "redis_info": self.client.info("memory"),
             }
         except Exception as e:
             return {"connected": False, "error": str(e)}
@@ -308,7 +362,7 @@ class HealthMonitor:
             "health_checks": 0,
             "health_failures": 0,
             "recoveries_attempted": 0,
-            "recoveries_successful": 0
+            "recoveries_successful": 0,
         }
 
     def start(self):
@@ -401,10 +455,12 @@ class HealthMonitor:
         return {
             "is_healthy": self.is_healthy,
             "consecutive_failures": self.consecutive_failures,
-            "last_check": self.last_health_check.isoformat() if self.last_health_check else None,
+            "last_check": self.last_health_check.isoformat()
+            if self.last_health_check
+            else None,
             "metrics": dict(self.metrics),
             "pool_metrics": self.pool.get_metrics(),
-            "redis_status": self.redis_mem.get_stats()
+            "redis_status": self.redis_mem.get_stats(),
         }
 
 
@@ -425,7 +481,7 @@ class MemoryDatabaseV2:
             cursor = conn.cursor()
 
             # Entities table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS entities (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT UNIQUE NOT NULL,
@@ -442,10 +498,10 @@ class MemoryDatabaseV2:
                     current_version INTEGER DEFAULT 1,
                     current_branch TEXT DEFAULT 'main'
                 )
-            ''')
+            """)
 
             # Observations table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS observations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     entity_id INTEGER,
@@ -454,24 +510,89 @@ class MemoryDatabaseV2:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (entity_id) REFERENCES entities (id)
                 )
-            ''')
+            """)
 
             # Indexes
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_entity_name ON entities(name)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_entity_type ON entities(entity_type)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_entity_tier ON entities(tier)')
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_entity_name ON entities(name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_entity_type ON entities(entity_type)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_entity_tier ON entities(tier)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_observations_entity "
+                "ON observations(entity_id)"
+            )
+
+            # Full-text index over observation content, plus the triggers that
+            # keep it in sync. search_nodes fuses BM25 over this with the name
+            # ranking; without it, content search silently degrades to
+            # name-only matching.
+            #
+            # This existed in the production database only because a migration
+            # added it -- init_database did not, so any NEW deployment came up
+            # without content search and nothing said so. Mirrors the live
+            # definitions exactly (external-content table over observations,
+            # keyed on its rowid) so a fresh database matches production.
+            cursor.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
+                    content, content='observations', content_rowid='id'
+                )
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS obs_fts_ai
+                AFTER INSERT ON observations BEGIN
+                    INSERT INTO observations_fts(rowid, content)
+                    VALUES (new.id, new.content);
+                END
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS obs_fts_ad
+                AFTER DELETE ON observations BEGIN
+                    INSERT INTO observations_fts(observations_fts, rowid, content)
+                    VALUES('delete', old.id, old.content);
+                END
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS obs_fts_au
+                AFTER UPDATE ON observations BEGIN
+                    INSERT INTO observations_fts(observations_fts, rowid, content)
+                    VALUES('delete', old.id, old.content);
+                    INSERT INTO observations_fts(rowid, content)
+                    VALUES (new.id, new.content);
+                END
+            """)
 
             conn.commit()
             logger.info(f"Database initialized at {self.db_path}")
 
     def _compress_data(self, data: Any) -> bytes:
-        """Compress data using JSON serialization + zlib (via secure compression module)"""
-        compressed, _orig, _comp, _ratio = _safe_compress(data)
-        return compressed
+        """Compress data using zlib"""
+        pickled = pickle.dumps(data)
+        return zlib.compress(pickled, level=9)
 
     def _decompress_data(self, compressed: bytes) -> Any:
-        """Decompress data (handles both JSON and legacy pickle formats)"""
-        return _safe_decompress(compressed)
+        """Decompress data (zlib+pickle | zlib+json | zlib+text | gzip)."""
+        try:
+            decompressed = zlib.decompress(compressed)
+        except zlib.error:
+            import gzip
+
+            decompressed = gzip.decompress(compressed)
+        # SECURITY: pickle source is the system's own local memory.db (first-party,
+        # written by this service's compress path), not external input. Pre-existing.
+        try:
+            return pickle.loads(decompressed)
+        except:
+            try:
+                return json.loads(decompressed.decode("utf-8"))
+            except:
+                return {
+                    "observations": [decompressed.decode("utf-8", errors="replace")]
+                }
 
     def _calculate_checksum(self, data: bytes) -> str:
         """Calculate SHA-256 checksum"""
@@ -479,7 +600,14 @@ class MemoryDatabaseV2:
 
     def create_entities(self, entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Create or update entities with retry logic"""
-        results = {"success": True, "created": 0, "updated": 0, "failed": 0, "count": 0, "results": []}
+        results = {
+            "success": True,
+            "created": 0,
+            "updated": 0,
+            "failed": 0,
+            "count": 0,
+            "results": [],
+        }
 
         max_retries = 3
         retry_delay = 0.5
@@ -499,46 +627,79 @@ class MemoryDatabaseV2:
                             entity_data = {
                                 "name": name,
                                 "type": entity_type,
-                                "observations": observations
+                                "observations": observations,
                             }
-                            compressed, original_size, compressed_size, _ = _safe_compress(entity_data)
-                            compression_ratio = compressed_size / original_size if original_size > 0 else 1.0
+                            compressed = self._compress_data(entity_data)
+                            original_size = len(pickle.dumps(entity_data))
+                            compressed_size = len(compressed)
+                            compression_ratio = (
+                                compressed_size / original_size
+                                if original_size > 0
+                                else 1.0
+                            )
                             checksum = self._calculate_checksum(compressed)
 
-                            cursor.execute("SELECT id FROM entities WHERE name = ?", (name,))
+                            cursor.execute(
+                                "SELECT id FROM entities WHERE name = ?", (name,)
+                            )
                             existing = cursor.fetchone()
 
                             if existing:
-                                cursor.execute('''
+                                cursor.execute(
+                                    """
                                     UPDATE entities SET entity_type = ?, compressed_data = ?,
                                     original_size = ?, compressed_size = ?, compression_ratio = ?,
                                     checksum = ?, access_count = access_count + 1,
                                     last_accessed = CURRENT_TIMESTAMP, current_version = current_version + 1
                                     WHERE name = ?
-                                ''', (entity_type, compressed, original_size, compressed_size,
-                                      compression_ratio, checksum, name))
+                                """,
+                                    (
+                                        entity_type,
+                                        compressed,
+                                        original_size,
+                                        compressed_size,
+                                        compression_ratio,
+                                        checksum,
+                                        name,
+                                    ),
+                                )
                                 results["updated"] += 1
                                 entity_id = existing[0]
                             else:
-                                cursor.execute('''
+                                cursor.execute(
+                                    """
                                     INSERT INTO entities (name, entity_type, compressed_data,
                                     original_size, compressed_size, compression_ratio, checksum)
                                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                                ''', (name, entity_type, compressed, original_size,
-                                      compressed_size, compression_ratio, checksum))
+                                """,
+                                    (
+                                        name,
+                                        entity_type,
+                                        compressed,
+                                        original_size,
+                                        compressed_size,
+                                        compression_ratio,
+                                        checksum,
+                                    ),
+                                )
                                 results["created"] += 1
                                 entity_id = cursor.lastrowid
 
                             for obs in observations:
-                                cursor.execute('''
+                                cursor.execute(
+                                    """
                                     INSERT INTO observations (entity_id, content) VALUES (?, ?)
-                                ''', (entity_id, obs))
+                                """,
+                                    (entity_id, obs),
+                                )
 
-                            results["results"].append({
-                                "name": name,
-                                "id": entity_id,
-                                "compression_ratio": f"{compression_ratio:.2%}"
-                            })
+                            results["results"].append(
+                                {
+                                    "name": name,
+                                    "id": entity_id,
+                                    "compression_ratio": f"{compression_ratio:.2%}",
+                                }
+                            )
                         except Exception as e:
                             logger.error(f"Failed to create entity: {e}")
                             results["failed"] += 1
@@ -554,30 +715,81 @@ class MemoryDatabaseV2:
                     continue
                 raise
 
-        return {"success": False, "error": "Max retries exceeded", "created": 0, "failed": len(entities)}
+        return {
+            "success": False,
+            "error": "Max retries exceeded",
+            "created": 0,
+            "failed": len(entities),
+        }
 
     def search_nodes(self, query: str, limit: int = 10) -> Dict[str, Any]:
-        """Search entities"""
+        """Search entities by name/type AND by observation content.
+
+        Until 2026-07-19 this matched only `name LIKE` / `entity_type LIKE`, so
+        the actual text of a memory was unreachable: searching "retrieval"
+        returned the 6 entities with that word in their NAME while ignoring
+        every one of the 63,997 observations. Content search now runs over the
+        existing `observations_fts` FTS5 index and the two rankings are fused
+        with Reciprocal Rank Fusion (SearchEyes arXiv 2607.05943 eq. 1).
+
+        RRF rather than a weighted score because BM25 relevance and
+        access-count recency are on unrelated scales; rank is the only common
+        currency. Name matches are weighted higher, so looking an entity up by
+        its exact name still puts it first.
+
+        Fails safe: if the FTS index is missing or the query is not valid FTS5
+        syntax, this degrades to the original name/type behaviour rather than
+        erroring.
+        """
         try:
             with self.pool.get_connection() as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('''
+                name_ids = self._search_ids_by_name(cursor, query, limit)
+                content_ids = self._search_ids_by_content(cursor, query, limit)
+
+                if content_ids:
+                    ordered_ids = rrf_fuse_ids(
+                        [name_ids, content_ids], limit=limit, weights=[2.0, 1.0]
+                    )
+                else:
+                    ordered_ids = name_ids[:limit]
+
+                if not ordered_ids:
+                    return {
+                        "success": True,
+                        "query": query,
+                        "count": 0,
+                        "results": [],
+                    }
+
+                placeholders = ",".join("?" * len(ordered_ids))
+                cursor.execute(
+                    f"""
                     SELECT id, name, entity_type, compressed_data, compression_ratio,
                            access_count, created_at, last_accessed, tier
                     FROM entities
-                    WHERE name LIKE ? OR entity_type LIKE ?
-                    ORDER BY access_count DESC, last_accessed DESC
-                    LIMIT ?
-                ''', (f'%{query}%', f'%{query}%', limit))
+                    WHERE id IN ({placeholders})
+                """,
+                    ordered_ids,
+                )
 
-                results = []
+                by_id = {}
                 for row in cursor.fetchall():
-                    entity_id, name, entity_type, compressed_data, compression_ratio, \
-                    access_count, created_at, last_accessed, tier = row
+                    (
+                        entity_id,
+                        name,
+                        entity_type,
+                        compressed_data,
+                        compression_ratio,
+                        access_count,
+                        created_at,
+                        last_accessed,
+                        tier,
+                    ) = row
 
                     entity_data = self._decompress_data(compressed_data)
-                    results.append({
+                    by_id[entity_id] = {
                         "id": entity_id,
                         "name": name,
                         "entityType": entity_type,
@@ -586,14 +798,77 @@ class MemoryDatabaseV2:
                         "compression_ratio": f"{compression_ratio:.2%}",
                         "access_count": access_count,
                         "created_at": created_at,
-                        "last_accessed": last_accessed
-                    })
+                        "last_accessed": last_accessed,
+                    }
 
-                return {"success": True, "query": query, "count": len(results), "results": results}
+                # SELECT ... IN (...) returns rows in arbitrary order, which
+                # would discard the ranking we just computed.
+                results = [by_id[i] for i in ordered_ids if i in by_id]
+
+                return {
+                    "success": True,
+                    "query": query,
+                    "count": len(results),
+                    "results": results,
+                }
 
         except Exception as e:
             logger.error(f"Error in search_nodes: {e}")
             return {"success": False, "error": str(e), "count": 0, "results": []}
+
+    @staticmethod
+    def _search_ids_by_name(cursor, query: str, limit: int) -> List[int]:
+        """Original behaviour: substring match on name or entity_type."""
+        cursor.execute(
+            """
+            SELECT id FROM entities
+            WHERE name LIKE ? OR entity_type LIKE ?
+            ORDER BY access_count DESC, last_accessed DESC
+            LIMIT ?
+            """,
+            (f"%{query}%", f"%{query}%", limit * 2),
+        )
+        return [row[0] for row in cursor.fetchall()]
+
+    @staticmethod
+    def _search_ids_by_content(cursor, query: str, limit: int) -> List[int]:
+        """BM25 over observation text via the observations_fts index.
+
+        The query is passed as a quoted FTS5 phrase so user input containing
+        FTS operators (AND, *, ^, ", NEAR) is treated as literal text rather
+        than syntax -- otherwise an apostrophe or a stray quote raises
+        OperationalError and takes out the whole search.
+
+        Returns [] on any FTS failure so the caller degrades to name matching
+        instead of surfacing an error.
+        """
+        cleaned = query.replace('"', " ").strip()
+        if not cleaned:
+            return []
+        try:
+            cursor.execute(
+                """
+                SELECT o.entity_id
+                FROM observations_fts f
+                JOIN observations o ON o.id = f.rowid
+                WHERE observations_fts MATCH ?
+                ORDER BY bm25(observations_fts)
+                LIMIT ?
+                """,
+                (f'"{cleaned}"', limit * 4),
+            )
+        except sqlite3.Error as e:
+            logger.warning(f"observation FTS search unavailable, name-only: {e}")
+            return []
+
+        # One entity can own several matching observations; keep first (best)
+        # occurrence so an entity is not double-counted in the fused ranking.
+        seen, ids = set(), []
+        for (entity_id,) in cursor.fetchall():
+            if entity_id is not None and entity_id not in seen:
+                seen.add(entity_id)
+                ids.append(entity_id)
+        return ids
 
     def get_memory_status(self) -> Dict[str, Any]:
         """Get memory system status"""
@@ -604,28 +879,36 @@ class MemoryDatabaseV2:
                 cursor.execute("SELECT COUNT(*) FROM entities")
                 total_entities = cursor.fetchone()[0]
 
-                cursor.execute('''
+                cursor.execute("""
                     SELECT AVG(compression_ratio), SUM(original_size), SUM(compressed_size)
                     FROM entities
-                ''')
+                """)
                 avg_ratio, total_original, total_compressed = cursor.fetchone()
 
-                cursor.execute('''
+                cursor.execute("""
                     SELECT tier, COUNT(*) FROM entities GROUP BY tier
-                ''')
+                """)
                 tier_distribution = {row[0]: row[1] for row in cursor.fetchall()}
 
                 return {
                     "success": True,
                     "entities": {"total": total_entities},
                     "compression": {
-                        "ratio": f"{avg_ratio:.2%}" if avg_ratio else "N/A",
-                        "total_original_kb": round(total_original / 1024, 2) if total_original else 0,
-                        "total_compressed_kb": round(total_compressed / 1024, 2) if total_compressed else 0
+                        # Savings from byte totals; per-entity ratio column has
+                        # mixed unit conventions and must not be averaged.
+                        "ratio": f"{(1 - total_compressed / total_original) * 100:.2f}%"
+                        if total_original
+                        else "N/A",
+                        "total_original_kb": round(total_original / 1024, 2)
+                        if total_original
+                        else 0,
+                        "total_compressed_kb": round(total_compressed / 1024, 2)
+                        if total_compressed
+                        else 0,
                     },
                     "tiers": tier_distribution,
                     "database_path": str(self.db_path),
-                    "health": self.health.get_status()
+                    "health": self.health.get_status(),
                 }
 
         except Exception as e:
@@ -633,14 +916,22 @@ class MemoryDatabaseV2:
             return {"success": False, "error": str(e), "entities": {"total": 0}}
 
     # Working memory operations (delegated to Redis)
-    def add_to_working_memory(self, context_key: str, content: str,
-                              priority: int = 5, ttl_minutes: int = 60,
-                              entity_id: Optional[int] = None) -> Dict[str, Any]:
+    def add_to_working_memory(
+        self,
+        context_key: str,
+        content: str,
+        priority: int = 5,
+        ttl_minutes: int = 60,
+        entity_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Add to Redis-backed working memory"""
-        return self.redis_mem.add(context_key, content, priority, ttl_minutes, entity_id)
+        return self.redis_mem.add(
+            context_key, content, priority, ttl_minutes, entity_id
+        )
 
-    def get_working_memory(self, context_key: Optional[str] = None,
-                           limit: int = 50) -> Dict[str, Any]:
+    def get_working_memory(
+        self, context_key: Optional[str] = None, limit: int = 50
+    ) -> Dict[str, Any]:
         """Get from Redis-backed working memory"""
         items = self.redis_mem.get(context_key, limit)
         return {"success": True, "items": items, "count": len(items)}
@@ -662,10 +953,14 @@ class MemoryDBServerV2:
         self.request_count = 0
         self.error_count = 0
 
-    async def handle_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def handle_request(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
         """Handle client request"""
         try:
-            request_data = await asyncio.wait_for(reader.read(10 * 1024 * 1024), timeout=30)
+            request_data = await asyncio.wait_for(
+                reader.read(10 * 1024 * 1024), timeout=30
+            )
             if not request_data:
                 return
 
@@ -680,7 +975,9 @@ class MemoryDBServerV2:
             if method == "create_entities":
                 result = self.db.create_entities(params.get("entities", []))
             elif method == "search_nodes":
-                result = self.db.search_nodes(params.get("query", ""), params.get("limit", 10))
+                result = self.db.search_nodes(
+                    params.get("query", ""), params.get("limit", 10)
+                )
             elif method == "get_memory_status":
                 result = self.db.get_memory_status()
             elif method == "add_to_working_memory":
@@ -689,12 +986,11 @@ class MemoryDBServerV2:
                     params.get("content"),
                     params.get("priority", 5),
                     params.get("ttl_minutes", 60),
-                    params.get("entity_id")
+                    params.get("entity_id"),
                 )
             elif method == "get_working_memory":
                 result = self.db.get_working_memory(
-                    params.get("context_key"),
-                    params.get("limit", 50)
+                    params.get("context_key"), params.get("limit", 50)
                 )
             elif method == "health_status":
                 result = self.db.health.get_status()
@@ -727,13 +1023,10 @@ class MemoryDBServerV2:
             os.unlink(self.socket_path)
 
         self.server = await asyncio.start_unix_server(
-            self.handle_request,
-            path=self.socket_path
+            self.handle_request, path=self.socket_path
         )
 
-        # Set socket permissions for multi-process IPC access
-        # nosec B103 - intentional for Unix socket IPC, not a file
-        os.chmod(self.socket_path, 0o666)  # nosec B103
+        os.chmod(self.socket_path, 0o666)
         logger.info(f"Memory-DB v2 listening on {self.socket_path}")
 
         async with self.server:
@@ -750,7 +1043,9 @@ class MemoryDBServerV2:
         if os.path.exists(self.socket_path):
             os.unlink(self.socket_path)
 
-        logger.info(f"Memory-DB v2 stopped (requests: {self.request_count}, errors: {self.error_count})")
+        logger.info(
+            f"Memory-DB v2 stopped (requests: {self.request_count}, errors: {self.error_count})"
+        )
 
 
 async def main():

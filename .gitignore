@@ -10,8 +10,12 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to the repository root on purpose. The conventional unanchored
+# "lib/" matches a directory named lib at ANY depth, which silently excluded
+# every file under setup/lib/ (the installer's shared shell and probe helpers).
+# A clone would have had a setup.sh that sources a file git never shipped.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -65,31 +69,14 @@ Thumbs.db
 *.log
 logs/
 
-# NMF local data files
-nmf_files/
+# Scratch data directory used by local verification runs. Its contents are
+# already covered by *.db / *.log, but only incidentally -- name it so a stray
+# file of another type cannot slip in.
+.tmpdata/
 
-# Tool registry local state
-tool_registry/
-
-# Venv backups
-.venv_*/
-
-# Literal path artifacts (should never exist)
+# Literal path artifacts: directories named for an unexpanded shell variable,
+# created when a script runs with the variable unset. Patterns are literal in
+# gitignore; there is no expansion here.
+$HOME/
 ${AGENTIC_SYSTEM_PATH:-*
-
-# Server backups
-server_backup_*.py
-server_legacy_*.py
-server_original_backup.py
-server.py.backup-*
-
-# Local orchestration state
-.claude-flow/
-.swarm/
-
-# Stale symlinks
-enhanced-memory-mcp
-
-# JSON artifacts
-*_templates.json
-*_workflows.json
+/~/

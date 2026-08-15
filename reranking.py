@@ -12,9 +12,8 @@ Expected improvement: +40-55% precision
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from sentence_transformers import CrossEncoder
-import asyncio
 
 logger = logging.getLogger(__name__)
 

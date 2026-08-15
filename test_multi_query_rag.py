@@ -6,15 +6,12 @@ and all core components without requiring full MCP integration.
 """
 
 import pytest
-import asyncio
-from typing import List, Dict
 
 from multi_query_rag_tools import (
     Perspective,
     SearchResult,
     FusedResult,
     PerspectiveGenerator,
-    MultiQueryExecutor,
     ResultFusionEngine
 )
 

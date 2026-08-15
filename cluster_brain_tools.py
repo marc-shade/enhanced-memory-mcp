@@ -11,7 +11,7 @@ Each node can:
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def register_cluster_brain_tools(app, brain_instance=None):
         app: FastMCP application instance
         brain_instance: Optional pre-initialized ClusterBrain instance
     """
-    from cluster_brain import ClusterBrain, get_cluster_brain
+    from cluster_brain import get_cluster_brain
 
     # Use provided instance or create new one
     brain = brain_instance or get_cluster_brain()

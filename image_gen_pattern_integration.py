@@ -352,7 +352,7 @@ class ImageGenPatternIntegration:
         try:
             asset_type = context.get("asset_type", "")
             target_format = context.get("target_format", "web")
-            quality_requirements = context.get("quality_requirements", "standard")
+            context.get("quality_requirements", "standard")
             
             # Get relevant optimization presets
             cursor.execute('''

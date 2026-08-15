@@ -13,16 +13,17 @@ This module implements surprise scoring for memory consolidation decisions.
 
 import logging
 import numpy as np
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime
-import json
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class SurpriseScore:
     """Result of surprise analysis for a memory candidate."""
+
     score: float  # 0.0 (predictable) to 1.0 (highly surprising)
     novelty_component: float  # How different from existing memories
     salience_component: float  # How important/meaningful
@@ -48,10 +49,6 @@ class SurpriseBasedMemory:
     MOMENTUM_WINDOW = 3  # Store N memories after high-surprise event
     MAX_SIMILAR_MEMORIES = 5  # Max near-duplicates before raising threshold
 
-    # MIRAS-style momentum smoothing parameters
-    MOMENTUM_BETA = 0.9  # EMA decay factor (higher = more smoothing)
-    MOMENTUM_BOOST = 1.3  # Boost factor for high-momentum periods
-
     def __init__(self, embedding_fn=None, search_fn=None):
         """
         Initialize surprise-based memory system.
@@ -66,15 +63,42 @@ class SurpriseBasedMemory:
         self.recent_surprises: List[float] = []
         self.adaptive_threshold = self.BASE_SURPRISE_THRESHOLD
 
-        # MIRAS-style momentum smoothing (EMA)
-        self.momentum_ema = 0.5  # Running EMA of surprise scores
-        self.momentum_gradient = 0.0  # Rate of change in surprise
+    @classmethod
+    def with_live_backend(cls) -> "SurpriseBasedMemory":
+        """Scorer wired to the live embedder + vector index (Phase 1, 2026-07-02).
+
+        Before this, every caller that constructed the class bare hit the
+        no-embedding fallback and got a flat 0.5 "default to store" — the
+        audit found surprise scoring was a stub in practice. This factory
+        wires the SAME local ollama model + Qdrant collection the write-path
+        indexer populates, so novelty is measured against the actual store.
+        Raises ImportError/ConnectionError early if the backend is missing —
+        callers keep their own fail-soft handling.
+        """
+        from local_semantic_recall import DEFAULT_MODEL, QDRANT, collection_for, embed
+        from qdrant_client import QdrantClient
+
+        client = QdrantClient(url=QDRANT)
+        coll = collection_for(DEFAULT_MODEL)
+
+        def embedding_fn(text: str) -> List[float]:
+            return embed([text], DEFAULT_MODEL)[0]
+
+        def search_fn(
+            embedding: List[float], limit: int, threshold: float
+        ) -> List[Dict]:
+            hits = client.query_points(
+                coll, query=embedding, limit=limit, score_threshold=threshold
+            ).points
+            return [{"id": str(h.id), "score": h.score} for h in hits]
+
+        return cls(embedding_fn=embedding_fn, search_fn=search_fn)
 
     def calculate_surprise(
         self,
         content: str,
         memory_type: str = "episodic",
-        context: Optional[Dict] = None
+        context: Optional[Dict] = None,
     ) -> SurpriseScore:
         """
         Calculate surprise score for a memory candidate.
@@ -98,7 +122,7 @@ class SurpriseBasedMemory:
                 salience_component=0.5,
                 temporal_component=0.5,
                 should_store=True,
-                reasoning="No embedding system - defaulting to store"
+                reasoning="No embedding system - defaulting to store",
             )
 
         try:
@@ -109,7 +133,7 @@ class SurpriseBasedMemory:
             similar_memories = self.search_fn(
                 embedding=candidate_embedding,
                 limit=10,
-                threshold=0.7  # Cosine similarity threshold
+                threshold=0.7,  # Cosine similarity threshold
             )
 
             # Calculate novelty component (inverse of max similarity)
@@ -123,31 +147,7 @@ class SurpriseBasedMemory:
 
             # Combine components (weighted average)
             # Novelty is most important, followed by salience, then temporal
-            raw_score = (
-                novelty * 0.5 +
-                salience * 0.3 +
-                temporal * 0.2
-            )
-
-            # MIRAS-style momentum smoothing (EMA)
-            # m_t = β * m_{t-1} + (1-β) * score_t
-            old_ema = self.momentum_ema
-            self.momentum_ema = (
-                self.MOMENTUM_BETA * self.momentum_ema +
-                (1 - self.MOMENTUM_BETA) * raw_score
-            )
-            self.momentum_gradient = raw_score - old_ema
-
-            # Apply momentum boost when gradient is positive (rising surprise)
-            # This implements MIRAS's "momentum smooths surprise signals"
-            if self.momentum_gradient > 0.1:
-                # Rising surprise trend - boost current score
-                combined_score = min(1.0, raw_score * self.MOMENTUM_BOOST)
-            elif self.momentum_gradient < -0.1:
-                # Falling surprise trend - slight dampening
-                combined_score = raw_score * 0.95
-            else:
-                combined_score = raw_score
+            combined_score = novelty * 0.5 + salience * 0.3 + temporal * 0.2
 
             # Apply momentum: if we recently saw high surprise, lower threshold
             effective_threshold = self._get_effective_threshold()
@@ -169,8 +169,13 @@ class SurpriseBasedMemory:
             self._update_adaptive_threshold()
 
             reasoning = self._generate_reasoning(
-                novelty, salience, temporal, combined_score,
-                effective_threshold, should_store, len(similar_memories)
+                novelty,
+                salience,
+                temporal,
+                combined_score,
+                effective_threshold,
+                should_store,
+                len(similar_memories),
             )
 
             return SurpriseScore(
@@ -179,7 +184,7 @@ class SurpriseBasedMemory:
                 salience_component=salience,
                 temporal_component=temporal,
                 should_store=should_store,
-                reasoning=reasoning
+                reasoning=reasoning,
             )
 
         except Exception as e:
@@ -191,7 +196,7 @@ class SurpriseBasedMemory:
                 salience_component=0.5,
                 temporal_component=0.5,
                 should_store=True,
-                reasoning=f"Error in calculation, defaulting to store: {e}"
+                reasoning=f"Error in calculation, defaulting to store: {e}",
             )
 
     def _calculate_novelty(self, similar_memories: List[Dict]) -> float:
@@ -204,13 +209,13 @@ class SurpriseBasedMemory:
             return 1.0  # Completely novel - nothing similar exists
 
         # Get highest similarity score
-        max_similarity = max(m.get('score', 0) for m in similar_memories)
+        max_similarity = max(m.get("score", 0) for m in similar_memories)
 
         # Novelty is inverse of similarity
         novelty = 1.0 - max_similarity
 
         # Penalize if too many similar memories exist
-        similar_count = len([m for m in similar_memories if m.get('score', 0) > 0.8])
+        similar_count = len([m for m in similar_memories if m.get("score", 0) > 0.8])
         if similar_count >= self.MAX_SIMILAR_MEMORIES:
             novelty *= 0.5  # Reduce novelty if we have many similar memories
 
@@ -237,9 +242,23 @@ class SurpriseBasedMemory:
 
         # Key terms indicating importance
         importance_terms = [
-            'error', 'bug', 'fix', 'solution', 'learned', 'discovered',
-            'important', 'critical', 'success', 'failure', 'insight',
-            'pattern', 'principle', 'rule', 'always', 'never', 'must'
+            "error",
+            "bug",
+            "fix",
+            "solution",
+            "learned",
+            "discovered",
+            "important",
+            "critical",
+            "success",
+            "failure",
+            "insight",
+            "pattern",
+            "principle",
+            "rule",
+            "always",
+            "never",
+            "must",
         ]
         content_lower = content.lower()
         term_count = sum(1 for term in importance_terms if term in content_lower)
@@ -247,23 +266,21 @@ class SurpriseBasedMemory:
 
         # Memory type factor
         type_factors = {
-            'procedural': 0.15,  # Skills are valuable
-            'semantic': 0.10,   # Knowledge is valuable
-            'episodic': 0.0,    # Experiences baseline
-            'working': -0.1     # Working memory less important for long-term
+            "procedural": 0.15,  # Skills are valuable
+            "semantic": 0.10,  # Knowledge is valuable
+            "episodic": 0.0,  # Experiences baseline
+            "working": -0.1,  # Working memory less important for long-term
         }
         salience += type_factors.get(memory_type, 0)
 
         # Structured content bonus
-        if any(indicator in content for indicator in ['```', '- ', '1.', '* ']):
+        if any(indicator in content for indicator in ["```", "- ", "1.", "* "]):
             salience += 0.1
 
         return min(1.0, max(0.0, salience))
 
     def _calculate_temporal_surprise(
-        self,
-        content: str,
-        context: Optional[Dict]
+        self, content: str, context: Optional[Dict]
     ) -> float:
         """
         Calculate temporal surprise - how unexpected given recent context.
@@ -276,7 +293,7 @@ class SurpriseBasedMemory:
         temporal = 0.5
 
         # Check for topic continuity
-        recent_topics = context.get('recent_topics', [])
+        recent_topics = context.get("recent_topics", [])
         if recent_topics:
             # Simple word overlap check (could use embeddings for better)
             content_words = set(content.lower().split())
@@ -292,11 +309,11 @@ class SurpriseBasedMemory:
                 temporal -= 0.1
 
         # Check for outcome surprise (if tracking expectations)
-        expected_outcome = context.get('expected_outcome')
+        expected_outcome = context.get("expected_outcome")
         if expected_outcome:
-            if 'error' in content.lower() and 'success' in expected_outcome.lower():
+            if "error" in content.lower() and "success" in expected_outcome.lower():
                 temporal += 0.3  # Unexpected failure
-            elif 'success' in content.lower() and 'error' in expected_outcome.lower():
+            elif "success" in content.lower() and "error" in expected_outcome.lower():
                 temporal += 0.2  # Unexpected success
 
         return min(1.0, max(0.0, temporal))
@@ -340,7 +357,7 @@ class SurpriseBasedMemory:
         combined: float,
         threshold: float,
         should_store: bool,
-        similar_count: int
+        similar_count: int,
     ) -> str:
         """Generate human-readable reasoning for the decision."""
         parts = []
@@ -368,12 +385,6 @@ class SurpriseBasedMemory:
 
         if self.momentum_counter > 0:
             parts.append(f"momentum active ({self.momentum_counter} remaining)")
-
-        # MIRAS momentum smoothing info
-        if self.momentum_gradient > 0.1:
-            parts.append(f"⬆ rising surprise (grad={self.momentum_gradient:.2f})")
-        elif self.momentum_gradient < -0.1:
-            parts.append(f"⬇ falling surprise (grad={self.momentum_gradient:.2f})")
 
         return " | ".join(parts)
 
@@ -406,7 +417,7 @@ class RetentionGate:
         memory_id: str,
         original_surprise: float,
         created_at: datetime,
-        memory_type: str
+        memory_type: str,
     ) -> float:
         """
         Calculate retention priority for a memory.
@@ -428,10 +439,10 @@ class RetentionGate:
 
         # Memory type factor
         type_retention = {
-            'procedural': 0.15,  # Skills persist
-            'semantic': 0.10,   # Knowledge persists
-            'episodic': 0.05,   # Episodes fade faster
-            'working': 0.0      # Working memory most transient
+            "procedural": 0.15,  # Skills persist
+            "semantic": 0.10,  # Knowledge persists
+            "episodic": 0.05,  # Episodes fade faster
+            "working": 0.0,  # Working memory most transient
         }
         score += type_retention.get(memory_type, 0)
 
@@ -443,9 +454,7 @@ class RetentionGate:
         self.last_access[memory_id] = datetime.now()
 
     def get_candidates_for_forgetting(
-        self,
-        memories: List[Dict],
-        count_to_remove: int
+        self, memories: List[Dict], count_to_remove: int
     ) -> List[str]:
         """
         Get memory IDs that are candidates for forgetting.
@@ -454,12 +463,14 @@ class RetentionGate:
         """
         scored = []
         for mem in memories:
-            mem_id = mem.get('id', '')
+            mem_id = mem.get("id", "")
             score = self.calculate_retention_score(
                 memory_id=mem_id,
-                original_surprise=mem.get('surprise_score', 0.5),
-                created_at=datetime.fromisoformat(mem.get('created_at', datetime.now().isoformat())),
-                memory_type=mem.get('memory_type', 'episodic')
+                original_surprise=mem.get("surprise_score", 0.5),
+                created_at=datetime.fromisoformat(
+                    mem.get("created_at", datetime.now().isoformat())
+                ),
+                memory_type=mem.get("memory_type", "episodic"),
             )
             scored.append((mem_id, score))
 
@@ -473,12 +484,14 @@ def create_surprise_scorer(qdrant_client=None, embedding_model=None):
     """
     Factory function to create surprise scorer with Qdrant integration.
     """
+
     def embedding_fn(text: str) -> List[float]:
         if embedding_model:
             return embedding_model.encode(text).tolist()
         # Fallback to SAFLA embeddings if available
         try:
             from safla_tools import generate_embeddings
+
             return generate_embeddings([text])[0]
         except:
             return []
@@ -491,30 +504,38 @@ def create_surprise_scorer(qdrant_client=None, embedding_model=None):
                 collection_name="memories",
                 query_vector=embedding,
                 limit=limit,
-                score_threshold=threshold
+                score_threshold=threshold,
             )
-            return [{'id': r.id, 'score': r.score} for r in results]
+            return [{"id": r.id, "score": r.score} for r in results]
         except:
             return []
 
     return SurpriseBasedMemory(
         embedding_fn=embedding_fn if embedding_model or True else None,
-        search_fn=search_fn if qdrant_client else None
+        search_fn=search_fn if qdrant_client else None,
     )
 
 
 if __name__ == "__main__":
     # Test the surprise scoring
-    import sys
 
     scorer = SurpriseBasedMemory()
 
     test_cases = [
-        ("I learned that Python dict comprehensions are faster than loops for building dictionaries.", "semantic"),
+        (
+            "I learned that Python dict comprehensions are faster than loops for building dictionaries.",
+            "semantic",
+        ),
         ("The meeting was at 2pm.", "episodic"),
-        ("CRITICAL ERROR: Database connection failed after timeout. Fixed by increasing pool size.", "procedural"),
+        (
+            "CRITICAL ERROR: Database connection failed after timeout. Fixed by increasing pool size.",
+            "procedural",
+        ),
         ("Had coffee.", "episodic"),
-        ("Discovered that using batch operations reduces API calls by 90% - major performance insight!", "semantic"),
+        (
+            "Discovered that using batch operations reduces API calls by 90% - major performance insight!",
+            "semantic",
+        ),
     ]
 
     print("Surprise-Based Memory Scoring Test")
@@ -525,7 +546,9 @@ if __name__ == "__main__":
         print(f"\nContent: {content[:60]}...")
         print(f"Type: {mem_type}")
         print(f"Score: {score.score:.2f} | Store: {score.should_store}")
-        print(f"Components: novelty={score.novelty_component:.2f}, "
-              f"salience={score.salience_component:.2f}, "
-              f"temporal={score.temporal_component:.2f}")
+        print(
+            f"Components: novelty={score.novelty_component:.2f}, "
+            f"salience={score.salience_component:.2f}, "
+            f"temporal={score.temporal_component:.2f}"
+        )
         print(f"Reasoning: {score.reasoning}")

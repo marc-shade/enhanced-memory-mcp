@@ -10,11 +10,10 @@ mathematical models as new data accumulates.
 """
 
 import logging
-import asyncio
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 import threading
 
 logger = logging.getLogger("pysr-scheduler")

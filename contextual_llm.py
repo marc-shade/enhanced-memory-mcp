@@ -11,7 +11,6 @@ Part of RAG Tier 1 Strategy - Week 1, Day 5-7
 import os
 import logging
 from typing import Dict, Any, Optional
-import asyncio
 
 logger = logging.getLogger(__name__)
 

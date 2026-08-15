@@ -11,12 +11,12 @@ Key Features:
 - Learning from outcomes
 """
 
-import sqlite3
 import json
 import logging
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 logger = logging.getLogger("self_improvement")
 
@@ -28,14 +28,17 @@ DB_PATH = MEMORY_DIR / "memory.db"
 class SelfImprovement:
     """Manages self-improvement cycles and optimization"""
 
-    def __init__(self):
-        pass
+    def __init__(self, db_path: str | Path | None = None):
+        # Default stays the production DB; tests pass a temp path instead of
+        # patching the module global (same hazard class as the cycle-63
+        # meta_learning.db test pollution).
+        self.db_path = Path(db_path) if db_path is not None else DB_PATH
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path)
 
     def start_improvement_cycle(
-        self,
-        agent_id: str,
-        cycle_type: str,
-        improvement_goals: Dict[str, Any]
+        self, agent_id: str, cycle_type: str, improvement_goals: dict[str, Any]
     ) -> int:
         """
         Start a new self-improvement cycle
@@ -48,42 +51,41 @@ class SelfImprovement:
         Returns:
             cycle_id
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         cursor = conn.cursor()
 
         # Get next cycle number
         cursor.execute(
-            'SELECT COALESCE(MAX(cycle_number), 0) + 1 FROM self_improvement_cycles WHERE agent_id = ?',
-            (agent_id,)
+            "SELECT COALESCE(MAX(cycle_number), 0) + 1 FROM self_improvement_cycles WHERE agent_id = ?",
+            (agent_id,),
         )
         cycle_number = cursor.fetchone()[0]
 
         cursor.execute(
-            '''
+            """
             INSERT INTO self_improvement_cycles (
                 agent_id, cycle_number, cycle_type,
                 improvement_goals
             ) VALUES (?, ?, ?, ?)
-            ''',
-            (
-                agent_id, cycle_number, cycle_type,
-                json.dumps(improvement_goals)
-            )
+            """,
+            (agent_id, cycle_number, cycle_type, json.dumps(improvement_goals)),
         )
 
         cycle_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
-        logger.info(f"Started improvement cycle {cycle_number} for {agent_id}: {cycle_type}")
+        logger.info(
+            f"Started improvement cycle {cycle_number} for {agent_id}: {cycle_type}"
+        )
 
         return cycle_id
 
     def assess_baseline_performance(
         self,
         cycle_id: int,
-        baseline_metrics: Dict[str, float],
-        identified_weaknesses: List[str]
+        baseline_metrics: dict[str, float],
+        identified_weaknesses: list[str],
     ):
         """
         Assess baseline performance before improvement
@@ -93,37 +95,47 @@ class SelfImprovement:
             baseline_metrics: Performance metrics before improvement
             identified_weaknesses: List of weaknesses to address
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         cursor = conn.cursor()
 
-        # Calculate overall baseline
+        # Calculate overall baseline (legacy scalar, kept for continuity)
         baseline_performance = sum(baseline_metrics.values()) / len(baseline_metrics)
 
+        # Per-metric baselines enable direction-aware validation later.
+        # Guarded migration: cycles predating 2026-07-01 lack the column.
+        try:
+            cursor.execute(
+                "ALTER TABLE self_improvement_cycles ADD COLUMN baseline_metrics TEXT"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
         cursor.execute(
-            '''
+            """
             UPDATE self_improvement_cycles
             SET
                 baseline_performance = ?,
+                baseline_metrics = ?,
                 identified_weaknesses = ?
             WHERE cycle_id = ?
-            ''',
+            """,
             (
                 baseline_performance,
+                json.dumps(baseline_metrics),
                 json.dumps(identified_weaknesses),
-                cycle_id
-            )
+                cycle_id,
+            ),
         )
 
         conn.commit()
         conn.close()
 
-        logger.info(f"Assessed baseline for cycle {cycle_id}: {baseline_performance:.3f}")
+        logger.info(
+            f"Assessed baseline for cycle {cycle_id}: {baseline_performance:.3f}"
+        )
 
     def apply_improvement_strategies(
-        self,
-        cycle_id: int,
-        strategies: List[Dict[str, Any]],
-        changes: List[str]
+        self, cycle_id: int, strategies: list[dict[str, Any]], changes: list[str]
     ):
         """
         Apply improvement strategies
@@ -133,36 +145,33 @@ class SelfImprovement:
             strategies: List of strategies being applied
             changes: Description of changes made
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         cursor = conn.cursor()
 
         cursor.execute(
-            '''
+            """
             UPDATE self_improvement_cycles
             SET
                 strategies_applied = ?,
                 changes_made = ?,
                 experiments_run = ?
             WHERE cycle_id = ?
-            ''',
-            (
-                json.dumps(strategies),
-                json.dumps(changes),
-                len(strategies),
-                cycle_id
-            )
+            """,
+            (json.dumps(strategies), json.dumps(changes), len(strategies), cycle_id),
         )
 
         conn.commit()
         conn.close()
 
-        logger.info(f"Applied {len(strategies)} improvement strategies to cycle {cycle_id}")
+        logger.info(
+            f"Applied {len(strategies)} improvement strategies to cycle {cycle_id}"
+        )
 
     def validate_improvements(
         self,
         cycle_id: int,
-        new_metrics: Dict[str, float],
-        success_criteria: Dict[str, Any]
+        new_metrics: dict[str, float],
+        success_criteria: dict[str, Any],
     ) -> bool:
         """
         Validate that improvements met success criteria
@@ -175,55 +184,105 @@ class SelfImprovement:
         Returns:
             True if improvements were successful
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         cursor = conn.cursor()
 
-        # Calculate new performance
+        # Calculate new performance (legacy scalar, kept for continuity)
         new_performance = sum(new_metrics.values()) / len(new_metrics)
 
-        # Get baseline
+        # Get baseline (scalar + per-metric JSON when available)
+        try:
+            cursor.execute(
+                "SELECT baseline_performance, baseline_metrics"
+                " FROM self_improvement_cycles WHERE cycle_id = ?",
+                (cycle_id,),
+            )
+            row = cursor.fetchone()
+            baseline_performance = row[0] if row else 0.0
+            baseline_metrics = json.loads(row[1]) if row and row[1] else None
+        except sqlite3.OperationalError:
+            # baseline_metrics column absent (cycle predates 2026-07-01)
+            cursor.execute(
+                "SELECT baseline_performance FROM self_improvement_cycles WHERE cycle_id = ?",
+                (cycle_id,),
+            )
+            row = cursor.fetchone()
+            baseline_performance = row[0] if row else 0.0
+            baseline_metrics = None
+
+        # Direction/scale-aware validation (2026-07-01; the original
+        # mean(raw values) comparison was direction-blind — metrics where a
+        # DECREASE is the improvement, e.g. stuck_tasks 8->0, scored as
+        # regressions — and scale-blind, letting raw-scale metrics dominate
+        # sub-1.0 scores; misreported cycles 48, 60, 61, 62).
+        # Precedence:
+        #   1. Explicit per-criterion booleans: success_criteria values that
+        #      are dicts carrying "met" — success = all of them.
+        #   2. Per-metric baselines: normalized, direction-aware improvement
+        #      (direction from success_criteria[metric]["direction"],
+        #      default "increase"; "hold" metrics are excluded).
+        #   3. Legacy scalar comparison (old cycles without baselines).
+        min_improvement = success_criteria.get("min_improvement", 0.0)
+        met_flags = [
+            bool(v["met"])
+            for v in success_criteria.values()
+            if isinstance(v, dict) and "met" in v
+        ]
+
+        if baseline_metrics:
+            deltas = []
+            for name, new_val in new_metrics.items():
+                if name not in baseline_metrics:
+                    continue
+                crit = success_criteria.get(name)
+                direction = (
+                    crit.get("direction", "increase")
+                    if isinstance(crit, dict)
+                    else "increase"
+                )
+                if direction == "hold":
+                    continue
+                base_val = float(baseline_metrics[name])
+                # scale by the larger magnitude so each metric's contribution
+                # is bounded to [-1, 1] (a bare |base| scale explodes on
+                # zero baselines, e.g. attribution 0.0 -> 1.0)
+                scale = max(abs(base_val), abs(float(new_val)), 1e-9)
+                delta = (float(new_val) - base_val) / scale
+                if direction == "decrease":
+                    delta = -delta
+                deltas.append(delta)
+            improvement_delta = sum(deltas) / len(deltas) if deltas else 0.0
+        else:
+            improvement_delta = new_performance - baseline_performance
+
+        if met_flags:
+            success = all(met_flags)
+        else:
+            success = improvement_delta > min_improvement
+
         cursor.execute(
-            'SELECT baseline_performance FROM self_improvement_cycles WHERE cycle_id = ?',
-            (cycle_id,)
-        )
-        row = cursor.fetchone()
-        baseline_performance = row[0] if row else 0.0
-
-        # Calculate improvement
-        improvement_delta = new_performance - baseline_performance
-
-        # Check success criteria
-        success = improvement_delta > success_criteria.get('min_improvement', 0.0)
-
-        cursor.execute(
-            '''
+            """
             UPDATE self_improvement_cycles
             SET
                 new_performance = ?,
                 improvement_delta = ?,
                 success_criteria_met = ?
             WHERE cycle_id = ?
-            ''',
-            (
-                new_performance,
-                improvement_delta,
-                success,
-                cycle_id
-            )
+            """,
+            (new_performance, improvement_delta, success, cycle_id),
         )
 
         conn.commit()
         conn.close()
 
-        logger.info(f"Validated cycle {cycle_id}: improvement={improvement_delta:.3f}, success={success}")
+        logger.info(
+            f"Validated cycle {cycle_id}: improvement={improvement_delta:.3f}, success={success}"
+        )
 
         return success
 
     def complete_cycle(
-        self,
-        cycle_id: int,
-        lessons_learned: List[str],
-        next_recommendations: List[str]
+        self, cycle_id: int, lessons_learned: list[str], next_recommendations: list[str]
     ):
         """
         Complete an improvement cycle and record learnings
@@ -233,13 +292,13 @@ class SelfImprovement:
             lessons_learned: Insights from this cycle
             next_recommendations: Recommendations for next cycle
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         cursor = conn.cursor()
 
         # Get start time
         cursor.execute(
-            'SELECT started_at FROM self_improvement_cycles WHERE cycle_id = ?',
-            (cycle_id,)
+            "SELECT started_at FROM self_improvement_cycles WHERE cycle_id = ?",
+            (cycle_id,),
         )
         row = cursor.fetchone()
         started_at = datetime.fromisoformat(row[0]) if row else datetime.now()
@@ -249,7 +308,7 @@ class SelfImprovement:
         duration_seconds = int((completed_at - started_at).total_seconds())
 
         cursor.execute(
-            '''
+            """
             UPDATE self_improvement_cycles
             SET
                 lessons_learned = ?,
@@ -257,13 +316,13 @@ class SelfImprovement:
                 completed_at = CURRENT_TIMESTAMP,
                 duration_seconds = ?
             WHERE cycle_id = ?
-            ''',
+            """,
             (
                 json.dumps(lessons_learned),
                 json.dumps(next_recommendations),
                 duration_seconds,
-                cycle_id
-            )
+                cycle_id,
+            ),
         )
 
         conn.commit()
@@ -272,11 +331,8 @@ class SelfImprovement:
         logger.info(f"Completed improvement cycle {cycle_id} ({duration_seconds}s)")
 
     def get_improvement_history(
-        self,
-        agent_id: str,
-        cycle_type: Optional[str] = None,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, agent_id: str, cycle_type: str | None = None, limit: int = 10
+    ) -> list[dict[str, Any]]:
         """
         Get improvement cycle history
 
@@ -288,29 +344,29 @@ class SelfImprovement:
         Returns:
             List of improvement cycles
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         if cycle_type:
             cursor.execute(
-                '''
-                SELECT * FROM improvement_progress
-                WHERE agent_id = ? AND cycle_type = ?
+                """
+                SELECT * FROM self_improvement_cycles
+                WHERE agent_id = ? AND cycle_type = ? AND completed_at IS NOT NULL
                 ORDER BY cycle_number DESC
                 LIMIT ?
-                ''',
-                (agent_id, cycle_type, limit)
+                """,
+                (agent_id, cycle_type, limit),
             )
         else:
             cursor.execute(
-                '''
-                SELECT * FROM improvement_progress
-                WHERE agent_id = ?
+                """
+                SELECT * FROM self_improvement_cycles
+                WHERE agent_id = ? AND completed_at IS NOT NULL
                 ORDER BY cycle_number DESC
                 LIMIT ?
-                ''',
-                (agent_id, limit)
+                """,
+                (agent_id, limit),
             )
 
         results = [dict(row) for row in cursor.fetchall()]
@@ -319,10 +375,8 @@ class SelfImprovement:
         return results
 
     def get_best_performing_strategies(
-        self,
-        agent_id: str,
-        min_success_rate: float = 0.7
-    ) -> List[Dict[str, Any]]:
+        self, agent_id: str, min_success_rate: float = 0.7
+    ) -> list[dict[str, Any]]:
         """
         Get strategies that have worked well in the past
 
@@ -333,13 +387,13 @@ class SelfImprovement:
         Returns:
             List of effective strategies
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._connect()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         # Analyze past cycles to find successful strategies
         cursor.execute(
-            '''
+            """
             SELECT
                 strategies_applied,
                 COUNT(*) as usage_count,
@@ -351,20 +405,22 @@ class SelfImprovement:
             GROUP BY strategies_applied
             HAVING success_rate >= ?
             ORDER BY success_rate DESC, avg_improvement DESC
-            ''',
-            (agent_id, min_success_rate)
+            """,
+            (agent_id, min_success_rate),
         )
 
         results = []
         for row in cursor.fetchall():
             try:
-                strategies = json.loads(row['strategies_applied'])
-                results.append({
-                    'strategies': strategies,
-                    'usage_count': row['usage_count'],
-                    'avg_improvement': row['avg_improvement'],
-                    'success_rate': row['success_rate']
-                })
+                strategies = json.loads(row["strategies_applied"])
+                results.append(
+                    {
+                        "strategies": strategies,
+                        "usage_count": row["usage_count"],
+                        "avg_improvement": row["avg_improvement"],
+                        "success_rate": row["success_rate"],
+                    }
+                )
             except:
                 continue
 
@@ -382,12 +438,12 @@ class CoordinationManager:
     def send_message(
         self,
         sender_agent_id: str,
-        recipient_agent_id: Optional[str],
+        recipient_agent_id: str | None,
         message_type: str,
         subject: str,
-        message_content: Dict[str, Any],
+        message_content: dict[str, Any],
         priority: float = 0.5,
-        requires_response: bool = False
+        requires_response: bool = False,
     ) -> int:
         """
         Send a coordination message to another agent
@@ -408,18 +464,22 @@ class CoordinationManager:
         cursor = conn.cursor()
 
         cursor.execute(
-            '''
+            """
             INSERT INTO coordination_messages (
                 sender_agent_id, recipient_agent_id,
                 message_type, subject, message_content,
                 priority, requires_response
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''',
+            """,
             (
-                sender_agent_id, recipient_agent_id,
-                message_type, subject, json.dumps(message_content),
-                priority, requires_response
-            )
+                sender_agent_id,
+                recipient_agent_id,
+                message_type,
+                subject,
+                json.dumps(message_content),
+                priority,
+                requires_response,
+            ),
         )
 
         message_id = cursor.lastrowid
@@ -427,15 +487,15 @@ class CoordinationManager:
         conn.close()
 
         recipient = recipient_agent_id or "ALL"
-        logger.info(f"Message {message_id} sent from {sender_agent_id} to {recipient}: {subject}")
+        logger.info(
+            f"Message {message_id} sent from {sender_agent_id} to {recipient}: {subject}"
+        )
 
         return message_id
 
     def receive_messages(
-        self,
-        agent_id: str,
-        status: str = "pending"
-    ) -> List[Dict[str, Any]]:
+        self, agent_id: str, status: str = "pending"
+    ) -> list[dict[str, Any]]:
         """
         Receive messages for an agent
 
@@ -451,27 +511,27 @@ class CoordinationManager:
         cursor = conn.cursor()
 
         cursor.execute(
-            '''
+            """
             SELECT * FROM coordination_messages
             WHERE (recipient_agent_id = ? OR recipient_agent_id IS NULL)
               AND status = ?
             ORDER BY priority DESC, sent_at ASC
-            ''',
-            (agent_id, status)
+            """,
+            (agent_id, status),
         )
 
         results = [dict(row) for row in cursor.fetchall()]
 
         # Mark as delivered
         if results:
-            message_ids = [r['message_id'] for r in results]
+            message_ids = [r["message_id"] for r in results]
             cursor.execute(
-                f'''
+                f"""
                 UPDATE coordination_messages
                 SET status = 'delivered'
-                WHERE message_id IN ({','.join('?' * len(message_ids))})
-                ''',
-                message_ids
+                WHERE message_id IN ({",".join("?" * len(message_ids))})
+                """,
+                message_ids,
             )
             conn.commit()
 
@@ -480,9 +540,7 @@ class CoordinationManager:
         return results
 
     def acknowledge_message(
-        self,
-        message_id: int,
-        response_content: Optional[Dict[str, Any]] = None
+        self, message_id: int, response_content: dict[str, Any] | None = None
     ):
         """
         Acknowledge receipt of a message
@@ -495,41 +553,41 @@ class CoordinationManager:
         cursor = conn.cursor()
 
         cursor.execute(
-            '''
+            """
             UPDATE coordination_messages
             SET
                 status = 'acknowledged',
                 acknowledged_at = CURRENT_TIMESTAMP
             WHERE message_id = ?
-            ''',
-            (message_id,)
+            """,
+            (message_id,),
         )
 
         # If response provided, send it
         if response_content:
             cursor.execute(
-                'SELECT sender_agent_id, recipient_agent_id, subject FROM coordination_messages WHERE message_id = ?',
-                (message_id,)
+                "SELECT sender_agent_id, recipient_agent_id, subject FROM coordination_messages WHERE message_id = ?",
+                (message_id,),
             )
             row = cursor.fetchone()
             if row:
                 original_sender, original_recipient, original_subject = row
 
                 cursor.execute(
-                    '''
+                    """
                     INSERT INTO coordination_messages (
                         sender_agent_id, recipient_agent_id,
                         message_type, subject, message_content,
                         response_message_id, status
                     ) VALUES (?, ?, 'response', ?, ?, ?, 'delivered')
-                    ''',
+                    """,
                     (
                         original_recipient,  # Now the sender
-                        original_sender,     # Now the recipient
+                        original_sender,  # Now the recipient
                         f"Re: {original_subject}",
                         json.dumps(response_content),
-                        message_id
-                    )
+                        message_id,
+                    ),
                 )
 
         conn.commit()
@@ -538,9 +596,8 @@ class CoordinationManager:
         logger.info(f"Acknowledged message {message_id}")
 
     def get_pending_coordination(
-        self,
-        agent_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, agent_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         Get pending coordination tasks
 
@@ -556,15 +613,15 @@ class CoordinationManager:
 
         if agent_id:
             cursor.execute(
-                '''
+                """
                 SELECT * FROM pending_coordination
                 WHERE recipient_agent_id = ? OR recipient_agent_id IS NULL
                 ORDER BY priority DESC, sent_at ASC
-                ''',
-                (agent_id,)
+                """,
+                (agent_id,),
             )
         else:
-            cursor.execute('SELECT * FROM pending_coordination')
+            cursor.execute("SELECT * FROM pending_coordination")
 
         results = [dict(row) for row in cursor.fetchall()]
         conn.close()

@@ -9,11 +9,9 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import asyncio
-from datetime import datetime
 
 # Import the tool functions directly from server
 # We'll need to mock the memory_client and other dependencies
-from unittest.mock import Mock, patch
 import sqlite3
 
 DB_PATH = "/Users/marc/.claude/enhanced_memories/memory.db"
@@ -230,13 +228,13 @@ async def main():
 
     try:
         # Test 1: Auto-extract facts
-        extract_result = await test_auto_extract_facts()
+        await test_auto_extract_facts()
 
         # Test 2: Detect conflicts
-        conflict_result = await test_detect_conflicts()
+        await test_detect_conflicts()
 
         # Test 3: Resolve conflict (if possible)
-        resolve_result = await test_resolve_conflict()
+        await test_resolve_conflict()
 
         # Verify database state
         await verify_database_state()

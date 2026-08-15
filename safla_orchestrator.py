@@ -14,7 +14,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -32,9 +32,21 @@ class SAFLAOrchestrator:
         self.db_path = db_path
         self._init_safla_tables()
 
+    def _connect(self) -> sqlite3.Connection:
+        """Connection with busy-timeout discipline.
+
+        The nightly consolidation run shares memory.db with live sessions;
+        the sqlite default 5s timeout caused recurring 'database is locked'
+        failures in autonomous_memory_curation (nightly runs failed Jun 3-8
+        2026). Matches ConsolidationEngine._get_connection.
+        """
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        conn.execute("PRAGMA busy_timeout = 30000")
+        return conn
+
     def _init_safla_tables(self):
         """Initialize SAFLA-specific tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             # Working memory - temporary, high-access, volatile
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS working_memory (
@@ -120,12 +132,24 @@ class SAFLAOrchestrator:
             """)
 
             # Indices for performance
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_working_expires ON working_memory(expires_at)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_working_context ON working_memory(context_key)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_episodic_time ON episodic_memory(start_time)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_episodic_significance ON episodic_memory(significance_score)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_concept ON semantic_memory(concept_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_procedural_skill ON procedural_memory(skill_name)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_working_expires ON working_memory(expires_at)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_working_context ON working_memory(context_key)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_episodic_time ON episodic_memory(start_time)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_episodic_significance ON episodic_memory(significance_score)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_semantic_concept ON semantic_memory(concept_name)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_procedural_skill ON procedural_memory(skill_name)"
+            )
 
             conn.commit()
 
@@ -137,50 +161,67 @@ class SAFLAOrchestrator:
         content: str,
         priority: int = 5,
         ttl_minutes: int = 60,
-        entity_id: Optional[int] = None
+        entity_id: Optional[int] = None,
     ) -> int:
         """Add item to working memory with TTL."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             expires_at = (datetime.now() + timedelta(minutes=ttl_minutes)).isoformat()
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 INSERT INTO working_memory
                 (entity_id, context_key, content, priority, ttl_minutes, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (entity_id, context_key, content, priority, ttl_minutes, expires_at))
+            """,
+                (entity_id, context_key, content, priority, ttl_minutes, expires_at),
+            )
             conn.commit()
             return cursor.lastrowid
 
-    def get_working_memory(self, context_key: Optional[str] = None, limit: int = 50) -> List[Dict]:
+    def get_working_memory(
+        self, context_key: Optional[str] = None, limit: int = 50
+    ) -> List[Dict]:
         """Get items from working memory, optionally filtered by context."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
             # Clean expired items first
-            conn.execute("DELETE FROM working_memory WHERE expires_at < ?", (datetime.now().isoformat(),))
+            conn.execute(
+                "DELETE FROM working_memory WHERE expires_at < ?",
+                (datetime.now().isoformat(),),
+            )
 
             if context_key:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT * FROM working_memory
                     WHERE context_key = ?
                     ORDER BY priority DESC, created_at DESC
                     LIMIT ?
-                """, (context_key, limit))
+                """,
+                    (context_key, limit),
+                )
             else:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT * FROM working_memory
                     ORDER BY priority DESC, created_at DESC
                     LIMIT ?
-                """, (limit,))
+                """,
+                    (limit,),
+                )
 
             # Update access counts
             items = [dict(row) for row in cursor.fetchall()]
             for item in items:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE working_memory
                     SET access_count = access_count + 1,
                         last_accessed = ?
                     WHERE id = ?
-                """, (datetime.now().isoformat(), item['id']))
+                """,
+                    (datetime.now().isoformat(), item["id"]),
+                )
 
             conn.commit()
             return items
@@ -194,23 +235,26 @@ class SAFLAOrchestrator:
         significance_score: float = 0.5,
         emotional_valence: Optional[float] = None,
         tags: List[str] = None,
-        entity_id: Optional[int] = None
+        entity_id: Optional[int] = None,
     ) -> int:
         """Add an episode to episodic memory."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
                 INSERT INTO episodic_memory
                 (entity_id, event_type, episode_data, start_time, significance_score, emotional_valence, tags)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                entity_id,
-                event_type,
-                json.dumps(episode_data),
-                datetime.now().isoformat(),
-                significance_score,
-                emotional_valence,
-                json.dumps(tags or [])
-            ))
+            """,
+                (
+                    entity_id,
+                    event_type,
+                    json.dumps(episode_data),
+                    datetime.now().isoformat(),
+                    significance_score,
+                    emotional_valence,
+                    json.dumps(tags or []),
+                ),
+            )
             conn.commit()
             return cursor.lastrowid
 
@@ -218,10 +262,10 @@ class SAFLAOrchestrator:
         self,
         event_type: Optional[str] = None,
         min_significance: float = 0.0,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Dict]:
         """Get episodes, optionally filtered."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
             query = """
@@ -241,8 +285,8 @@ class SAFLAOrchestrator:
             episodes = []
             for row in cursor.fetchall():
                 episode = dict(row)
-                episode['episode_data'] = json.loads(episode['episode_data'])
-                episode['tags'] = json.loads(episode['tags'] or '[]')
+                episode["episode_data"] = json.loads(episode["episode_data"])
+                episode["tags"] = json.loads(episode["tags"] or "[]")
                 episodes.append(episode)
 
             return episodes
@@ -255,52 +299,61 @@ class SAFLAOrchestrator:
         concept_type: str,
         definition: str,
         related_concepts: List[str] = None,
-        confidence_score: float = 0.5
+        confidence_score: float = 0.5,
     ) -> int:
         """Add or update a concept in semantic memory."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             try:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     INSERT INTO semantic_memory
                     (concept_name, concept_type, definition, related_concepts, confidence_score)
                     VALUES (?, ?, ?, ?, ?)
-                """, (
-                    concept_name,
-                    concept_type,
-                    definition,
-                    json.dumps(related_concepts or []),
-                    confidence_score
-                ))
+                """,
+                    (
+                        concept_name,
+                        concept_type,
+                        definition,
+                        json.dumps(related_concepts or []),
+                        confidence_score,
+                    ),
+                )
                 conn.commit()
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 # Update existing concept
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE semantic_memory
                     SET definition = ?,
                         related_concepts = ?,
                         confidence_score = ?,
                         updated_at = ?
                     WHERE concept_name = ?
-                """, (
-                    definition,
-                    json.dumps(related_concepts or []),
-                    confidence_score,
-                    datetime.now().isoformat(),
-                    concept_name
-                ))
+                """,
+                    (
+                        definition,
+                        json.dumps(related_concepts or []),
+                        confidence_score,
+                        datetime.now().isoformat(),
+                        concept_name,
+                    ),
+                )
                 conn.commit()
-                cursor = conn.execute("SELECT id FROM semantic_memory WHERE concept_name = ?", (concept_name,))
+                cursor = conn.execute(
+                    "SELECT id FROM semantic_memory WHERE concept_name = ?",
+                    (concept_name,),
+                )
                 return cursor.fetchone()[0]
 
     def get_concepts(
         self,
         concept_type: Optional[str] = None,
         min_confidence: float = 0.0,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Dict]:
         """Get concepts from semantic memory."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
             query = "SELECT * FROM semantic_memory WHERE confidence_score >= ?"
@@ -317,7 +370,9 @@ class SAFLAOrchestrator:
             concepts = []
             for row in cursor.fetchall():
                 concept = dict(row)
-                concept['related_concepts'] = json.loads(concept['related_concepts'] or '[]')
+                concept["related_concepts"] = json.loads(
+                    concept["related_concepts"] or "[]"
+                )
                 concepts.append(concept)
 
             return concepts
@@ -330,77 +385,93 @@ class SAFLAOrchestrator:
         skill_category: str,
         procedure_steps: List[str],
         preconditions: List[str] = None,
-        success_criteria: List[str] = None
+        success_criteria: List[str] = None,
     ) -> int:
         """Add or update a skill in procedural memory."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             try:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     INSERT INTO procedural_memory
                     (skill_name, skill_category, procedure_steps, preconditions, success_criteria)
                     VALUES (?, ?, ?, ?, ?)
-                """, (
-                    skill_name,
-                    skill_category,
-                    json.dumps(procedure_steps),
-                    json.dumps(preconditions or []),
-                    json.dumps(success_criteria or [])
-                ))
+                """,
+                    (
+                        skill_name,
+                        skill_category,
+                        json.dumps(procedure_steps),
+                        json.dumps(preconditions or []),
+                        json.dumps(success_criteria or []),
+                    ),
+                )
                 conn.commit()
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 # Update existing skill
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE procedural_memory
                     SET procedure_steps = ?,
                         preconditions = ?,
                         success_criteria = ?,
                         updated_at = ?
                     WHERE skill_name = ?
-                """, (
-                    json.dumps(procedure_steps),
-                    json.dumps(preconditions or []),
-                    json.dumps(success_criteria or []),
-                    datetime.now().isoformat(),
-                    skill_name
-                ))
+                """,
+                    (
+                        json.dumps(procedure_steps),
+                        json.dumps(preconditions or []),
+                        json.dumps(success_criteria or []),
+                        datetime.now().isoformat(),
+                        skill_name,
+                    ),
+                )
                 conn.commit()
-                cursor = conn.execute("SELECT id FROM procedural_memory WHERE skill_name = ?", (skill_name,))
+                cursor = conn.execute(
+                    "SELECT id FROM procedural_memory WHERE skill_name = ?",
+                    (skill_name,),
+                )
                 return cursor.fetchone()[0]
 
     def record_skill_execution(
-        self,
-        skill_name: str,
-        success: bool,
-        execution_time_ms: int
+        self, skill_name: str, success: bool, execution_time_ms: int
     ):
         """Record skill execution for learning."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             # Get current stats
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT execution_count, success_rate, avg_execution_time_ms
                 FROM procedural_memory
                 WHERE skill_name = ?
-            """, (skill_name,))
+            """,
+                (skill_name,),
+            )
 
             row = cursor.fetchone()
             if not row:
-                logger.warning(f"Skill '{skill_name}' not found for execution recording")
+                logger.warning(
+                    f"Skill '{skill_name}' not found for execution recording"
+                )
                 return
 
             exec_count, success_rate, avg_time = row
 
             # Calculate new stats
             new_count = exec_count + 1
-            new_success_rate = ((success_rate * exec_count) + (1.0 if success else 0.0)) / new_count
+            new_success_rate = (
+                (success_rate * exec_count) + (1.0 if success else 0.0)
+            ) / new_count
 
             if avg_time:
-                new_avg_time = int((avg_time * exec_count + execution_time_ms) / new_count)
+                new_avg_time = int(
+                    (avg_time * exec_count + execution_time_ms) / new_count
+                )
             else:
                 new_avg_time = execution_time_ms
 
             # Update
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE procedural_memory
                 SET execution_count = ?,
                     success_rate = ?,
@@ -408,24 +479,26 @@ class SAFLAOrchestrator:
                     last_executed = ?,
                     updated_at = ?
                 WHERE skill_name = ?
-            """, (
-                new_count,
-                new_success_rate,
-                new_avg_time,
-                datetime.now().isoformat(),
-                datetime.now().isoformat(),
-                skill_name
-            ))
+            """,
+                (
+                    new_count,
+                    new_success_rate,
+                    new_avg_time,
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                    skill_name,
+                ),
+            )
             conn.commit()
 
     def get_skills(
         self,
         skill_category: Optional[str] = None,
         min_success_rate: float = 0.0,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Dict]:
         """Get skills from procedural memory."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
             query = "SELECT * FROM procedural_memory WHERE success_rate >= ?"
@@ -442,9 +515,11 @@ class SAFLAOrchestrator:
             skills = []
             for row in cursor.fetchall():
                 skill = dict(row)
-                skill['procedure_steps'] = json.loads(skill['procedure_steps'])
-                skill['preconditions'] = json.loads(skill['preconditions'] or '[]')
-                skill['success_criteria'] = json.loads(skill['success_criteria'] or '[]')
+                skill["procedure_steps"] = json.loads(skill["procedure_steps"])
+                skill["preconditions"] = json.loads(skill["preconditions"] or "[]")
+                skill["success_criteria"] = json.loads(
+                    skill["success_criteria"] or "[]"
+                )
                 skills.append(skill)
 
             return skills
@@ -460,73 +535,98 @@ class SAFLAOrchestrator:
         - Episodic → Semantic: Patterns become concepts
         - Episodic → Procedural: Repeated actions become skills
         """
-        with sqlite3.connect(self.db_path) as conn:
-            stats = {
-                "promoted_to_episodic": 0,
-                "promoted_to_semantic": 0,
-                "promoted_to_procedural": 0,
-                "expired_working": 0
-            }
+        stats = {
+            "promoted_to_episodic": 0,
+            "promoted_to_semantic": 0,
+            "promoted_to_procedural": 0,
+            "expired_working": 0,
+        }
 
-            # 1. Clean expired working memory
-            cursor = conn.execute("DELETE FROM working_memory WHERE expires_at < ?", (datetime.now().isoformat(),))
-            stats["expired_working"] = cursor.rowcount
-
-            # 2. Promote high-access working memory to episodic
-            cursor = conn.execute("""
-                SELECT * FROM working_memory
-                WHERE access_count >= 5 AND promoted_to IS NULL
-            """)
+        # Phase 1: expiry + reads, then COMMIT AND RELEASE the connection.
+        # add_episode()/add_concept() each open their own connection; calling
+        # them while this connection holds an open write transaction is a
+        # same-process deadlock (single WAL writer): the inner write waits on
+        # our uncommitted DELETE until busy_timeout, then raises 'database is
+        # locked'. Root cause of every nightly consolidation failure
+        # Jun 3 - Jul 11 2026, unfixable by busy_timeout alone.
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
-            for row in cursor.fetchall():
-                # Create episode from working memory
-                episode_id = self.add_episode(
-                    event_type="promoted_from_working",
-                    episode_data={"content": row['content'], "context": row['context_key']},
-                    significance_score=min(row['access_count'] / 10.0, 1.0),
-                    entity_id=row['entity_id']
-                )
+            # 1. Clean expired working memory
+            cursor = conn.execute(
+                "DELETE FROM working_memory WHERE expires_at < ?",
+                (datetime.now().isoformat(),),
+            )
+            stats["expired_working"] = cursor.rowcount
 
-                # Mark as promoted
-                conn.execute("UPDATE working_memory SET promoted_to = ? WHERE id = ?", (f"episodic:{episode_id}", row['id']))
-                stats["promoted_to_episodic"] += 1
+            # 2. Read high-access working memory eligible for promotion
+            promotable = conn.execute("""
+                SELECT * FROM working_memory
+                WHERE access_count >= 5 AND promoted_to IS NULL
+            """).fetchall()
 
-            # 3. Consolidate high-significance episodes into concepts
-            cursor = conn.execute("""
+            # 3. Read high-significance episodes eligible for consolidation
+            episode_rows = conn.execute("""
                 SELECT event_type, episode_data, significance_score, id
                 FROM episodic_memory
                 WHERE significance_score >= 0.8 AND consolidated_to_semantic = 0
                 ORDER BY significance_score DESC
                 LIMIT 20
-            """)
-
-            episode_groups = defaultdict(list)
-            for row in cursor.fetchall():
-                episode_groups[row[0]].append(row)
-
-            for event_type, episodes in episode_groups.items():
-                if len(episodes) >= 3:  # Need pattern of 3+ episodes
-                    concept_id = self.add_concept(
-                        concept_name=f"pattern_{event_type}",
-                        concept_type="learned_pattern",
-                        definition=f"Learned pattern from {len(episodes)} high-significance episodes",
-                        confidence_score=sum(e[2] for e in episodes) / len(episodes)
-                    )
-
-                    # Mark episodes as consolidated
-                    for episode in episodes:
-                        conn.execute("UPDATE episodic_memory SET consolidated_to_semantic = 1 WHERE id = ?", (episode[3],))
-
-                    stats["promoted_to_semantic"] += 1
+            """).fetchall()
 
             conn.commit()
 
-            return stats
+        # Phase 2: promotions, each on its own short-lived connection
+        promoted = []
+        for row in promotable:
+            episode_id = self.add_episode(
+                event_type="promoted_from_working",
+                episode_data={
+                    "content": row["content"],
+                    "context": row["context_key"],
+                },
+                significance_score=min(row["access_count"] / 10.0, 1.0),
+                entity_id=row["entity_id"],
+            )
+            promoted.append((episode_id, row["id"]))
+
+        episode_groups = defaultdict(list)
+        for row in episode_rows:
+            episode_groups[row[0]].append(row)
+
+        consolidated_ids = []
+        for event_type, episodes in episode_groups.items():
+            if len(episodes) >= 3:  # Need pattern of 3+ episodes
+                self.add_concept(
+                    concept_name=f"pattern_{event_type}",
+                    concept_type="learned_pattern",
+                    definition=f"Learned pattern from {len(episodes)} high-significance episodes",
+                    confidence_score=sum(e[2] for e in episodes) / len(episodes),
+                )
+                consolidated_ids.extend(e[3] for e in episodes)
+                stats["promoted_to_semantic"] += 1
+
+        # Phase 3: bookkeeping marks in a fresh connection
+        if promoted or consolidated_ids:
+            with self._connect() as conn:
+                for episode_id, wm_id in promoted:
+                    conn.execute(
+                        "UPDATE working_memory SET promoted_to = ? WHERE id = ?",
+                        (f"episodic:{episode_id}", wm_id),
+                    )
+                for ep_id in consolidated_ids:
+                    conn.execute(
+                        "UPDATE episodic_memory SET consolidated_to_semantic = 1 WHERE id = ?",
+                        (ep_id,),
+                    )
+                conn.commit()
+            stats["promoted_to_episodic"] = len(promoted)
+
+        return stats
 
     async def analyze_memory_usage_patterns(self) -> Dict:
         """Analyze memory usage across all tiers."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
 
             analysis = {
@@ -534,7 +634,7 @@ class SAFLAOrchestrator:
                 "episodic_memory": {},
                 "semantic_memory": {},
                 "procedural_memory": {},
-                "recommendations": []
+                "recommendations": [],
             }
 
             # Working memory stats
@@ -585,12 +685,21 @@ class SAFLAOrchestrator:
 
             # Generate recommendations
             if analysis["working_memory"]["expired"] > 10:
-                analysis["recommendations"].append("High number of expired working memory items - consider running cleanup")
+                analysis["recommendations"].append(
+                    "High number of expired working memory items - consider running cleanup"
+                )
 
             if analysis["episodic_memory"]["total"] > 1000:
-                analysis["recommendations"].append("Large episodic memory - consider consolidating to semantic")
+                analysis["recommendations"].append(
+                    "Large episodic memory - consider consolidating to semantic"
+                )
 
-            if analysis["procedural_memory"]["avg_success_rate"] and analysis["procedural_memory"]["avg_success_rate"] < 0.5:
-                analysis["recommendations"].append("Low average skill success rate - review and refine procedures")
+            if (
+                analysis["procedural_memory"]["avg_success_rate"]
+                and analysis["procedural_memory"]["avg_success_rate"] < 0.5
+            ):
+                analysis["recommendations"].append(
+                    "Low average skill success rate - review and refine procedures"
+                )
 
             return analysis

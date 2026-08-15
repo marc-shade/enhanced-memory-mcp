@@ -10,8 +10,7 @@ Part of RAG Tier 1 Strategy - Week 1, Day 3-4
 
 import sys
 import requests
-import json
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 QDRANT_URL = "http://localhost:6333"
 

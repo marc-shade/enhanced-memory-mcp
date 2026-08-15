@@ -6,8 +6,14 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PATH="${AGENTIC_SYSTEM_PATH:-/mnt/agentic-system}/.venv"
-LOG_FILE="${SCRIPT_DIR}/startup.log"
+# The venv lives beside this script unless MEMORY_VENV_PATH says otherwise.
+VENV_PATH="${MEMORY_VENV_PATH:-${SCRIPT_DIR}/.venv}"
+LOG_FILE="${MEMORY_LOG_FILE:-${SCRIPT_DIR}/startup.log}"
+
+if [ ! -x "$VENV_PATH/bin/python" ]; then
+    echo "[$(date)] venv not found at $VENV_PATH -- run setup first" >> "$LOG_FILE"
+    exit 1
+fi
 
 # Suppress Python warnings
 export PYTHONWARNINGS="ignore"

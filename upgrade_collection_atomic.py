@@ -5,7 +5,6 @@ Uses collection aliases for instant switchover to sparse vector support
 """
 import asyncio
 import logging
-from datetime import datetime
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     VectorParams, Distance, SparseVectorParams, SparseIndexParams,

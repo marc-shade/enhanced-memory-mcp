@@ -2,7 +2,7 @@
 Test reasoning prioritization integration
 """
 import asyncio
-from reasoning_prioritizer import get_prioritizer, ContentCategory
+from reasoning_prioritizer import get_prioritizer
 
 async def test_prioritizer():
     print("\n=== Testing Reasoning Prioritizer ===\n")

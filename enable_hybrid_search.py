@@ -11,8 +11,7 @@ Expected improvement: +20-30% recall with minimal latency overhead
 
 import sys
 import requests
-import json
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 # Qdrant configuration
 QDRANT_URL = "http://localhost:6333"

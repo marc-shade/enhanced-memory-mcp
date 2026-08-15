@@ -5,7 +5,6 @@ Supports Google, OpenAI, MLX, Ollama, and other embedding providers
 with automatic fallback, benchmarking, and provider comparison
 """
 
-import asyncio
 import logging
 import os
 import time
@@ -19,6 +18,7 @@ logger = logging.getLogger("embedding-providers")
 
 class ProviderType(Enum):
     """Embedding provider types"""
+
     GOOGLE = "google"
     OPENAI = "openai"
     MLX = "mlx"
@@ -30,6 +30,7 @@ class ProviderType(Enum):
 @dataclass
 class EmbeddingResult:
     """Result from embedding generation"""
+
     embedding: List[float]
     provider: str
     model: str
@@ -72,7 +73,8 @@ class GoogleProvider(EmbeddingProvider):
 
     def is_available(self) -> bool:
         try:
-            import google.generativeai as genai
+            import google.generativeai as genai  # noqa: F401
+
             api_key = os.getenv(self.config.get("api_key_env", "GOOGLE_API_KEY"))
             return api_key is not None
         except ImportError:
@@ -92,22 +94,22 @@ class GoogleProvider(EmbeddingProvider):
 
             text = self._truncate_text(text)
             result = genai.embed_content(
-                model=self.model,
-                content=text,
-                task_type=self.task_type
+                model=self.model, content=text, task_type=self.task_type
             )
 
             latency_ms = (time.time() - start_time) * 1000
-            embedding = result['embedding']
+            embedding = result["embedding"]
 
-            logger.debug(f"Google embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
+            logger.debug(
+                f"Google embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms"
+            )
 
             return EmbeddingResult(
                 embedding=embedding,
                 provider="google",
                 model=self.model,
                 dimensions=len(embedding),
-                latency_ms=latency_ms
+                latency_ms=latency_ms,
             )
 
         except Exception as e:
@@ -125,7 +127,8 @@ class OpenAIProvider(EmbeddingProvider):
 
     def is_available(self) -> bool:
         try:
-            import openai
+            import openai  # noqa: F401
+
             api_key = os.getenv(self.config.get("api_key_env", "OPENAI_API_KEY"))
             return api_key is not None
         except ImportError:
@@ -145,19 +148,21 @@ class OpenAIProvider(EmbeddingProvider):
 
             text = self._truncate_text(text)
             response = client.embeddings.create(
-                model=self.model,
-                input=text,
-                dimensions=self.dimensions
+                model=self.model, input=text, dimensions=self.dimensions
             )
 
             latency_ms = (time.time() - start_time) * 1000
             embedding = response.data[0].embedding
 
             # Cost estimate (text-embedding-3-small: $0.02 per 1M tokens)
-            token_count = response.usage.total_tokens if hasattr(response, 'usage') else None
+            token_count = (
+                response.usage.total_tokens if hasattr(response, "usage") else None
+            )
             cost = (token_count / 1_000_000 * 0.02) if token_count else None
 
-            logger.debug(f"OpenAI embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
+            logger.debug(
+                f"OpenAI embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms"
+            )
 
             return EmbeddingResult(
                 embedding=embedding,
@@ -166,7 +171,7 @@ class OpenAIProvider(EmbeddingProvider):
                 dimensions=len(embedding),
                 latency_ms=latency_ms,
                 token_count=token_count,
-                cost_estimate=cost
+                cost_estimate=cost,
             )
 
         except Exception as e:
@@ -188,10 +193,11 @@ class MLXProvider(EmbeddingProvider):
 
     def is_available(self) -> bool:
         try:
-            import mlx.core as mx
+            import mlx.core as mx  # noqa: F401
             import platform
+
             # MLX only works on Apple Silicon
-            return platform.processor() == 'arm'
+            return platform.processor() == "arm"
         except ImportError:
             return False
 
@@ -200,7 +206,6 @@ class MLXProvider(EmbeddingProvider):
         if self._model is None:
             try:
                 from sentence_transformers import SentenceTransformer
-                import mlx.core as mx
 
                 # Load model with MLX backend
                 self._model = SentenceTransformer(self.model, device=self.device)
@@ -220,7 +225,9 @@ class MLXProvider(EmbeddingProvider):
 
             latency_ms = (time.time() - start_time) * 1000
 
-            logger.debug(f"MLX embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
+            logger.debug(
+                f"MLX embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms"
+            )
 
             return EmbeddingResult(
                 embedding=embedding,
@@ -228,7 +235,7 @@ class MLXProvider(EmbeddingProvider):
                 model=self.model,
                 dimensions=len(embedding),
                 latency_ms=latency_ms,
-                cost_estimate=0.0  # Local is free
+                cost_estimate=0.0,  # Local is free
             )
 
         except Exception as e:
@@ -241,8 +248,10 @@ class OllamaProvider(EmbeddingProvider):
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.model = config.get("model", "mxbai-embed-large")
-        self.dimensions = config.get("dimensions", 1024)  # mxbai-embed-large uses 1024 dimensions
+        self.model = config.get("model", "nomic-embed-text-v2-moe")
+        self.dimensions = config.get(
+            "dimensions", 768
+        )  # nomic-embed-text-v2-moe: 768d, MoE, 140ms
         self.base_url = config.get("base_url", "http://localhost:11434")
 
     def is_available(self) -> bool:
@@ -270,10 +279,7 @@ class OllamaProvider(EmbeddingProvider):
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.base_url}/api/embeddings",
-                    json={
-                        "model": self.model,
-                        "prompt": text
-                    }
+                    json={"model": self.model, "prompt": text},
                 )
 
                 if response.status_code != 200:
@@ -285,7 +291,9 @@ class OllamaProvider(EmbeddingProvider):
 
                 latency_ms = (time.time() - start_time) * 1000
 
-                logger.debug(f"Ollama embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
+                logger.debug(
+                    f"Ollama embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms"
+                )
 
                 return EmbeddingResult(
                     embedding=embedding,
@@ -293,7 +301,7 @@ class OllamaProvider(EmbeddingProvider):
                     model=self.model,
                     dimensions=len(embedding),
                     latency_ms=latency_ms,
-                    cost_estimate=0.0  # Local is free
+                    cost_estimate=0.0,  # Local is free
                 )
 
         except Exception as e:
@@ -311,7 +319,8 @@ class VoyageProvider(EmbeddingProvider):
 
     def is_available(self) -> bool:
         try:
-            import voyageai
+            import voyageai  # noqa: F401
+
             api_key = os.getenv(self.config.get("api_key_env", "VOYAGE_API_KEY"))
             return api_key is not None
         except ImportError:
@@ -335,14 +344,16 @@ class VoyageProvider(EmbeddingProvider):
             latency_ms = (time.time() - start_time) * 1000
             embedding = result.embeddings[0]
 
-            logger.debug(f"Voyage embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
+            logger.debug(
+                f"Voyage embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms"
+            )
 
             return EmbeddingResult(
                 embedding=embedding,
                 provider="voyage",
                 model=self.model,
                 dimensions=len(embedding),
-                latency_ms=latency_ms
+                latency_ms=latency_ms,
             )
 
         except Exception as e:
@@ -361,7 +372,8 @@ class CohereProvider(EmbeddingProvider):
 
     def is_available(self) -> bool:
         try:
-            import cohere
+            import cohere  # noqa: F401
+
             api_key = os.getenv(self.config.get("api_key_env", "COHERE_API_KEY"))
             return api_key is not None
         except ImportError:
@@ -381,22 +393,22 @@ class CohereProvider(EmbeddingProvider):
 
             text = self._truncate_text(text)
             response = client.embed(
-                texts=[text],
-                model=self.model,
-                input_type=self.input_type
+                texts=[text], model=self.model, input_type=self.input_type
             )
 
             latency_ms = (time.time() - start_time) * 1000
             embedding = response.embeddings[0]
 
-            logger.debug(f"Cohere embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms")
+            logger.debug(
+                f"Cohere embedding generated: {len(embedding)} dims in {latency_ms:.2f}ms"
+            )
 
             return EmbeddingResult(
                 embedding=embedding,
                 provider="cohere",
                 model=self.model,
                 dimensions=len(embedding),
-                latency_ms=latency_ms
+                latency_ms=latency_ms,
             )
 
         except Exception as e:
@@ -427,7 +439,7 @@ class EmbeddingManager:
             "mlx": MLXProvider,
             "ollama": OllamaProvider,
             "voyage": VoyageProvider,
-            "cohere": CohereProvider
+            "cohere": CohereProvider,
         }
 
         providers_config = self.config.get("providers", {})
@@ -445,9 +457,7 @@ class EmbeddingManager:
                     logger.warning(f"Failed to initialize {provider_name}: {e}")
 
     async def generate_embedding(
-        self,
-        text: str,
-        provider: Optional[str] = None
+        self, text: str, provider: Optional[str] = None
     ) -> Optional[EmbeddingResult]:
         """
         Generate embedding with automatic fallback
@@ -483,9 +493,7 @@ class EmbeddingManager:
         return None
 
     async def benchmark_providers(
-        self,
-        test_texts: List[str],
-        providers: Optional[List[str]] = None
+        self, test_texts: List[str], providers: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Benchmark multiple providers on test texts
@@ -503,7 +511,7 @@ class EmbeddingManager:
         results = {
             "providers": {},
             "test_count": len(test_texts),
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         for provider_name in providers:
@@ -516,7 +524,7 @@ class EmbeddingManager:
                 "failed": 0,
                 "latencies_ms": [],
                 "dimensions": None,
-                "total_cost": 0.0
+                "total_cost": 0.0,
             }
 
             for text in test_texts:
@@ -536,10 +544,14 @@ class EmbeddingManager:
                 provider_results["avg_latency_ms"] = sum(latencies) / len(latencies)
                 provider_results["min_latency_ms"] = min(latencies)
                 provider_results["max_latency_ms"] = max(latencies)
-                provider_results["median_latency_ms"] = sorted(latencies)[len(latencies) // 2]
+                provider_results["median_latency_ms"] = sorted(latencies)[
+                    len(latencies) // 2
+                ]
 
             results["providers"][provider_name] = provider_results
-            logger.info(f"Benchmark {provider_name}: {provider_results['successful']}/{len(test_texts)} successful")
+            logger.info(
+                f"Benchmark {provider_name}: {provider_results['successful']}/{len(test_texts)} successful"
+            )
 
         return results
 
@@ -558,5 +570,5 @@ class EmbeddingManager:
             "model": provider.config.get("model"),
             "dimensions": provider.config.get("dimensions"),
             "available": provider.is_available(),
-            "local": provider.config.get("local", False)
+            "local": provider.config.get("local", False),
         }

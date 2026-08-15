@@ -6,7 +6,6 @@ Test script to verify automatic contextual enrichment on entity creation.
 import asyncio
 import sys
 import logging
-from pathlib import Path
 import sqlite3
 
 # Set up logging

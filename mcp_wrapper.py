@@ -7,18 +7,15 @@ Implements proper MCP JSON-RPC protocol
 import sys
 import json
 import logging
-from pathlib import Path
 
 # Import the core server functionality
 from server import (
-    init_database_sync, create_entities, search_nodes,
-    read_graph, get_memory_status, create_relations,
-    DB_PATH
+    init_database_sync, DB_PATH
 )
 
 # Import context compression system
 try:
-    from compressed_context_integration import CompressedContextManager
+    from compressed_context_integration import CompressedContextManager  # noqa: F401
     CONTEXT_COMPRESSION_AVAILABLE = True
     logging.info("🗜️ Context compression system loaded in wrapper")
 except ImportError as e:

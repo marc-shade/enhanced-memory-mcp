@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, SparseVector
 from fastembed import SparseTextEmbedding
-import numpy as np
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

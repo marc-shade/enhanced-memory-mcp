@@ -13,7 +13,7 @@ Key features:
 
 import sqlite3
 from typing import List, Dict, Any, Optional, Set, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -97,7 +97,7 @@ class GraphTraversal:
             return []
 
         root_id = root['id']
-        root_type = root['entity_type']
+        root['entity_type']
 
         # Initialize traversal
         results = []

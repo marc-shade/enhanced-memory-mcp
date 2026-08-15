@@ -17,7 +17,6 @@ Expected Token Savings: 77k → 8.7k (89% reduction)
 
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-import re
 from difflib import SequenceMatcher
 
 from tool_catalog import (
@@ -26,7 +25,6 @@ from tool_catalog import (
     ToolTier,
     CATEGORIES,
     ALWAYS_LOAD,
-    get_tools_by_tier,
     get_tools_by_category,
 )
 

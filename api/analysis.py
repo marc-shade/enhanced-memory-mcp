@@ -5,7 +5,6 @@ Analysis and Pattern Detection API
 from typing import List, Dict, Any, Optional
 import sqlite3
 from pathlib import Path
-from datetime import datetime, timedelta
 
 DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
 

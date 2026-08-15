@@ -316,7 +316,7 @@ This implementation demonstrates the system's ability to:
 ## References
 
 - **Original Article**: [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
-- **Analysis**: `MCP_CODE_EXECUTION_ANALYSIS.md`
+- **Analysis**: `docs/_archive/MCP_CODE_EXECUTION_ANALYSIS.md` (repo root docs/_archive)
 - **Design**: `ENHANCED_MEMORY_CODE_EXEC_DESIGN.md`
 - **Status**: `MCP_CODE_EXEC_IMPLEMENTATION_COMPLETE.md`
 - **Ember Evolution**: `EMBER_SELF_IMPROVEMENT_2025-11-08.md`

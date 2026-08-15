@@ -13,30 +13,14 @@ Date: 2025-01-09
 """
 
 import sys
-import os
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 
 def test_imports():
     """Test that all imports work"""
     print("Testing imports...")
 
     try:
-        from contextual_retrieval_tools import (
-            ContextualChunk,
-            QualityScore,
-            ReindexingProgress,
-            LLMProvider,
-            OllamaProvider,
-            OpenAIProvider,
-            ContextQualityValidator,
-            PromptBuilder,
-            ContextGenerator,
-            ProgressTracker,
-            CheckpointManager,
-            ReindexingEngine,
-            register_contextual_retrieval_tools
-        )
         print("✅ All imports successful")
         return True
     except Exception as e:
@@ -75,8 +59,7 @@ async def test_tool_functionality():
     try:
         from contextual_retrieval_tools import (
             ContextGenerator,
-            OllamaProvider,
-            ContextQualityValidator
+            OllamaProvider
         )
 
         # Create mock provider

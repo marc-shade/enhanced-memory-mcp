@@ -16,7 +16,7 @@ enhanced-memory-mcp/
 ├── server.py                           # Working SQLite implementation
 ├── requirements.txt                     # Clean dependencies
 ├── README.md                           # Updated documentation
-├── comprehensive_test.py               # 76/76 tests passing
+├── comprehensive_test.py               # post-install gate (judge by exit code)
 ├── orchestrator_integration_test.py    # 4/4 integration tests passing
 ├── performance_test.py                 # Performance benchmarks
 ├── TEST_RESULTS_SUMMARY.md            # Test documentation

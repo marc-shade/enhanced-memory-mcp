@@ -12,11 +12,9 @@ Key Features:
 """
 
 import sqlite3
-import json
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from math import exp
 
 logger = logging.getLogger("emotional-memory")

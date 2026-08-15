@@ -8,7 +8,6 @@ Applies SQL migrations to the database with tracking and rollback capability.
 import sqlite3
 import sys
 from pathlib import Path
-from datetime import datetime
 
 # Configuration
 MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"

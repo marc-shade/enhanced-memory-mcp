@@ -17,7 +17,7 @@ Run: python3 test_agi_phase2.py
 import sys
 import sqlite3
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 # Add current directory to path
@@ -150,14 +150,14 @@ def test_causal_chain_traversal(entity_ids):
 
     try:
         # Create a chain: context → action → outcome
-        link1 = temporal.create_causal_link(
+        temporal.create_causal_link(
             cause_entity_id=entity_ids["test_context_production"],
             effect_entity_id=entity_ids["test_action_deploy"],
             relationship_type="contributory",
             strength=0.7
         )
 
-        link2 = temporal.create_causal_link(
+        temporal.create_causal_link(
             cause_entity_id=entity_ids["test_action_deploy"],
             effect_entity_id=entity_ids["test_outcome_success"],
             relationship_type="direct",

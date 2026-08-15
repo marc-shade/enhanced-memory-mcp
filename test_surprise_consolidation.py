@@ -13,7 +13,7 @@ from typing import List, Dict
 # Add path for imports
 sys.path.insert(0, '/mnt/agentic-system/mcp-servers/enhanced-memory-mcp')
 
-from surprise_memory import SurpriseBasedMemory, SurpriseScore, RetentionGate
+from surprise_memory import SurpriseBasedMemory, RetentionGate
 from surprise_consolidation import SurpriseConsolidator
 
 

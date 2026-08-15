@@ -11,7 +11,7 @@ Registers MCP tools for Letta-style memory blocks that agents can use to:
 
 import logging
 import os
-from typing import Dict, List, Any
+from typing import Dict, Any
 from letta_memory_blocks import MemoryBlockManager
 
 logger = logging.getLogger(__name__)

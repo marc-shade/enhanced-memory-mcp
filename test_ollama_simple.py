@@ -5,7 +5,6 @@ Directly tests Ollama API with mxbai-embed-large model
 """
 
 import requests
-import json
 import time
 
 

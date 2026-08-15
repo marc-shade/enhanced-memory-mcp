@@ -15,13 +15,41 @@ import asyncio
 import json
 import os
 import re
-from typing import List, Dict, Any, Optional, Callable, Set
+from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_memory_db_path(nmf=None) -> str:
+    """Resolve the SQLite memory.db path the same way server.py does.
+
+    Preference order:
+      1. An explicit path exposed by the nmf instance (`db_path` / `sqlite_path`).
+      2. ENHANCED_MEMORY_DB_PATH / MEMORY_DB_PATH env override.
+      3. ENHANCED_MEMORY_DIR / MEMORY_DIR env override + "memory.db".
+      4. Default ~/.claude/enhanced_memories/memory.db.
+    """
+    for attr in ("db_path", "sqlite_path", "database_path"):
+        candidate = getattr(nmf, attr, None) if nmf is not None else None
+        if candidate:
+            return os.path.expandvars(os.path.expanduser(str(candidate)))
+
+    db_override = os.environ.get("ENHANCED_MEMORY_DB_PATH") or os.environ.get(
+        "MEMORY_DB_PATH"
+    )
+    if db_override:
+        return os.path.expandvars(os.path.expanduser(db_override))
+
+    dir_override = os.environ.get("ENHANCED_MEMORY_DIR") or os.environ.get("MEMORY_DIR")
+    if dir_override:
+        base = os.path.expandvars(os.path.expanduser(dir_override))
+    else:
+        base = os.path.join(os.path.expanduser("~"), ".claude", "enhanced_memories")
+    return os.path.join(base, "memory.db")
 
 
 # ============================================================================
@@ -32,6 +60,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ContextualChunk:
     """Chunk with contextual prefix"""
+
     chunk_id: str
     entity_id: str
     original_content: str
@@ -48,13 +77,14 @@ class ContextualChunk:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         result = asdict(self)
-        result['generation_timestamp'] = self.generation_timestamp.isoformat()
+        result["generation_timestamp"] = self.generation_timestamp.isoformat()
         return result
 
 
 @dataclass
 class QualityScore:
     """Context quality assessment"""
+
     overall_score: float  # 0.0-1.0
     length_score: float
     relevance_score: float
@@ -71,6 +101,7 @@ class QualityScore:
 @dataclass
 class ReindexingProgress:
     """Re-indexing progress tracking"""
+
     total_entities: int
     processed_entities: int
     failed_entities: List[str]
@@ -85,9 +116,9 @@ class ReindexingProgress:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         result = asdict(self)
-        result['start_time'] = self.start_time.isoformat()
-        result['last_update_time'] = self.last_update_time.isoformat()
-        result['estimated_completion'] = self.estimated_completion.isoformat()
+        result["start_time"] = self.start_time.isoformat()
+        result["last_update_time"] = self.last_update_time.isoformat()
+        result["estimated_completion"] = self.estimated_completion.isoformat()
         return result
 
 
@@ -101,10 +132,7 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 150,
-        temperature: float = 0.3
+        self, prompt: str, max_tokens: int = 150, temperature: float = 0.3
     ) -> str:
         """Generate text from prompt"""
 
@@ -125,10 +153,7 @@ class OllamaProvider(LLMProvider):
         self.base_url = "http://localhost:11434"
 
     async def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 150,
-        temperature: float = 0.3
+        self, prompt: str, max_tokens: int = 150, temperature: float = 0.3
     ) -> str:
         """Generate using Ollama API"""
         import aiohttp
@@ -138,10 +163,7 @@ class OllamaProvider(LLMProvider):
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens
-            }
+            "options": {"temperature": temperature, "num_predict": max_tokens},
         }
 
         try:
@@ -168,11 +190,7 @@ class OllamaProvider(LLMProvider):
 class OpenAIProvider(LLMProvider):
     """OpenAI GPT provider"""
 
-    def __init__(
-        self,
-        api_key: str = None,
-        model: str = "gpt-3.5-turbo"
-    ):
+    def __init__(self, api_key: str = None, model: str = "gpt-3.5-turbo"):
         self.model = model
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
 
@@ -180,10 +198,7 @@ class OpenAIProvider(LLMProvider):
             raise ValueError("OpenAI API key required")
 
     async def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 150,
-        temperature: float = 0.3
+        self, prompt: str, max_tokens: int = 150, temperature: float = 0.3
     ) -> str:
         """Generate using OpenAI API"""
         import aiohttp
@@ -191,16 +206,19 @@ class OpenAIProvider(LLMProvider):
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         data = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": "You are a helpful assistant that generates contextual information for text chunks."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that generates contextual information for text chunks.",
+                },
+                {"role": "user", "content": prompt},
             ],
             "max_tokens": max_tokens,
-            "temperature": temperature
+            "temperature": temperature,
         }
 
         try:
@@ -211,7 +229,9 @@ class OpenAIProvider(LLMProvider):
                         return result["choices"][0]["message"]["content"].strip()
                     else:
                         error_text = await response.text()
-                        raise Exception(f"OpenAI API error: {response.status} - {error_text}")
+                        raise Exception(
+                            f"OpenAI API error: {response.status} - {error_text}"
+                        )
         except Exception as e:
             logger.error(f"OpenAI generation failed: {e}")
             raise
@@ -236,9 +256,33 @@ class ContextQualityValidator:
     def __init__(self):
         # Common English stop words (simplified set)
         self.stop_words = {
-            'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
-            'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
-            'to', 'was', 'will', 'with', 'this', 'these', 'those'
+            "a",
+            "an",
+            "and",
+            "are",
+            "as",
+            "at",
+            "be",
+            "by",
+            "for",
+            "from",
+            "has",
+            "he",
+            "in",
+            "is",
+            "it",
+            "its",
+            "of",
+            "on",
+            "that",
+            "the",
+            "to",
+            "was",
+            "will",
+            "with",
+            "this",
+            "these",
+            "those",
         }
 
         # Generic phrases that indicate low specificity
@@ -248,7 +292,7 @@ class ContextQualityValidator:
             "this explains",
             "this is about",
             "this discusses",
-            "this covers"
+            "this covers",
         ]
 
     def extract_key_terms(self, text: str) -> Set[str]:
@@ -261,12 +305,11 @@ class ContextQualityValidator:
         - Keep words with 3+ characters
         """
         # Tokenize
-        words = re.findall(r'\b[a-z]+\b', text.lower())
+        words = re.findall(r"\b[a-z]+\b", text.lower())
 
         # Filter stop words and short words
         key_terms = {
-            word for word in words
-            if word not in self.stop_words and len(word) >= 3
+            word for word in words if word not in self.stop_words and len(word) >= 3
         }
 
         return key_terms
@@ -313,12 +356,12 @@ class ContextQualityValidator:
         Returns: score 0.0-1.0
         """
         # Check for capital letters at start
-        sentences = [s.strip() for s in context.split('.') if s.strip()]
+        sentences = [s.strip() for s in context.split(".") if s.strip()]
         if not sentences:
             return 0.0
 
         has_capitals = any(s and s[0].isupper() for s in sentences)
-        ends_with_period = context.strip().endswith('.')
+        ends_with_period = context.strip().endswith(".")
 
         if has_capitals and ends_with_period:
             return 1.0
@@ -337,8 +380,7 @@ class ContextQualityValidator:
 
         # Count generic phrases
         generic_count = sum(
-            1 for phrase in self.generic_phrases
-            if phrase in context_lower
+            1 for phrase in self.generic_phrases if phrase in context_lower
         )
 
         # Penalty for each generic phrase
@@ -346,11 +388,7 @@ class ContextQualityValidator:
 
         return specificity
 
-    def validate(
-        self,
-        context: str,
-        chunk: str
-    ) -> QualityScore:
+    def validate(self, context: str, chunk: str) -> QualityScore:
         """
         Validate context quality
 
@@ -364,10 +402,10 @@ class ContextQualityValidator:
 
         # Calculate overall score (weighted average)
         overall = (
-            length_score * 0.2 +
-            relevance_score * 0.4 +
-            coherence_score * 0.2 +
-            specificity_score * 0.2
+            length_score * 0.2
+            + relevance_score * 0.4
+            + coherence_score * 0.2
+            + specificity_score * 0.2
         )
 
         # Collect issues
@@ -398,7 +436,7 @@ class ContextQualityValidator:
             coherence_score=coherence_score,
             specificity_score=specificity_score,
             issues=issues,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
 
@@ -433,10 +471,7 @@ for this information. Be specific and include key terms.
 Contextual Prefix:"""
 
     def build_context_prompt(
-        self,
-        chunk: str,
-        document: str,
-        metadata: Dict[str, Any]
+        self, chunk: str, document: str, metadata: Dict[str, Any]
     ) -> str:
         """
         Build prompt for generating contextual prefix
@@ -456,10 +491,7 @@ Contextual Prefix:"""
             document = document[:max_doc_length] + "..."
 
         return self.CONTEXT_PROMPT_TEMPLATE.format(
-            title=title,
-            doc_type=doc_type,
-            document=document,
-            chunk=chunk
+            title=title, doc_type=doc_type, document=document, chunk=chunk
         )
 
 
@@ -471,22 +503,14 @@ Contextual Prefix:"""
 class ContextGenerator:
     """Generate contextual prefixes for chunks"""
 
-    def __init__(
-        self,
-        llm_provider: LLMProvider,
-        max_retries: int = 3
-    ):
+    def __init__(self, llm_provider: LLMProvider, max_retries: int = 3):
         self.llm = llm_provider
         self.prompt_builder = PromptBuilder()
         self.validator = ContextQualityValidator()
         self.max_retries = max_retries
 
     async def generate_context(
-        self,
-        chunk: str,
-        document: str,
-        metadata: Dict[str, Any],
-        entity_id: str = None
+        self, chunk: str, document: str, metadata: Dict[str, Any], entity_id: str = None
     ) -> ContextualChunk:
         """
         Generate context for chunk
@@ -503,20 +527,18 @@ class ContextGenerator:
 
         # Build prompt
         prompt = self.prompt_builder.build_context_prompt(
-            chunk=chunk,
-            document=document,
-            metadata=metadata
+            chunk=chunk, document=document, metadata=metadata
         )
 
         # Generate with retries
         for attempt in range(self.max_retries):
             try:
                 # Call LLM
-                logger.debug(f"Generating context (attempt {attempt + 1}/{self.max_retries})")
+                logger.debug(
+                    f"Generating context (attempt {attempt + 1}/{self.max_retries})"
+                )
                 context = await self.llm.generate(
-                    prompt=prompt,
-                    max_tokens=150,
-                    temperature=0.3
+                    prompt=prompt, max_tokens=150, temperature=0.3
                 )
 
                 # Validate quality
@@ -544,7 +566,7 @@ class ContextGenerator:
                         quality_score=quality.overall_score,
                         token_count=token_count,
                         llm_provider=self.llm.__class__.__name__,
-                        llm_model=self.llm.get_model_name()
+                        llm_model=self.llm.get_model_name(),
                     )
 
                 # Quality too low - retry
@@ -561,17 +583,16 @@ class ContextGenerator:
                     # Last retry - return empty context
                     break
                 # Wait before retry (exponential backoff)
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
         # All retries failed - return chunk without context
-        logger.warning("All context generation attempts failed, using chunk without context")
+        logger.warning(
+            "All context generation attempts failed, using chunk without context"
+        )
         return self._create_empty_context(chunk, metadata, entity_id)
 
     def _create_empty_context(
-        self,
-        chunk: str,
-        metadata: Dict[str, Any],
-        entity_id: str = None
+        self, chunk: str, metadata: Dict[str, Any], entity_id: str = None
     ) -> ContextualChunk:
         """Create chunk without context (fallback)"""
         return ContextualChunk(
@@ -586,7 +607,7 @@ class ContextGenerator:
             quality_score=0.0,
             token_count=0,
             llm_provider=self.llm.__class__.__name__,
-            llm_model=self.llm.get_model_name()
+            llm_model=self.llm.get_model_name(),
         )
 
 
@@ -607,13 +628,7 @@ class ProgressTracker:
         self.token_count = 0
         self.cost = 0.0
 
-    def update(
-        self,
-        entity_id: str,
-        success: bool,
-        tokens: int = 0,
-        cost: float = 0.0
-    ):
+    def update(self, entity_id: str, success: bool, tokens: int = 0, cost: float = 0.0):
         """Update progress"""
         self.processed += 1
         self.last_update = datetime.now()
@@ -646,7 +661,7 @@ class ProgressTracker:
             status=status,
             avg_time_per_entity=avg_time,
             total_tokens_used=self.token_count,
-            estimated_cost=self.cost
+            estimated_cost=self.cost,
         )
 
     def get_percentage(self) -> float:
@@ -670,12 +685,12 @@ class CheckpointManager:
         checkpoint = progress.to_dict()
 
         try:
-            with open(self.checkpoint_file, 'w') as f:
+            with open(self.checkpoint_file, "w") as f:
                 json.dump(checkpoint, f, indent=2)
 
             logger.info(
                 f"Checkpoint saved: {progress.processed_entities}/"
-                f"{progress.total_entities} ({progress.processed_entities/progress.total_entities*100:.1f}%)"
+                f"{progress.total_entities} ({progress.processed_entities / progress.total_entities * 100:.1f}%)"
             )
         except Exception as e:
             logger.error(f"Failed to save checkpoint: {e}")
@@ -686,9 +701,11 @@ class CheckpointManager:
             return None
 
         try:
-            with open(self.checkpoint_file, 'r') as f:
+            with open(self.checkpoint_file, "r") as f:
                 checkpoint = json.load(f)
-                logger.info(f"Checkpoint loaded: {checkpoint.get('processed_entities', 0)} entities processed")
+                logger.info(
+                    f"Checkpoint loaded: {checkpoint.get('processed_entities', 0)} entities processed"
+                )
                 return checkpoint
         except Exception as e:
             logger.error(f"Failed to load checkpoint: {e}")
@@ -716,18 +733,17 @@ class ReindexingEngine:
         self,
         context_generator: ContextGenerator,
         nmf,  # NeuralMemoryFabric instance
-        max_workers: int = 10
+        max_workers: int = 10,
+        db_path: Optional[str] = None,
     ):
         self.generator = context_generator
         self.nmf = nmf
         self.max_workers = max_workers
         self.checkpoint = CheckpointManager()
         self.tracker = None
+        self.db_path = db_path or _resolve_memory_db_path(nmf)
 
-    async def reindex_all(
-        self,
-        resume: bool = True
-    ) -> Dict[str, Any]:
+    async def reindex_all(self, resume: bool = True) -> Dict[str, Any]:
         """
         Re-index all entities with contextual prefixes
 
@@ -758,7 +774,7 @@ class ReindexingEngine:
                 "total_entities": 0,
                 "processed": 0,
                 "failed": 0,
-                "message": "No entities to process"
+                "message": "No entities to process",
             }
 
         # Resume from checkpoint
@@ -789,7 +805,7 @@ class ReindexingEngine:
                 return await self._process_entity(entity)
 
         for i in range(0, len(entities_to_process), batch_size):
-            batch = entities_to_process[i:i + batch_size]
+            batch = entities_to_process[i : i + batch_size]
             batch_num = (i // batch_size) + 1
 
             logger.info(f"Processing batch {batch_num} ({len(batch)} entities)")
@@ -810,7 +826,7 @@ class ReindexingEngine:
                         entity_name,
                         result.get("success", False),
                         tokens=result.get("tokens", 0),
-                        cost=result.get("cost", 0.0)
+                        cost=result.get("cost", 0.0),
                     )
 
             # Save checkpoint
@@ -850,26 +866,78 @@ class ReindexingEngine:
             "duration_seconds": duration,
             "total_tokens_used": self.tracker.token_count,
             "estimated_cost": self.tracker.cost,
-            "progress": progress.to_dict()
+            "progress": progress.to_dict(),
         }
 
-    async def _get_all_entities(self) -> List[Dict]:
-        """Get all entities from database"""
+    async def _get_all_entities(self, limit: Optional[int] = None) -> List[Dict]:
+        """Load all entities (name, entity_type, observations) from the live
+        SQLite memory.db that the server already uses.
+
+        Reads the real `entities` table and joins plain-text `observations.content`
+        per entity. Read-only. Returns a list of dicts shaped for `_process_entity`:
+        ``{"id", "name", "entity_type", "observations": [str, ...]}``. Runs the
+        blocking sqlite work in a thread so the event loop is not stalled.
+        """
+
+        def _read() -> List[Dict]:
+            import sqlite3
+
+            db_path = self.db_path
+            if not db_path or not os.path.exists(db_path):
+                logger.warning("_get_all_entities: memory.db not found at %s", db_path)
+                return []
+
+            conn = sqlite3.connect(db_path, timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            try:
+                # Confirm the expected schema exists before querying.
+                tables = {
+                    r[0]
+                    for r in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                }
+                if "entities" not in tables:
+                    logger.warning("_get_all_entities: no 'entities' table present")
+                    return []
+
+                has_obs = "observations" in tables
+                sql = (
+                    "SELECT e.id AS id, e.name AS name, e.entity_type AS etype, "
+                    + (
+                        "(SELECT GROUP_CONCAT(o.content, char(10)) "
+                        "FROM observations o WHERE o.entity_id = e.id) AS obs"
+                        if has_obs
+                        else "'' AS obs"
+                    )
+                    + " FROM entities e ORDER BY e.id ASC"
+                )
+                if limit is not None:
+                    sql += " LIMIT ?"
+                    rows = conn.execute(sql, (limit,)).fetchall()
+                else:
+                    rows = conn.execute(sql).fetchall()
+            finally:
+                conn.close()
+
+            entities: List[Dict] = []
+            for r in rows:
+                obs_blob = r["obs"] or ""
+                observations = [line for line in obs_blob.split("\n") if line.strip()]
+                entities.append(
+                    {
+                        "id": r["id"],
+                        "name": r["name"] or f"entity_{r['id']}",
+                        "entity_type": r["etype"],
+                        "observations": observations,
+                    }
+                )
+            return entities
+
         try:
-            # Use NMF to search for all entities
-            # We'll do a broad search and get all results
-            from neural_memory_fabric import NeuralMemoryFabric
-
-            # Get all entities by searching with empty/broad query
-            # This is a temporary approach - NMF should have a get_all method
-            results = []
-
-            # For now, we'll return empty list as placeholder
-            # This will be filled in when we integrate with actual NMF
-            logger.warning("_get_all_entities is using placeholder implementation")
-
-            return results
-
+            entities = await asyncio.to_thread(_read)
+            logger.info("_get_all_entities: loaded %d entities", len(entities))
+            return entities
         except Exception as e:
             logger.error(f"Failed to get entities: {e}")
             return []
@@ -896,20 +964,19 @@ class ReindexingEngine:
             document = " ".join(observations)
 
             # Get metadata
-            metadata = {
-                "title": entity_id,
-                "type": entity.get("entityType", "unknown")
-            }
+            metadata = {"title": entity_id, "type": entity.get("entityType", "unknown")}
 
             # Generate context for first observation (or combine all)
             # For simplicity, we'll contextualize the combined observations
-            primary_observation = observations[0] if len(observations) == 1 else document[:500]
+            primary_observation = (
+                observations[0] if len(observations) == 1 else document[:500]
+            )
 
             contextual_chunk = await self.generator.generate_context(
                 chunk=primary_observation,
                 document=document,
                 metadata=metadata,
-                entity_id=entity_id
+                entity_id=entity_id,
             )
 
             # Update entity with contextualized content
@@ -929,7 +996,7 @@ class ReindexingEngine:
                 "success": True,
                 "tokens": total_tokens,
                 "cost": cost,
-                "quality": contextual_chunk.quality_score
+                "quality": contextual_chunk.quality_score,
             }
 
         except Exception as e:
@@ -968,7 +1035,7 @@ def register_contextual_retrieval_tools(app, nmf):
         chunk: str,
         document: str,
         metadata: Optional[Dict[str, Any]] = None,
-        max_words: int = 100
+        max_words: int = 100,
     ) -> Dict[str, Any]:
         """
         Generate contextual prefix for a single chunk
@@ -987,9 +1054,7 @@ def register_contextual_retrieval_tools(app, nmf):
                 metadata = {}
 
             contextual_chunk = await context_generator.generate_context(
-                chunk=chunk,
-                document=document,
-                metadata=metadata
+                chunk=chunk, document=document, metadata=metadata
             )
 
             return {
@@ -1002,23 +1067,17 @@ def register_contextual_retrieval_tools(app, nmf):
                 "metadata": {
                     "llm_provider": contextual_chunk.llm_provider,
                     "llm_model": contextual_chunk.llm_model,
-                    "timestamp": contextual_chunk.generation_timestamp.isoformat()
-                }
+                    "timestamp": contextual_chunk.generation_timestamp.isoformat(),
+                },
             }
 
         except Exception as e:
             logger.error(f"Context generation failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "chunk": chunk
-            }
+            return {"success": False, "error": str(e), "chunk": chunk}
 
     @app.tool()
     async def reindex_with_context(
-        batch_size: int = 10,
-        max_workers: int = 10,
-        resume: bool = True
+        batch_size: int = 10, max_workers: int = 10, resume: bool = True
     ) -> Dict[str, Any]:
         """
         Re-index all entities with contextual prefixes
@@ -1042,10 +1101,7 @@ def register_contextual_retrieval_tools(app, nmf):
 
         except Exception as e:
             logger.error(f"Re-indexing failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def get_reindexing_progress() -> Dict[str, Any]:
@@ -1063,21 +1119,18 @@ def register_contextual_retrieval_tools(app, nmf):
                 return {
                     "success": True,
                     "in_progress": checkpoint.get("status") == "in_progress",
-                    "progress": checkpoint
+                    "progress": checkpoint,
                 }
             else:
                 return {
                     "success": True,
                     "in_progress": False,
-                    "message": "No re-indexing in progress"
+                    "message": "No re-indexing in progress",
                 }
 
         except Exception as e:
             logger.error(f"Failed to get progress: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     @app.tool()
     async def get_contextual_retrieval_stats() -> Dict[str, Any]:
@@ -1092,7 +1145,9 @@ def register_contextual_retrieval_tools(app, nmf):
             "llm_provider": llm_provider.__class__.__name__,
             "llm_model": llm_provider.get_model_name(),
             "max_workers": reindexing_engine.max_workers,
-            "checkpoint_available": os.path.exists(reindexing_engine.checkpoint.checkpoint_file)
+            "checkpoint_available": os.path.exists(
+                reindexing_engine.checkpoint.checkpoint_file
+            ),
         }
 
     logger.info("Contextual Retrieval tools registered successfully")

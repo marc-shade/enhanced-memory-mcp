@@ -5,7 +5,6 @@ import sys
 sys.path.insert(0, '/mnt/agentic-system/mcp-servers/enhanced-memory-mcp')
 
 from memory_client import MemoryClient
-import json
 
 client = MemoryClient()
 

@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from fastmcp import FastMCP
 
-from neural_memory_fabric import get_nmf, RetrievalMode
+from neural_memory_fabric import get_nmf
 
 logger = logging.getLogger("nmf-tools")
 
@@ -21,7 +21,7 @@ def register_nmf_tools(app: FastMCP):
         content: str,
         agent_id: str = "default",
         tags: List[str] = None,
-        metadata: Dict[str, Any] = None
+        metadata: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """
         Store a new memory in the Neural Memory Fabric.
@@ -41,7 +41,7 @@ def register_nmf_tools(app: FastMCP):
         if metadata is None:
             metadata = {}
         if tags:
-            metadata['tags'] = tags
+            metadata["tags"] = tags
 
         result = await nmf.remember(content, metadata, agent_id)
         return result
@@ -51,7 +51,7 @@ def register_nmf_tools(app: FastMCP):
         query: str,
         mode: str = "hybrid",
         agent_id: Optional[str] = None,
-        limit: int = 10
+        limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve memories from the Neural Memory Fabric.
@@ -70,10 +70,7 @@ def register_nmf_tools(app: FastMCP):
         return results
 
     @app.tool()
-    async def nmf_open_block(
-        agent_id: str,
-        block_name: str
-    ) -> Dict[str, Any]:
+    async def nmf_open_block(agent_id: str, block_name: str) -> Dict[str, Any]:
         """
         Load a memory block into context (Letta-style).
 
@@ -90,9 +87,7 @@ def register_nmf_tools(app: FastMCP):
 
     @app.tool()
     async def nmf_edit_block(
-        agent_id: str,
-        block_name: str,
-        new_value: str
+        agent_id: str, block_name: str, new_value: str
     ) -> Dict[str, Any]:
         """
         Edit a memory block (Letta-style).
@@ -110,10 +105,7 @@ def register_nmf_tools(app: FastMCP):
         return result
 
     @app.tool()
-    async def nmf_close_block(
-        agent_id: str,
-        block_name: str
-    ) -> Dict[str, Any]:
+    async def nmf_close_block(agent_id: str, block_name: str) -> Dict[str, Any]:
         """
         Close a memory block (remove from active context).
 
@@ -124,12 +116,9 @@ def register_nmf_tools(app: FastMCP):
         Returns:
             Confirmation
         """
-        # For now, this is a no-op (blocks are automatically managed)
-        # In future: could implement LRU eviction
-        return {
-            'success': True,
-            'message': f'Block {block_name} closed for agent {agent_id}'
-        }
+        nmf = await get_nmf()
+        result = await nmf.close_block(agent_id, block_name)
+        return result
 
     @app.tool()
     async def nmf_get_status() -> Dict[str, Any]:
@@ -158,21 +147,31 @@ def register_nmf_tools(app: FastMCP):
 
         # Query SQLite for agent's blocks
         cursor = nmf.sqlite_conn.cursor()
-        cursor.execute('''
-            SELECT block_name, block_value, version, last_updated, persistence
+        cursor.execute(
+            """
+            SELECT block_name, block_value, version, last_updated, persistence,
+                   is_open, closed_at
             FROM nmf_memory_blocks
             WHERE agent_id = ?
-        ''', (agent_id,))
+        """,
+            (agent_id,),
+        )
 
         blocks = []
         for row in cursor.fetchall():
-            blocks.append({
-                'block_name': row[0],
-                'value_preview': row[1][:100] + '...' if len(row[1]) > 100 else row[1],
-                'version': row[2],
-                'last_updated': row[3],
-                'persistence': row[4]
-            })
+            blocks.append(
+                {
+                    "block_name": row[0],
+                    "value_preview": row[1][:100] + "..."
+                    if len(row[1]) > 100
+                    else row[1],
+                    "version": row[2],
+                    "last_updated": row[3],
+                    "persistence": row[4],
+                    "is_open": bool(row[5]),
+                    "closed_at": row[6],
+                }
+            )
 
         return blocks
 

@@ -27,7 +27,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         relationship_type: str = "direct",
         strength: float = 0.5,
         typical_delay_seconds: Optional[int] = None,
-        context_conditions: Optional[Dict[str, Any]] = None
+        context_conditions: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Create a causal link between two entities
@@ -45,16 +45,19 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         """
         temporal = TemporalReasoning()
         link_id = temporal.create_causal_link(
-            cause_entity_id, effect_entity_id,
-            relationship_type, strength,
-            typical_delay_seconds, context_conditions
+            cause_entity_id,
+            effect_entity_id,
+            relationship_type,
+            strength,
+            typical_delay_seconds,
+            context_conditions,
         )
         return {
             "status": "success",
             "link_id": link_id,
             "cause_id": cause_entity_id,
             "effect_id": effect_entity_id,
-            "strength": strength
+            "strength": strength,
         }
 
     @app.tool()
@@ -62,7 +65,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         entity_id: int,
         direction: str = "forward",
         depth: int = 5,
-        min_strength: float = 0.3
+        min_strength: float = 0.3,
     ) -> List[Dict[str, Any]]:
         """
         Get causal chain from an entity
@@ -83,8 +86,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def predict_outcome(
-        action_entity_id: int,
-        context: Optional[Dict[str, Any]] = None
+        action_entity_id: int, context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Predict likely outcomes of an action based on causal history
@@ -108,8 +110,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def detect_causal_pattern(
-        entity_ids: List[int],
-        time_window_hours: int = 24
+        entity_ids: List[int], time_window_hours: int = 24
     ) -> Optional[Dict[str, Any]]:
         """
         Detect if a sequence of entities represents a causal pattern
@@ -132,8 +133,8 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         chain_type: str,
         chain_name: Optional[str] = None,
         description: Optional[str] = None,
-        confidence: float = 0.5
-    ) -> Dict[str, str]:
+        confidence: float = 0.5,
+    ) -> Dict[str, Any]:
         """
         Create a temporal chain from a sequence of entities
 
@@ -157,7 +158,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
             "status": "success",
             "chain_id": chain_id,
             "chain_type": chain_type,
-            "entity_count": len(entity_ids)
+            "entity_count": len(entity_ids),
         }
 
     @app.tool()
@@ -180,8 +181,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def run_pattern_extraction(
-        time_window_hours: int = 24,
-        min_pattern_frequency: int = 3
+        time_window_hours: int = 24, min_pattern_frequency: int = 3
     ) -> Dict[str, Any]:
         """
         Extract patterns from recent episodic memories
@@ -202,12 +202,13 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         Run this periodically to consolidate learnings.
         """
         consolidation = ConsolidationEngine()
-        return consolidation.run_pattern_extraction(time_window_hours, min_pattern_frequency)
+        return consolidation.run_pattern_extraction(
+            time_window_hours, min_pattern_frequency
+        )
 
     @app.tool()
     def run_causal_discovery(
-        time_window_hours: int = 24,
-        min_confidence: float = 0.6
+        time_window_hours: int = 24, min_confidence: float = 0.6
     ) -> Dict[str, Any]:
         """
         Discover causal relationships from recent action outcomes
@@ -232,7 +233,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
 
     @app.tool()
     def run_memory_compression(
-        time_window_hours: int = 168  # 7 days
+        time_window_hours: int = 168,  # 7 days
     ) -> Dict[str, Any]:
         """
         Compress old low-importance memories
@@ -254,9 +255,7 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         return consolidation.run_memory_compression(time_window_hours)
 
     @app.tool()
-    def run_full_consolidation(
-        time_window_hours: int = 24
-    ) -> Dict[str, Any]:
+    def run_full_consolidation(time_window_hours: int = 24) -> Dict[str, Any]:
         """
         Run all consolidation processes (sleep-like consolidation)
 
@@ -295,4 +294,6 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         consolidation = ConsolidationEngine()
         return consolidation.get_consolidation_stats()
 
-    logger.info("✅ AGI Memory Phase 2 tools registered (Temporal Reasoning & Consolidation)")
+    logger.info(
+        "✅ AGI Memory Phase 2 tools registered (Temporal Reasoning & Consolidation)"
+    )

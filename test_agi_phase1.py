@@ -10,7 +10,6 @@ Tests:
 """
 
 import sys
-import asyncio
 from pathlib import Path
 
 # Add parent directory to path

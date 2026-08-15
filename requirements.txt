@@ -1,18 +1,31 @@
-# Enhanced Memory MCP Server Requirements
-# Pinned to exact versions for supply-chain safety (2026-02-22)
+# enhanced-memory-mcp — CORE runtime dependencies.
+#
+# This is the set the server needs to boot and serve the front door
+# (create_entities, search_nodes, semantic_recall, get_memory_status,
+# execute_code). Everything in requirements-optional.txt is genuinely optional:
+# each optional backend degrades with a logged reason rather than failing.
+#
+# Determined by installing these four into an empty Python 3.11 venv and booting
+# the server over stdio: 188 tools registered. Not copied from a working venv's
+# package list -- most of that list is transitive.
+#
+# Python: 3.11 verified. See RELEASE_NOTES.md for what was and was not tested.
 
-# Primary implementation (server.py) - uses standard library + extensions
+# MCP protocol + server framework.
+fastmcp==2.14.1
 
-# FastMCP implementation - for better MCP protocol compliance
-fastmcp==2.12.3
+# PINNED DELIBERATELY, NOT TRANSITIVELY. fastmcp will happily resolve mcp 2.x,
+# but mcp 2.0.0 removes the low-level server decorators and the _call_tool hook
+# that server.py patches for large results. Raising this pin requires re-testing
+# the result-meta patch at the bottom of server.py.
+mcp==1.25.0
 
-# Code execution security
-RestrictedPython==8.1  # Safe Python code compilation
-psutil==5.9.5          # Resource monitoring and limits
+# Pulled in by fastmcp, pinned to the version this release was verified against.
+pydantic==2.12.5
+httpx==0.28.1
 
-# RAG Tier 1 Strategy Dependencies
-sentence-transformers==4.1.0  # Re-ranking with cross-encoder
-redis==5.2.0                   # Cache layer for re-ranking and adaptive routing
-qdrant-client==1.15.1          # Hybrid search with BM25 + Vector
-anthropic==0.71.0              # Claude API for contextual prefix generation
-aiohttp==3.13.3                # SAFLA remote integration async HTTP client
+# nmf_config.yaml and the reasoning/NMF config loaders.
+PyYAML==6.0.3
+
+# Sandbox for the execute_code tool (sandbox/executor.py).
+RestrictedPython==8.1
