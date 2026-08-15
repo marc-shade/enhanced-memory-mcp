@@ -39,7 +39,13 @@ die()  { fail "$*"; exit 1; }
 # Octal permission bits of a path, for reporting what was left alone.
 # BSD stat and GNU stat disagree on the flag, so try both before giving up.
 file_mode() {
-    stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null || printf '?'
+    # GNU first, BSD as the fallback - NOT the other way around. On GNU
+    # coreutils `stat -f` means FILESYSTEM status, so it SUCCEEDS with the
+    # wrong output and a BSD-first chain never falls through: the mode line
+    # rendered as btrfs filesystem info on the exact platform CFGI runs
+    # (measured on fedora, 2026-08-15). GNU `stat -c` fails cleanly on
+    # macOS, so this order works on both.
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null || printf '?'
 }
 
 # --- .env ------------------------------------------------------------------
