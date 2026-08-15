@@ -540,6 +540,17 @@ idempotent. Genuinely new observations still append. Duplicates created by
 re-imports from before the fix are not deleted for you — issue #8 has the
 one-time cleanup SQL.
 
+**Re-worded** re-imports (the same seed file lightly edited) are detected
+too, via deterministic simhash — no LLM involved. By default they are
+**stored and reported** in a `near_duplicates` response field naming which
+existing row each one resembles: a correction ("62Gi" → "125Gi") is
+indistinguishable from a reword at this layer, and a memory store must never
+silently drop a correction. An import pipeline that knows it is re-importing
+can set `ENHANCED_MEMORY_NEAR_DUP_POLICY=skip` to drop them instead; any
+other value of that variable falls back to the safe store-and-report.
+Distance threshold and the measured calibration bands live in
+`simhash_dedup.py`.
+
 ### `OSError` when the daemon starts, with no useful message
 
 The socket path is too long. AF_UNIX caps the path string at 104 bytes on macOS

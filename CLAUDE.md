@@ -127,6 +127,10 @@ register_query_expansion_tools(app, nmf_instance)
   reports `success: false` with an `error`.
 - `create_entities` skips exact-duplicate observations per entity and reports
   the skips as `observations_deduped` (idempotent re-imports, e9ca30c).
+  Re-WORDED near-duplicates (simhash, `simhash_dedup.py`) are stored and
+  reported in `near_duplicates` by default — corrections must never be
+  silently dropped; `ENHANCED_MEMORY_NEAR_DUP_POLICY=skip` opts an import
+  pipeline into dropping them (`observations_near_dup_skipped`).
 - `search_nodes` responses carry `degraded: "name-only (...)"` when content
   search is unavailable; absence of the key means FTS ran.
 - A daemon-down state returns well-formed error objects, not empty successes;

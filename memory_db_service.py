@@ -24,6 +24,8 @@ import re  # noqa: F401  — used by search_nodes FTS tokenisation
 import zlib
 import pickle
 from pathlib import Path
+
+from simhash_dedup import find_near_duplicate, near_dup_policy
 from typing import Dict, List, Any, Optional
 
 from socket_guard import SocketInUseError, claim_socket_path
@@ -301,6 +303,9 @@ class MemoryDatabase:
             "failed": 0,
             "count": 0,
             "observations_deduped": 0,
+            "observations_near_dup_stored": 0,
+            "observations_near_dup_skipped": 0,
+            "near_duplicates": [],
             "results": [],
             "errors": [],
         }
@@ -394,15 +399,44 @@ class MemoryDatabase:
                     # Genuinely new observations on an existing entity still
                     # append; the check also holds within one batch because
                     # earlier inserts in this transaction are visible to it.
-                    for obs in observations:
-                        cursor.execute(
-                            "SELECT 1 FROM observations "
-                            "WHERE entity_id = ? AND content = ? LIMIT 1",
-                            (entity_id, obs),
+                    # NEAR-duplicates (re-worded re-imports) are detected via
+                    # simhash against this entity's existing rows. Default
+                    # policy REPORTS them and inserts anyway -- a correction
+                    # is indistinguishable from a reword at this layer, and
+                    # silently dropping corrections is the one behavior a
+                    # memory store must never have (see simhash_dedup.py for
+                    # the measured distance bands and the 62Gi precedent).
+                    # ENHANCED_MEMORY_NEAR_DUP_POLICY=skip opts an import
+                    # pipeline into dropping them.
+                    dup_policy = near_dup_policy()
+                    existing_texts = [
+                        r[0]
+                        for r in cursor.execute(
+                            "SELECT content FROM observations WHERE entity_id = ?",
+                            (entity_id,),
                         )
-                        if cursor.fetchone():
+                    ]
+                    for obs in observations:
+                        if obs in existing_texts:
                             results["observations_deduped"] += 1
                             continue
+                        near = find_near_duplicate(obs, existing_texts)
+                        if near is not None:
+                            detail = {
+                                "entity": name,
+                                "new": obs[:120],
+                                "resembles": near[0][:120],
+                                "distance": near[1],
+                                "action": "skipped"
+                                if dup_policy == "skip"
+                                else "stored",
+                            }
+                            if len(results["near_duplicates"]) < 20:
+                                results["near_duplicates"].append(detail)
+                            if dup_policy == "skip":
+                                results["observations_near_dup_skipped"] += 1
+                                continue
+                            results["observations_near_dup_stored"] += 1
                         cursor.execute(
                             """
                             INSERT INTO observations (entity_id, content)
@@ -410,6 +444,7 @@ class MemoryDatabase:
                         """,
                             (entity_id, obs),
                         )
+                        existing_texts.append(obs)
 
                     results["results"].append(
                         {
