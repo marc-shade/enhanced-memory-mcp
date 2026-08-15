@@ -308,8 +308,18 @@ python3 comprehensive_test.py    # the functional suite (needs the daemon runnin
 ```
 
 Judge `comprehensive_test.py` by its exit code, not by a pass count. The number
-of checks it runs depends on which optional backends are importable, so any
-figure printed in a README would be wrong on some machines.
+of checks depends on the mode it selects: with no `ENHANCED_MEMORY_*` or
+`MEMORY_DB_*` variables set it builds its own sandbox and runs everything, and
+with them set it runs against your deployment and skips the checks that describe
+a sandbox it did not create. Measured on one machine, one commit: **106**
+isolated and **102** operator-directed, both exit 0. The run prints its own mode
+and names what it skipped.
+
+Installing the optional backends changes that count by **zero**, measured both
+ways. An earlier revision of this file said the backends were the cause. They
+are not, and the same wrong guess was attached to the `pytest` skip count before
+anyone tested it; see the test-suite section of `RELEASE_NOTES.md` for what
+actually moves that one.
 
 `./healthcheck.sh` is built so that it can fail. It writes a probe entity
 through the daemon socket, searches it back, and deletes it. It treats an
