@@ -799,3 +799,12 @@ snapshot of its own moment, not as current status.
   `mirror_mind_enhancements.py`, several migration scripts). Only the one
   reachable from `execute_code` was fixed. The rest are mostly standalone
   utilities, they were sampled rather than audited, and no test covers them.
+
+## Verifying commit signatures
+
+Release commits are SSH-signed. To verify:
+
+```bash
+git config gpg.ssh.allowedSignersFile .allowed_signers
+git log --show-signature -1
+```
