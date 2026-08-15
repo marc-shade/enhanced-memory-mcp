@@ -34,12 +34,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any
 from letta_memory_blocks import MemoryBlockManager
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger(__name__)
 
 # Database path
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class SleetimeAgent:

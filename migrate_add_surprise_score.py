@@ -6,14 +6,16 @@ Adds surprise_score column to episodic_memory and semantic_memory tables
 to support Titans/MIRAS-inspired surprise-based consolidation.
 """
 
-import sqlite3
 import os
+import sqlite3
 import logging
+
+from memory_paths import get_db_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.expanduser("~/.claude/enhanced_memories/memory.db")
+DB_PATH = str(get_db_path())
 
 
 def migrate():

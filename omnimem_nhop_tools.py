@@ -46,6 +46,7 @@ QDRANT_PORT = 6333
 from local_semantic_recall import DEFAULT_MODEL as OLLAMA_EMBED_MODEL
 from local_semantic_recall import OLLAMA_URL as OLLAMA_HOST
 from local_semantic_recall import collection_for as _collection_for
+from memory_paths import get_memory_paths
 
 QDRANT_COLLECTION = _collection_for(OLLAMA_EMBED_MODEL)
 
@@ -70,8 +71,7 @@ def _ollama_embed(text: str) -> Optional[List[float]]:
         return None
 
 
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 def _find_seed_entities_text(

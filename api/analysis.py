@@ -4,9 +4,9 @@ Analysis and Pattern Detection API
 
 from typing import List, Dict, Any, Optional
 import sqlite3
-from pathlib import Path
+from memory_paths import get_db_path
 
-DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DB_PATH = get_db_path()
 
 
 def detect_conflicts(threshold: float = 0.85) -> List[Dict[str, Any]]:

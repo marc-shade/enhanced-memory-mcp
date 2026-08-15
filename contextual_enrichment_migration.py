@@ -25,11 +25,12 @@ from datetime import datetime, timedelta
 
 # Import contextual LLM module
 from contextual_llm import get_prefix_generator
+from memory_paths import get_db_path
 
 logger = logging.getLogger(__name__)
 
 # Database path (same as server.py)
-DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DB_PATH = get_db_path()
 
 # LLM configuration (using Claude SDK with 4.5 models)
 LLM_MODEL = "claude-sonnet-4.5-20250929"  # Sonnet 4.5 for high-quality contextual prefix generation

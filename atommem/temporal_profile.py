@@ -34,6 +34,7 @@ from datetime import date
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .idf_keyword_graph import jaccard_similarity, normalize_keyword
+from memory_paths import get_db_path
 
 
 # --------------------------------------------------------------------------- #
@@ -258,7 +259,7 @@ def view_at_time(profile: Dict[str, Any], query_time: Any) -> Optional[Dict[str,
 # --------------------------------------------------------------------------- #
 # SQLite-backed store                                                          #
 # --------------------------------------------------------------------------- #
-DEFAULT_DB = os.path.expanduser("~/.claude/enhanced_memories/memory.db")
+DEFAULT_DB = str(get_db_path())
 
 
 class TemporalProfileStore:

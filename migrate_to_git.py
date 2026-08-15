@@ -6,11 +6,11 @@ Safe migration that preserves existing data
 
 import sqlite3
 import shutil
-from pathlib import Path
 from datetime import datetime
 
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+from memory_paths import get_memory_paths
+
+MEMORY_DIR, DB_PATH = get_memory_paths()
 BACKUP_PATH = (
     MEMORY_DIR / f"memory_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
 )

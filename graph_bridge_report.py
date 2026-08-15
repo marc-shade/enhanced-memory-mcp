@@ -38,8 +38,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "libs"))
 
 from memgraph import bridging  # noqa: E402
 from memgraph.ontology import OntologyLayer  # noqa: E402
+from memory_paths import get_db_path
 
-DEFAULT_DB = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DEFAULT_DB = get_db_path()
 QDRANT = "http://127.0.0.1:6333"
 # The live collection. Bare `enhanced_memory` and `enhanced_memory__bge_m3` are
 # legacy and hold 364 stale points each.

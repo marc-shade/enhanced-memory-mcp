@@ -15,6 +15,7 @@ import time
 sys.path.insert(0, str(Path(__file__).parent))
 
 from neural_memory_fabric import get_nmf
+from memory_paths import get_db_path
 
 # Configure logging
 logging.basicConfig(
@@ -23,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database path
-DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DB_PATH = get_db_path()
 
 
 def get_all_entities_from_sqlite() -> List[Dict[str, Any]]:

@@ -9,9 +9,10 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from memory_paths import get_memory_paths
+
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 

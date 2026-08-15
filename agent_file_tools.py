@@ -9,11 +9,12 @@ import logging
 from typing import Dict, Any
 from pathlib import Path
 from agent_file import AgentFileExporter, AgentFileImporter
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger(__name__)
 
-# Default export directory
-EXPORT_DIR = Path.home() / ".claude" / "enhanced_memories" / "exports"
+# Default export directory, beside whichever memory store is configured
+EXPORT_DIR = get_memory_paths()[0] / "exports"
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 

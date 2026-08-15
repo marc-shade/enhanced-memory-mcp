@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from neural_memory_fabric import get_nmf
+from memory_paths import get_db_path
 
 # Configure logging
 logging.basicConfig(
@@ -21,8 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database path - uses home directory
-DB_PATH = str(Path.home() / ".claude/enhanced_memories/memory.db")
+# Database path
+DB_PATH = str(get_db_path())
 
 
 async def main():

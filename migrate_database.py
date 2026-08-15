@@ -8,10 +8,10 @@ Uses PRAGMA busy_timeout to handle locks gracefully.
 
 import sqlite3
 import sys
-from pathlib import Path
 
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+from memory_paths import get_memory_paths
+
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 # All migrations to apply
 MIGRATIONS = [

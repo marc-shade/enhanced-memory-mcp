@@ -18,6 +18,8 @@ from contextlib import contextmanager
 from collections import deque
 from typing import Optional, Any, Generator
 
+from memory_paths import get_db_path
+
 logger = logging.getLogger("db-pool")
 
 # Configuration
@@ -28,7 +30,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 0.5
 
 # Default database path
-DEFAULT_DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DEFAULT_DB_PATH = get_db_path()
 
 
 class DatabasePool:

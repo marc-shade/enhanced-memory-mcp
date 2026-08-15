@@ -19,7 +19,12 @@ import sqlite3
 import sys
 from pathlib import Path
 
-DB = str(Path.home() / ".claude" / "enhanced_memories" / "memory.db")
+# Run as a script from this subdirectory, so the repo root is not on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from memory_paths import get_db_path  # noqa: E402
+
+DB = str(get_db_path())
 
 
 def main() -> int:

@@ -532,11 +532,12 @@ class GraphTraversal:
 
 if __name__ == "__main__":
     # Test graph traversal
-    from pathlib import Path
     import sys
 
-    # Use test database
-    db_path = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+    from memory_paths import get_db_path
+
+    # Use whichever database is configured
+    db_path = get_db_path()
 
     if not db_path.exists():
         print("Database not found. Run enhanced-memory-mcp first.")

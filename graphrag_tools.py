@@ -22,6 +22,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+from memory_paths import get_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def register_graphrag_tools(app, db_path: Path = None):
 
     # Initialize GraphRAG instance
     if db_path is None:
-        db_path = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+        db_path = get_db_path()
 
     rag = GraphRAG(db_path=db_path)
     logger.info(f"✅ GraphRAG initialized with database: {db_path}")

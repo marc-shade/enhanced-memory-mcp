@@ -4,10 +4,15 @@ Run database migration to add always_include column
 """
 
 import sqlite3
+import sys
 from pathlib import Path
 
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+# Run as a script from this subdirectory, so the repo root is not on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from memory_paths import get_memory_paths  # noqa: E402
+
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 def run_migration():

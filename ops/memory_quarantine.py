@@ -47,11 +47,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+
+# Run as a script from this subdirectory, so the repo root is not on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from memory_paths import get_db_path  # noqa: E402
 
 PROTECT_TYPE_PREFIX = "auto_memory/"
 DEFAULT_AGE_DAYS = 90
@@ -91,10 +95,7 @@ def _params(age_days: int, broad: bool) -> tuple:
 
 
 def _db_path() -> Path:
-    env = os.environ.get("ENHANCED_MEMORY_DB_PATH")
-    if env:
-        return Path(env).expanduser()
-    return Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+    return get_db_path()
 
 
 def _connect_ro(p: Path) -> sqlite3.Connection:

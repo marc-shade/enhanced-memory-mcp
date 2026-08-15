@@ -17,6 +17,7 @@ from typing import List, Dict, Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 from neural_memory_fabric import get_nmf
+from memory_paths import get_db_path
 
 # Configure logging
 logging.basicConfig(
@@ -187,7 +188,7 @@ async def main():
     parser.add_argument(
         "--db-path",
         type=str,
-        default=str(Path.home() / ".claude/enhanced_memories/memory.db"),
+        default=str(get_db_path()),
         help="Path to memory database",
     )
     args = parser.parse_args()

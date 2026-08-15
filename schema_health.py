@@ -37,8 +37,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "libs"))
 
 from memgraph.conflicts import normalize  # noqa: E402
 from memgraph.ontology import OntologyLayer  # noqa: E402
+from memory_paths import get_db_path
 
-DEFAULT_DB = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DEFAULT_DB = get_db_path()
 
 
 def load_type_counts(db_path: Path) -> Counter[str]:

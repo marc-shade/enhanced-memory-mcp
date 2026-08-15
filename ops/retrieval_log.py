@@ -40,20 +40,21 @@ Env:
 from __future__ import annotations
 
 import argparse
-import os
 import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Run as a script from this subdirectory, so the repo root is not on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from memory_paths import get_db_path  # noqa: E402
+
 
 def _db_path(override: str | None = None) -> Path:
     if override:
         return Path(override).expanduser()
-    env = os.environ.get("ENHANCED_MEMORY_DB_PATH")
-    if env:
-        return Path(env).expanduser()
-    return Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+    return get_db_path()
 
 
 def _connect(db_path: str | None = None) -> sqlite3.Connection:

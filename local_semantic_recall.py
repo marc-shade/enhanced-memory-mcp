@@ -30,20 +30,18 @@ import os
 import re
 import sqlite3
 import sys
-from pathlib import Path
 
 import httpx
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
+from memory_paths import get_db_path
 
 # Env seams (ADDITIVE — default to prod, so unset env == prior behavior). A scratch/benchmark
 # instance can redirect the backfill source DB (ENHANCED_MEMORY_DB_PATH, the same var the
 # server uses), the Qdrant endpoint (MEMORY_QDRANT_URL), and the collection (see
 # collection_for) so it can build/query an isolated per-question index without touching the
 # prod enhanced_memory* collections.
-DB = os.environ.get("ENHANCED_MEMORY_DB_PATH") or str(
-    Path.home() / ".claude" / "enhanced_memories" / "memory.db"
-)
+DB = str(get_db_path())
 QDRANT = os.environ.get("MEMORY_QDRANT_URL", "http://localhost:6333")
 DEFAULT_MODEL = os.environ.get("MEMORY_EMBED_MODEL", "embeddinggemma")
 # Retrieval-quality signal (Phase G, 2026-08-05): a top cosine below this flags a

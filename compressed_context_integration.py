@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from context_compression_filter import ContextCompressionFilter
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("compressed-context")
 
@@ -228,7 +229,7 @@ class CompressedContextManager:
 
 def test_compressed_context():
     """Test the compressed context manager"""
-    manager = CompressedContextManager(Path.home() / ".claude" / "enhanced_memories")
+    manager = CompressedContextManager(get_memory_paths()[0])
 
     print("Testing Compressed Context Manager:")
 

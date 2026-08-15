@@ -6,8 +6,9 @@ Git-like versioning for memory entities
 from typing import Dict, List, Any, Optional
 import sqlite3
 from pathlib import Path
+from memory_paths import get_db_path
 
-DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DB_PATH = get_db_path()
 
 
 def diff(

@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 import json
+from memory_paths import get_db_path
 
 # Setup logging
 logging.basicConfig(
@@ -324,8 +325,8 @@ def main():
     parser.add_argument(
         "--db-path",
         type=Path,
-        default=Path.home() / ".claude" / "enhanced_memories" / "memory.db",
-        help="Path to memory database (default: ~/.claude/enhanced_memories/memory.db)",
+        default=get_db_path(),
+        help="Path to memory database (default: the configured memory store)",
     )
     parser.add_argument(
         "--dry-run",

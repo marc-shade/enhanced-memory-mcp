@@ -9,10 +9,11 @@ import logging
 import sys
 import asyncio
 import aiohttp
-from pathlib import Path
 from typing import List, Dict, Any
 import time
 import uuid
+
+from memory_paths import get_db_path
 
 # Configure logging
 logging.basicConfig(
@@ -22,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database path
-DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
+DB_PATH = get_db_path()
 # Cloud-first Ollama for embeddings (prefer GPU nodes)
 # Set OLLAMA_HOST to your inference node (e.g., http://your-node:11434)
 import os

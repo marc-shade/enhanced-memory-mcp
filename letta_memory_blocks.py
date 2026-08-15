@@ -24,9 +24,10 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from io import StringIO
 
+from memory_paths import get_memory_paths
+
 # Database path (same as enhanced-memory)
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 # Create directory if needed
 MEMORY_DIR.mkdir(parents=True, exist_ok=True)
