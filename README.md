@@ -77,7 +77,9 @@ is empty rather than deaf. `./healthcheck.sh` exists to tell the two apart.
 
 - Python 3.11 or newer. On some macOS machines a bare `python3` is
   still 3.9, so the installer looks for versioned names first.
-- git, and about 2 GB of disk for the virtual environment.
+- git, and disk for the virtualenv. Measured on macOS arm64 with Python 3.11:
+  **83 MB** for a core install, **964 MB** with the optional backends, since
+  those pull sentence-transformers and torch. The checkout itself is 5 MB.
 - Optional: podman or docker, if you want the container path or a local Qdrant.
 - Optional: [ollama](https://ollama.com), for local embeddings.
 
@@ -195,14 +197,34 @@ setup/setup.sh --with-ollama     # verifies ollama, pulls the embedding model
 `./healthcheck.sh` reports both as OPTIONAL and never fails the gate on their
 absence. Pass `--require-optional` if you want the stricter contract.
 
+### GraphRAG is optional and external
+
+The GraphRAG tools (`graph_enhanced_search`, `get_entity_neighbors`) do not ship
+here. `graphrag_tools.py` loads its implementation from
+`$AGENTIC_SYSTEM_PATH/scripts/graph-rag.py`, a file that belongs to a separate
+system and is not part of this package. `AGENTIC_SYSTEM_PATH` defaults to the
+grandparent of the checkout, so on a standalone install that path does not
+exist.
+
+Nothing breaks. Registration is wrapped, the server logs
+`GraphRAG integration skipped: ...` and starts without those tools. If you do
+have that system, point `AGENTIC_SYSTEM_PATH` at its root and they register.
+Note that the skip message goes to the log file, not your terminal, so absent
+tools look like tools that were never there.
+
 ## Running in a container
 
 The delivery path for shared environments. Podman first, docker compatible.
 
 ```bash
-podman compose up --build                 # core only
-podman compose --profile qdrant up        # with the vector store
+podman-compose up --build                 # core only
+podman-compose --profile qdrant up        # with the vector store
 ```
+
+On Fedora 44, `podman compose` (a space, not a hyphen) shims out to
+`docker-compose` and fails out of the box until you run
+`systemctl --user start podman.socket`. `podman-compose` works natively with no
+socket. Docker users run `docker compose up --build` as usual.
 
 The image runs both processes under `container-entrypoint.sh`, which starts the
 daemon, waits for the socket to answer, and only then starts the MCP server on
@@ -212,9 +234,20 @@ zeros forever.
 
 Notes that will save you time:
 
+- **`podman build` silently discards the `HEALTHCHECK`.** Podman defaults to the
+  OCI image format, which has no field for it, so the instruction is dropped
+  without a warning and the built image reports a null healthcheck. Nothing
+  tells you; `podman ps` simply never shows a health state. Either build with
+  `podman build --format docker`, or use compose (its service-level healthcheck
+  is defined in `compose.yaml` and works regardless of image format), or check
+  on demand with `podman exec <name> /app/healthcheck.sh --skip-mcp`. Docker
+  keeps the instruction.
 - The MCP port is published on the **host loopback only**
   (`127.0.0.1:9106:9106`). Inside the container the server binds `0.0.0.0`,
   which is correct there and wrong on a workstation.
+- Qdrant's host ports are `${QDRANT_PORT:-6333}` and
+  `${QDRANT_ADMIN_PORT:-6334}`. Set them in `.env` if you already run Qdrant on
+  6333, which is otherwise a bind conflict that stops the profile from starting.
 - The database lives in the named volume `enhanced-memory-data`. Without a
   volume, your memory dies with the container.
 - ollama runs on your host, and a container cannot reach it at `127.0.0.1`.
@@ -287,6 +320,35 @@ your environment resolves. It checks:
 
 Useful flags: `--skip-mcp` for a fast daemon-only check, `--expect-tools N` to
 pin the count, `--require-optional` to demand the vector stack.
+
+### Where the logs are
+
+`/tmp/enhanced-memory-mcp.log`, always, for every install on the host.
+
+The MCP server clears every logging handler at startup and sends all output to
+that one rotating file (50 MB, two backups), because on the stdio transport
+anything on stdout corrupts the protocol and anything on stderr is read as an
+error by some clients. Two consequences worth knowing before you go looking:
+
+- The path is fixed, so two checkouts on one machine interleave into the same
+  file. Timestamps and pids are your only separator.
+- Every `... integration skipped: <reason>` message lands there and nowhere
+  else. If a tool you expected is missing, that log says why, and it is the only
+  place that does.
+
+### Verifying the signatures on this release
+
+Commits are signed with SSH. Git will not verify them until you tell it which
+keys to trust, and that config does not travel with a clone:
+
+```bash
+git config gpg.ssh.allowedSignersFile .allowed_signers
+git log --show-signature -1
+```
+
+Without the first line, `git log --format=%G?` reports `N` for every commit,
+which means "cannot verify", not "unsigned". The signatures are present either
+way: `git cat-file commit HEAD` shows the `gpgsig` block.
 
 ## Troubleshooting
 
