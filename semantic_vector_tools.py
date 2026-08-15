@@ -29,17 +29,12 @@ def _failure(error, backend, **echo):
 
 
 def _make_can_view(db_path):
-    """Lazily import the visibility ACL checker (governance sidecar)."""
-    import sys
-    from pathlib import Path
+    """Return the visibility ACL checker bound to this database.
 
-    _mf = (
-        Path(__file__).resolve().parent.parent.parent
-        / "intelligent-agents"
-        / "memory_federation"
-    )
-    if str(_mf) not in sys.path and _mf.exists():
-        sys.path.insert(0, str(_mf))
+    visibility.py ships in this repository. It used to be reached by walking up
+    out of the tree into a separate private checkout, so viewer-scoped filtering
+    silently did nothing on any machine without that checkout.
+    """
 
     def can_view(entity_id, viewer):
         from visibility import can_view as _cv

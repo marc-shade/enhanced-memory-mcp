@@ -15,28 +15,15 @@ intelligent-agents/memory_federation/visibility.py.
 
 import logging
 import sqlite3
-import sys
-from pathlib import Path
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger("governance_tools")
 
-# Resolve the memory_federation module from the repo layout.
-_MF_PATHS = [
-    Path(__file__).resolve().parent.parent.parent
-    / "intelligent-agents"
-    / "memory_federation",
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "agentic-system"
-    / "intelligent-agents"
-    / "memory_federation",
-]
-for _p in _MF_PATHS:
-    if _p.exists():
-        sys.path.insert(0, str(_p))
-        break
-
-from visibility import (  # noqa: E402
+# visibility.py ships in this repository. It used to be reached by walking up
+# out of the tree into a separate private checkout, which meant this whole tool
+# group failed to register on any machine that did not have that checkout --
+# silently, because the only record was a line in a log file under /tmp.
+from visibility import (
     VisibilityTag,
     can_view,
     ensure_sidecar_tables,

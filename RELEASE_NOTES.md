@@ -15,14 +15,36 @@ re-run them rather than trust them. What was *not* verified is listed at the end
 
 ## Measured tool surface
 
-| Dependency set | Tools registered |
-|---|---|
-| `requirements.txt` only | **188** |
-| plus `requirements-optional.txt` | **206** |
+| Dependency set | External integration | Tools registered |
+|---|---|---|
+| `requirements.txt` only | none | **186** |
+| plus `requirements-optional.txt` | none | **204** |
+| `requirements.txt` only | `AGENTIC_SYSTEM_PATH` set | 193 |
+| plus `requirements-optional.txt` | `AGENTIC_SYSTEM_PATH` set | 211 |
+
+**186 is the number a fresh install gets.** The bottom two rows need a separate
+checkout that is not part of this repository (see fix 11).
 
 Front door (eagerly loaded, flagged `anthropic/alwaysLoad`): `search_nodes`,
 `semantic_recall`, `create_entities`, `get_memory_status`, `execute_code`.
 The remaining tools are registered but deferred.
+
+### These numbers were wrong until verification, and the reason is worth reading
+
+Earlier drafts of this file said 188 and 206. Both were measured on machines
+that had `AGENTIC_SYSTEM_PATH` exported, pointing at a private checkout
+containing `scripts/graph-rag.py`. That silently registered 7 GraphRAG tools
+that no fresh install can register: 181 + 7 = 188.
+
+Two builders reproduced 188 independently and treated the agreement as
+confirmation. It was not. Both machines carried the same environment variable,
+so the measurements were correlated, not independent — agreement between
+observers sharing a confounder is worth nothing. The error was caught by running
+the install somewhere that had never seen the private repository, which is the
+only measurement that answers "what does a stranger get".
+
+If you re-measure, `unset AGENTIC_SYSTEM_PATH` first, or you will reproduce the
+same mistake.
 
 Source comments in `server.py` previously described the surface as "~142 tools".
 That figure was the historical decision point for the front-door design, not a
@@ -80,7 +102,7 @@ AGI Memory Phase 1 integration skipped: FastMCP.tool() got an unexpected
 keyword argument 'outputSchema'. Did you mean 'output_schema'?
 ```
 
-Fixed. The group registers and the surface goes from 172 to 188 tools — the 16
+Fixed. The group registers and the surface gains 16 tools — the 16
 tools defined in that file: `get_agent_identity`, `update_agent_skills`,
 `add_agent_belief`, `update_agent_personality`, `set_agent_preference`,
 `start_session`, `end_session`, `get_session_context`, `get_recent_sessions`,
@@ -256,7 +278,7 @@ with no availability check. Agent code inside `execute_code` was therefore told
 it could call tools from five servers a standalone install does not have.
 
 The `enhanced-memory` entry was wrong too, in the opposite direction: it
-declared 6 tools while the server registers 188.
+declared 6 tools while the server registers 186.
 
 The registry now defaults to **empty** — this module cannot know what an
 installation runs, so it claims nothing. Servers are declared by pointing
@@ -283,6 +305,41 @@ and with `MEMORY_TOOL_REGISTRY_FILE` set to a one-server file,
 `list_servers() -> ['my-real-server']` with its tool and schema retrievable. A
 malformed or missing declaration file logs the specific reason and declares
 nothing, rather than emptying itself silently.
+
+### 11. The release still reached into a private repository
+
+From-scratch verification failed on one root cause: two modules resolved code
+that ships only in a separate private checkout.
+
+**`visibility.py` is now shipped.** `governance_tools.py` walked up out of the
+tree looking for `intelligent-agents/memory_federation/visibility.py` and did a
+module-scope `from visibility import ...`. On any machine without that checkout
+the entire governance group failed to register — and the only record was a line
+in a rotating log file under `/tmp`, so nobody saw it. The file is 239 lines of
+pure standard library (`sqlite3`, `enum`, `typing`), so it simply belongs here.
+Copied to the repository root and the path-walking removed from both
+`governance_tools.py` and `semantic_vector_tools.py`. Measured on a clean clone:
+181 tools before, **186 after**, the five being `set_entity_visibility`,
+`get_entity_visibility`, `grant_entity_access`, `revoke_entity_access` and
+`can_agent_view`.
+
+**GraphRAG is now documented-optional rather than silently broken.**
+`graphrag_tools.py` loads `scripts/graph-rag.py` from `AGENTIC_SYSTEM_PATH`.
+That script is NOT shipped here and is not going to be. Previously its absence
+produced `'NoneType' object has no attribute 'loader'`, which tells an operator
+nothing. It now fails with a message naming the variable, the exact path it
+looked in, the current value of the variable, and the fact that this is an
+optional integration whose absence affects nothing else. Verified both ways:
+absent it skips with that message, and with `AGENTIC_SYSTEM_PATH` pointing at a
+checkout that has the script, 7 tools register (186 -> 193).
+
+**Registration failures are now loud.** All logging above INFO went only to
+`/tmp/enhanced-memory-mcp.log`, so an installer watching the terminal saw a
+clean start while tool groups quietly failed. `WARNING` and above now also go to
+stderr. Set `MEMORY_LOG_STDERR=0` to suppress that if your client treats stderr
+as errors — but a healthy install skips nothing, so the noise is the signal.
+This also makes the database split-brain banner (fix 3) visible where it needs
+to be.
 
 ### Smaller items
 
@@ -425,6 +482,26 @@ patches for large results. Raising that pin means re-testing that patch.
 ---
 
 ## Test suite
+
+**Correction to commit 39f601c's own message.** That message closes by listing
+what it had not verified, including "the test suite, which is not green". That
+sentence was written before the sweep in the same commit and understates what
+the commit actually carries: both gates pass on the tree it produced. The commit
+message cannot be edited without rewriting history and discarding the signature,
+so the correction lives here. Read this section, not that line.
+
+Re-measured independently on 2026-08-15, on macOS arm64 with a Python 3.11.11
+virtualenv holding the core requirements only, each run under an isolated `HOME`:
+
+| Gate | Result |
+|---|---|
+| `python comprehensive_test.py` | **exit 0**, 106 of 106 assertions, isolated sandbox mode |
+| `python -m pytest tests/ -q` | **exit 0**, 137 passed, 1 skipped |
+
+The skip is the difference from the 138-passed figure recorded below: one test
+skips in an environment without the optional backends installed. Same tree, same
+commit, different install mode, which is exactly the property the count-versus-
+exit-code warning below is about.
 
 Two gates ship, and they answer different questions.
 
@@ -757,7 +834,7 @@ snapshot of its own moment, not as current status.
   is actually answering — was not built.
 - **The test suite proves contracts, not correctness at scale.** Both gates run
   a single client against a fresh database. `comprehensive_test.py` calls five
-  of the 206 registered tools; a tool being listed is not evidence that it
+  of the registered tools; a tool being listed is not evidence that it
   works. Concurrency is untested on both gates, which matters because the socket
   daemon exists specifically to serve concurrent clients.
 - **`pytest` is in no requirements file.** `pytest tests/` needs pytest

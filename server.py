@@ -99,6 +99,23 @@ logging.root.handlers.clear()
 logging.root.addHandler(_file_handler)
 logging.root.setLevel(logging.INFO)
 
+# WARNING and above ALSO go to stderr, unless MEMORY_LOG_STDERR=0.
+#
+# Routine INFO stays in the file, because MCP clients treat stderr chatter as
+# errors. But warnings here are not chatter: a skipped tool group, a missing
+# dependency, or the database split-brain banner are exactly what an installer
+# has to see, and routing them only to a rotating file under /tmp meant nobody
+# ever did. The governance group failed to register on every machine without a
+# separate private checkout and the sole record was a line in that file.
+#
+# If this is noisy in your client, the noise is the signal: a healthy install
+# skips nothing. Set MEMORY_LOG_STDERR=0 to silence it anyway.
+if os.environ.get("MEMORY_LOG_STDERR", "1") != "0":
+    _stderr_handler = logging.StreamHandler(sys.stderr)
+    _stderr_handler.setLevel(logging.WARNING)
+    _stderr_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logging.root.addHandler(_stderr_handler)
+
 logger = logging.getLogger("enhanced-memory-git")
 
 
@@ -1565,11 +1582,15 @@ except Exception as e:
 # of schema, EAGERLY LOADED into every context window of every session whether or
 # not memory is touched. That was 80% of the harness's entire eager tool-schema tax.
 #
-# MEASURED IN THIS RELEASE (stdio tools/list, Python 3.11): 188 tools with the
-# core dependency set installed, rising as optional backends (qdrant-client,
-# sentence-transformers) become importable and their tool groups register. The
-# 142 figure below is the historical decision point, not the current count --
-# re-measure rather than quoting either number.
+# MEASURED ON A CLEAN CLONE (stdio tools/list, Python 3.11): 186 tools with the
+# core dependency set, 204 with the optional backends. Both rise by 7 if
+# AGENTIC_SYSTEM_PATH points at a checkout containing scripts/graph-rag.py,
+# which is NOT shipped here. The 142 figure below is the historical decision
+# point, not a current count.
+#
+# If you re-measure, unset AGENTIC_SYSTEM_PATH first. An earlier draft of this
+# comment said 188 because it was measured on a machine that had it set, and
+# a second machine with the same variable "confirmed" it.
 #
 # Tool count is a selection-accuracy variable, not just a token-cost one: ~18 of
 # those tools were all "retrieve memories given a query" (search_nodes,
@@ -2074,7 +2095,8 @@ if __name__ == "__main__":
             "✅ GraphRAG (RAG Tier 4) integrated - graph-enhanced search + entity neighbors"
         )
     except Exception as e:
-        logger.warning(f"⚠️  GraphRAG integration skipped: {e}")
+        # Optional external integration: not shipped, not required.
+        logger.warning(f"⚠️  GraphRAG (optional external integration) skipped: {e}")
 
     # Register Agentic RAG tools (RAG Tier 4.1+4.3 Strategy) - Self-Reflective Retrieval
     if nmf_instance:

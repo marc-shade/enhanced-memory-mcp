@@ -40,6 +40,27 @@ def register_graphrag_tools(app, db_path: Path = None):
         app: FastMCP application instance
         db_path: Path to SQLite database (defaults to enhanced-memory DB)
     """
+    # GraphRAG is an OPTIONAL EXTERNAL INTEGRATION. Its implementation
+    # (scripts/graph-rag.py) is not part of this repository and is not shipped
+    # with it. Without it this group registers no tools -- that is expected, not
+    # a broken install.
+    #
+    # Check for the script explicitly so the failure names what is missing.
+    # Previously the importlib call below just raised on a None spec, producing
+    # "'NoneType' object has no attribute 'loader'", which tells an operator
+    # nothing about the environment variable they were supposed to set.
+    _script = os.path.join(AGENTIC_SYSTEM_PATH, "scripts", "graph-rag.py")
+    if not os.path.isfile(_script):
+        raise FileNotFoundError(
+            f"GraphRAG is an optional external integration and is not installed. "
+            f"Its implementation is not shipped with this repository; it was "
+            f"looked for at {_script}. Point AGENTIC_SYSTEM_PATH at a checkout "
+            f"containing scripts/graph-rag.py to enable the 7 GraphRAG tools, or "
+            f"ignore this -- every other tool group is unaffected. "
+            f"(AGENTIC_SYSTEM_PATH is currently "
+            f"{os.environ.get('AGENTIC_SYSTEM_PATH', 'unset, defaulting to ' + AGENTIC_SYSTEM_PATH)}.)"
+        )
+
     # Import GraphRAG implementation from scripts
     sys.path.insert(0, os.path.join(AGENTIC_SYSTEM_PATH, "scripts"))
 
