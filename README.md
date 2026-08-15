@@ -516,6 +516,30 @@ configured to exec `python server.py` directly, bypassing the launcher that
 applies `.env`. Fix the client config to use `setup/bin/mcp-server.sh`, then
 restart both processes.
 
+### Content queries return zero while name queries work
+
+Since `e9ca30c` this cannot happen silently: when search cannot see
+observation content, the response says so —
+
+```json
+{"count": 0, "results": [], "degraded": "name-only (observations_fts missing)"}
+```
+
+`degraded` means the database predates the full-text index and no daemon has
+initialized against it since upgrading. Restart the daemon: `init_database()`
+now creates the index and backfills every existing row. The other value,
+`name-only (FTS query error)`, is per-query and means the query text broke
+FTS syntax after sanitization; the name/type match still ran.
+
+### Re-importing a seed appends duplicate observations
+
+Fixed in `e9ca30c`: `create_entities` skips observations whose exact content
+already exists for that entity and reports the skips as
+`observations_deduped` in its response, so repeated seed imports are
+idempotent. Genuinely new observations still append. Duplicates created by
+re-imports from before the fix are not deleted for you — issue #8 has the
+one-time cleanup SQL.
+
 ### `OSError` when the daemon starts, with no useful message
 
 The socket path is too long. AF_UNIX caps the path string at 104 bytes on macOS
