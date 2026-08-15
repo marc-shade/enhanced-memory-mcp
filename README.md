@@ -85,7 +85,10 @@ is empty rather than deaf. `./healthcheck.sh` exists to tell the two apart.
   still 3.9, so the installer looks for versioned names first.
 - git, and disk for the virtualenv. Measured on macOS arm64 with Python 3.11:
   **83 MB** for a core install, **964 MB** with the optional backends, since
-  those pull sentence-transformers and torch. The checkout itself is 5 MB.
+  those pull sentence-transformers and torch. On Linux x86_64 the core figure
+  is **131 MB** (measured in a python:3.11-slim container) — the wheels differ
+  by platform, so expect the number to move with yours. The checkout itself
+  is 5 MB.
 - Optional: podman or docker, if you want the container path or a local Qdrant.
 - Optional: [ollama](https://ollama.com), for local embeddings.
 
@@ -225,9 +228,21 @@ tools look like tools that were never there.
 The delivery path for shared environments. Podman first, docker compatible.
 
 ```bash
-podman-compose up --build                 # core only
-podman-compose --profile qdrant up        # with the vector store
+podman-compose up --build                              # core only
+WITH_OPTIONAL=1 podman-compose --profile qdrant up     # with a USABLE vector store
 ```
+
+**`WITH_OPTIONAL=1` is load-bearing on the qdrant profile.** The default image
+installs `requirements.txt` only, which does not include `qdrant-client` — so
+`--profile qdrant` without it gives you a healthy, reachable, entirely unused
+Qdrant: the healthcheck reports the service reachable (true) while the server
+logs "qdrant-client not installed - vector search disabled" and every search
+stays lexical. A green signal beside an inert capability is exactly the failure
+mode this project exists to kill, so it is named here rather than left for you
+to find. `WITH_OPTIONAL=1` builds the image with `requirements-optional.txt`
+and the vector path actually engages. (Measured: a core image alongside the
+qdrant profile answered `/readyz` with "all shards are ready" and used it for
+nothing.)
 
 Use the hyphen. On Fedora 44, `podman compose` (a space) hands off to an
 external provider, `/usr/libexec/docker/cli-plugins/docker-compose`, which needs
@@ -277,6 +292,19 @@ Notes that will save you time:
 - Qdrant's host ports are `${QDRANT_PORT:-6333}` and
   `${QDRANT_ADMIN_PORT:-6334}`. Set them in `.env` if you already run Qdrant on
   6333, which is otherwise a bind conflict that stops the profile from starting.
+- **The image is a core install, so the qdrant profile does nothing on its own.**
+  `podman-compose --profile qdrant up` gives you a Qdrant that starts, passes its
+  healthcheck and answers on its port, while the server has no `qdrant-client`
+  to talk to it with. Everything looks green and nothing is indexed. Build with
+  the optional stack to actually use it:
+  ```bash
+  podman build --build-arg WITH_OPTIONAL=1 -t enhanced-memory:local -f Containerfile .
+  # or, through compose:
+  WITH_OPTIONAL=1 podman-compose up --build
+  ```
+  `./healthcheck.sh` distinguishes the two cases: it reports Qdrant as reachable
+  *and* usable only when the client library is importable, and warns when the
+  service is up but nothing can use it.
 - The database lives in the named volume `enhanced-memory-data`. Without a
   volume, your memory dies with the container.
 - ollama runs on your host, and a container cannot reach it at `127.0.0.1`.

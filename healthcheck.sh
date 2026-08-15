@@ -240,7 +240,16 @@ QDRANT_URL="${MEMORY_QDRANT_URL:-http://localhost:6333}"
 if [ -z "$PY" ] || [ ! -x "$PY" ]; then
     record SKIP "qdrant" "no interpreter to probe with"
 elif http_get "${QDRANT_URL%/}/readyz" >/dev/null 2>&1 || http_get "${QDRANT_URL%/}/" >/dev/null 2>&1; then
-    record PASS "qdrant" "reachable at $QDRANT_URL (OPTIONAL, enables semantic recall)"
+    # Reachable is not the same as used. A core install has no qdrant_client, so
+    # the server cannot talk to a Qdrant that is running perfectly well: the
+    # container is healthy, the port answers, and nothing indexes anything.
+    # Reporting only reachability here would put a green tick next to an inert
+    # capability, which is the exact failure this gate exists to catch.
+    if "$PY" -c "import qdrant_client" >/dev/null 2>&1; then
+        record PASS "qdrant" "reachable at $QDRANT_URL and qdrant-client is installed (OPTIONAL, semantic recall active)"
+    else
+        record WARN "qdrant" "reachable at $QDRANT_URL but qdrant-client is NOT installed, so nothing uses it: recall is still lexical. Install it with setup/setup.sh --with-optional (container: --build-arg WITH_OPTIONAL=1)."
+    fi
 else
     optional_status "qdrant" "unreachable at $QDRANT_URL (OPTIONAL). Recall degrades from semantic to lexical: keyword matches still work, meaning-based ones do not. Provision: setup/setup.sh --with-qdrant"
 fi
