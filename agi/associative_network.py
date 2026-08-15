@@ -15,15 +15,14 @@ import sqlite3
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from math import exp
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("associative-network")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class AssociativeNetwork:

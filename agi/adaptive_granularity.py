@@ -17,16 +17,15 @@ import sqlite3
 import json
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("adaptive_granularity")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class GranularityLevel(Enum):

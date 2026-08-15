@@ -18,9 +18,9 @@ import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, Optional
-from pathlib import Path
 from datetime import datetime
 import sqlite3
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("pysr-symbolic-regression")
 
@@ -35,8 +35,7 @@ except ImportError:
     logger.warning("PySR not available - symbolic regression features disabled")
 
 # Memory database path
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class SymbolicRegressionEngine:

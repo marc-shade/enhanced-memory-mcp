@@ -17,12 +17,12 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("self_improvement")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class SelfImprovement:

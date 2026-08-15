@@ -13,16 +13,15 @@ Also implements Meta-Rewarding for alignment self-improvement.
 
 import sqlite3
 import logging
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("sharpening_engine")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class VerificationResult(Enum):

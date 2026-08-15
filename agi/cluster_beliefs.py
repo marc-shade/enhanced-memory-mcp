@@ -13,14 +13,13 @@ import sqlite3
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("cluster-beliefs")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class ClusterBeliefManager:

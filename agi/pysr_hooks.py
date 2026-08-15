@@ -8,16 +8,15 @@ system events and data accumulation thresholds.
 
 import logging
 import sqlite3
-from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import json
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("pysr-hooks")
 
 # Memory database path
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 HOOKS_STATE_FILE = MEMORY_DIR / "pysr_hooks_state.json"
 
 

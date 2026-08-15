@@ -19,15 +19,14 @@ import math
 import logging
 import random
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("rl_retrieval")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 # RL Hyperparameters (tuned from RMM research)
 LEARNING_RATE = 0.1        # α: How fast to update Q-values

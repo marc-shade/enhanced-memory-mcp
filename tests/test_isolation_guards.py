@@ -123,6 +123,48 @@ class TestProductionMkdirGuard:
         assert Path(server.MEMORY_DIR).resolve() != REAL_MEMORY_DB.parent.resolve()
 
 
+class TestAgiModulesHonourTheConfiguredDatabase:
+    """Isolation by environment variable only isolates modules that read it.
+
+    On 2026-08-14 test_agi_phase1.py ran under a harness that overrode every
+    ENHANCED_MEMORY_* variable and still wrote 11 rows into the operator's real
+    database: the agi/ modules built ~/.claude/enhanced_memories/memory.db
+    inline and opened SQLite on it directly, so nothing the harness set was ever
+    consulted. These tests fail against that code.
+    """
+
+    def test_no_agi_module_resolves_the_memory_directory_inline(self):
+        """Static sweep: the whole package, not just the two modules that bit.
+
+        Twenty-one of them carried the same two lines. A test naming only the
+        ones in the reproduction would go green the moment a twenty-second file
+        copies the pattern.
+        """
+        offenders = []
+        for module in sorted((REPO_ROOT / "agi").glob("*.py")):
+            text = module.read_text(encoding="utf-8", errors="ignore")
+            if "enhanced_memories" in text and "Path.home()" in text:
+                offenders.append(module.name)
+
+        assert not offenders, (
+            "These agi modules resolve the memory directory themselves and will "
+            f"ignore ENHANCED_MEMORY_DB_PATH: {offenders}. Import "
+            "get_memory_paths from memory_paths instead."
+        )
+
+    def test_agi_modules_resolve_the_configured_database(self):
+        """The runtime half: what the modules in the incident actually opened."""
+        import agi.action_tracker
+        import agi.agent_identity
+
+        configured = Path(os.environ["ENHANCED_MEMORY_DB_PATH"]).resolve()
+        for module in (agi.action_tracker, agi.agent_identity):
+            assert Path(module.DB_PATH).resolve() == configured, (
+                f"{module.__name__}.DB_PATH is {module.DB_PATH}, not the "
+                f"configured {configured}"
+            )
+
+
 class TestSocketIsolation:
     """No test may inherit a socket pointing at a live daemon."""
 

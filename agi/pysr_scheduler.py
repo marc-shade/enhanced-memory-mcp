@@ -15,11 +15,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional
 import threading
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("pysr-scheduler")
 
 # Memory directory
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
+MEMORY_DIR = get_memory_paths()[0]
 SCHEDULER_STATE_FILE = MEMORY_DIR / "pysr_scheduler_state.json"
 
 

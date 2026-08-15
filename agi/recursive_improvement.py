@@ -16,14 +16,13 @@ This module:
 import sqlite3
 import json
 import logging
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("recursive_improvement")
 
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 @dataclass

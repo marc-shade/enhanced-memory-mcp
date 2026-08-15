@@ -14,15 +14,14 @@ import json
 import logging
 import random
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field, asdict
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("probability-reversal-task")
 
 # Configuration
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 # Standard PRT parameters from Reflection-Bench
 PRT_TRIALS = 40

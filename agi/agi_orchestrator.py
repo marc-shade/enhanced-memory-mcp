@@ -26,7 +26,6 @@ import sqlite3
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -45,11 +44,11 @@ from .adaptive_granularity import get_adaptive_granularity_manager
 from .rl_retrieval import get_rl_retrieval_optimizer
 from .sharpening_engine import get_sharpening_engine
 from .recursive_improvement import get_recursive_improvement_engine
+from memory_paths import get_memory_paths
 
 logger = logging.getLogger("agi_orchestrator")
 
-MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
-DB_PATH = MEMORY_DIR / "memory.db"
+MEMORY_DIR, DB_PATH = get_memory_paths()
 
 
 class CognitiveState(Enum):
