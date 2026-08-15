@@ -2,15 +2,17 @@
 """
 Governance MCP Tools: per-agent ACL on memory entities.
 
-Wraps the memory_federation visibility sidecar (entity_visibility +
-entity_acl) as MCP tools so agents can set/get visibility, set an owner, and
-grant/revoke per-agent read access. Retrieval scoping itself is enforced in the
-socket service's search path (viewer_agent param): a scoped viewer sees only
-PUBLIC/CLUSTER entities plus PRIVATE ones they own or are granted. Untagged
-entities default to PRIVATE (opt-in sharing).
+Wraps the visibility sidecar (entity_visibility + entity_acl) as MCP tools so
+agents can set/get visibility, set an owner, and grant/revoke per-agent read
+access. Retrieval scoping itself is enforced in the socket service's search path
+(viewer_agent param): a scoped viewer sees only PUBLIC/CLUSTER entities plus
+PRIVATE ones they own or are granted. Untagged entities default to PRIVATE
+(opt-in sharing).
 
-Storage lives in the same memory.db as the entities, via
-intelligent-agents/memory_federation/visibility.py.
+Storage lives in the same memory.db as the entities, via visibility.py in this
+repository. That module used to be reached by walking out of the tree into a
+separate checkout, which meant this whole group failed to register anywhere
+else -- and said so only in a log file under /tmp.
 """
 
 import logging
