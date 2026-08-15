@@ -1,8 +1,0 @@
-{
-  "server": "voice-mode",
-  "tool_count": 2,
-  "tools": [
-    "converse",
-    "voice_registry"
-  ]
-}

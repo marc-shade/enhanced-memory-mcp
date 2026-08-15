@@ -35,6 +35,7 @@ TOOL_REGISTRY_DIR = Path(__file__).parent.parent / "tool_registry"
 @dataclass
 class ToolSchema:
     """Lightweight tool schema for progressive disclosure"""
+
     name: str
     server: str
     description: str
@@ -44,185 +45,84 @@ class ToolSchema:
     cost_estimate: Optional[str] = None  # e.g., "low", "medium", "high"
 
 
-# Known MCP servers and their tools (cached schemas)
-MCP_TOOL_REGISTRY: Dict[str, List[Dict[str, Any]]] = {
-    "enhanced-memory": [
-        {
-            "name": "create_entities",
-            "description": "Create entities with compression and versioning",
-            "parameters": {"entities": "List[Dict] - entities with name, entityType, observations"},
-            "returns": "Dict with created count and results",
-            "cost_estimate": "medium"
-        },
-        {
-            "name": "search_nodes",
-            "description": "Search entities by name or type",
-            "parameters": {"query": "str", "limit": "int = 10"},
-            "returns": "Dict with matching entities",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "execute_code",
-            "description": "Execute Python code in sandbox with memory APIs",
-            "parameters": {"code": "str", "context_vars": "Optional[Dict]"},
-            "returns": "Execution result with stdout/stderr",
-            "cost_estimate": "medium"
-        },
-        {
-            "name": "memory_diff",
-            "description": "Get diff between entity versions",
-            "parameters": {"entity_name": "str", "version1": "int", "version2": "int"},
-            "returns": "Unified diff between versions",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "memory_branch",
-            "description": "Create experimental branch of entity",
-            "parameters": {"entity_name": "str", "branch_name": "str"},
-            "returns": "Branch creation result",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "detect_memory_conflicts",
-            "description": "Find duplicate/conflicting memories",
-            "parameters": {"threshold": "float = 0.85"},
-            "returns": "List of detected conflicts",
-            "cost_estimate": "high"
-        },
-    ],
-    "voice-mode": [
-        {
-            "name": "converse",
-            "description": "Speak message and optionally listen for response",
-            "parameters": {
-                "message": "str - text to speak",
-                "wait_for_response": "bool = True",
-                "voice": "Optional[str] - TTS voice",
-                "tts_provider": "Optional[str] - openai or kokoro"
-            },
-            "returns": "Voice response or confirmation",
-            "cost_estimate": "medium"
-        },
-        {
-            "name": "voice_registry",
-            "description": "Get available voice providers and voices",
-            "parameters": {},
-            "returns": "Registry of TTS/STT endpoints",
-            "cost_estimate": "low"
-        },
-    ],
-    "agent-runtime": [
-        {
-            "name": "create_goal",
-            "description": "Create persistent goal that survives sessions",
-            "parameters": {"name": "str", "description": "str"},
-            "returns": "Goal ID and metadata",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "decompose_goal",
-            "description": "AI-powered goal decomposition into tasks",
-            "parameters": {"goal_id": "int", "strategy": "str = sequential"},
-            "returns": "List of created task IDs",
-            "cost_estimate": "high"
-        },
-        {
-            "name": "create_task",
-            "description": "Create manual task in queue",
-            "parameters": {"title": "str", "description": "str", "priority": "int = 5"},
-            "returns": "Task ID and metadata",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "get_next_task",
-            "description": "Get highest priority task with met dependencies",
-            "parameters": {},
-            "returns": "Next task or null",
-            "cost_estimate": "low"
-        },
-    ],
-    "sequential-thinking": [
-        {
-            "name": "sequentialthinking",
-            "description": "Multi-step reasoning with revision capability",
-            "parameters": {
-                "thought": "str - current thinking step",
-                "thoughtNumber": "int",
-                "totalThoughts": "int",
-                "nextThoughtNeeded": "bool"
-            },
-            "returns": "Reasoning chain state",
-            "cost_estimate": "medium"
-        },
-    ],
-    "safla-enhanced": [
-        {
-            "name": "generate_embeddings",
-            "description": "Generate embeddings (1.75M+ ops/sec)",
-            "parameters": {"texts": "List[str]"},
-            "returns": "Embedding vectors",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "store_memory",
-            "description": "Store in SAFLA hybrid memory",
-            "parameters": {"content": "str", "memory_type": "str = episodic"},
-            "returns": "Storage confirmation",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "retrieve_memories",
-            "description": "Search SAFLA memory system",
-            "parameters": {"query": "str", "limit": "int = 5"},
-            "returns": "Matching memories",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "analyze_text",
-            "description": "Deep semantic analysis with entities/sentiment",
-            "parameters": {"text": "str", "analysis_type": "str = all"},
-            "returns": "Analysis results",
-            "cost_estimate": "medium"
-        },
-        {
-            "name": "detect_patterns",
-            "description": "Find anomalies, trends, correlations",
-            "parameters": {"data": "array", "pattern_type": "str = all"},
-            "returns": "Detected patterns",
-            "cost_estimate": "high"
-        },
-    ],
-    "arduino-surface": [
-        {
-            "name": "surface_display",
-            "description": "Write text to LCD display",
-            "parameters": {"row": "int 0-1", "col": "int 0-15", "text": "str max 16"},
-            "returns": "Confirmation",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "surface_led_set",
-            "description": "Set RGB LED color",
-            "parameters": {"tier": "int = 0", "r": "int 0-255", "g": "int", "b": "int"},
-            "returns": "Confirmation",
-            "cost_estimate": "low"
-        },
-        {
-            "name": "surface_alert",
-            "description": "Play alert pattern (success/warning/error/info)",
-            "parameters": {"type": "str"},
-            "returns": "Confirmation",
-            "cost_estimate": "low"
-        },
-    ],
-}
+# Declared MCP servers and their tools.
+#
+# EMPTY BY DEFAULT, ON PURPOSE. This used to ship a fixed in-source dict naming
+# six servers -- voice-mode, arduino-surface, agent-runtime, safla-enhanced,
+# sequential-thinking and enhanced-memory -- which init_tool_registry() wrote to
+# disk and list_servers() then reported as available. On a standalone install
+# five of those do not exist, so agent code inside execute_code was told it
+# could call tools that were not there. This module cannot know what a given
+# installation runs, so its honest default is to claim nothing.
+#
+# To declare the servers you actually run, point MEMORY_TOOL_REGISTRY_FILE at a
+# JSON file of the same shape:
+#
+#   {"my-server": [{"name": "do_thing",
+#                   "description": "...",
+#                   "parameters": {"x": "str"},
+#                   "returns": "...",
+#                   "cost_estimate": "low"}]}
+#
+# Anything already present as a directory under tool_registry/ is also reported
+# by list_servers(), so an installation can declare servers by writing that tree
+# directly instead.
+MCP_TOOL_REGISTRY: Dict[str, List[Dict[str, Any]]] = {}
+
+
+def _load_declared_registry() -> Dict[str, List[Dict[str, Any]]]:
+    """Read the operator-declared registry, if one is configured.
+
+    A malformed or unreadable file is reported and treated as "nothing
+    declared". It is never silently swallowed: a registry that quietly empties
+    itself is the failure this module was changed to stop.
+    """
+    import os
+
+    path = os.environ.get("MEMORY_TOOL_REGISTRY_FILE")
+    if not path:
+        return {}
+    try:
+        declared = json.loads(Path(path).expanduser().read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "MEMORY_TOOL_REGISTRY_FILE=%s could not be read (%s: %s); "
+            "no servers declared",
+            path,
+            type(exc).__name__,
+            exc,
+        )
+        return {}
+    if not isinstance(declared, dict):
+        logger.warning(
+            "MEMORY_TOOL_REGISTRY_FILE=%s must contain a JSON object mapping "
+            "server name -> list of tools; got %s",
+            path,
+            type(declared).__name__,
+        )
+        return {}
+    return declared
 
 
 def init_tool_registry():
-    """Initialize tool registry filesystem structure"""
+    """Write the declared registry to disk.
+
+    With nothing declared this creates an empty directory and reports no
+    servers, which is the correct answer when the installation has not said
+    what it runs. It does NOT invent entries.
+    """
     TOOL_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
 
-    for server_name, tools in MCP_TOOL_REGISTRY.items():
+    declared = {**MCP_TOOL_REGISTRY, **_load_declared_registry()}
+    if not declared:
+        logger.info(
+            "Tool registry at %s: no servers declared "
+            "(set MEMORY_TOOL_REGISTRY_FILE to declare them)",
+            TOOL_REGISTRY_DIR,
+        )
+        return
+
+    for server_name, tools in declared.items():
         server_dir = TOOL_REGISTRY_DIR / server_name
         server_dir.mkdir(exist_ok=True)
 
@@ -230,7 +130,7 @@ def init_tool_registry():
         index = {
             "server": server_name,
             "tool_count": len(tools),
-            "tools": [t["name"] for t in tools]
+            "tools": [t["name"] for t in tools],
         }
         (server_dir / "index.json").write_text(json.dumps(index, indent=2))
 
@@ -301,21 +201,20 @@ def search_tools(query: str, detail_level: str = "names") -> Dict[str, Any]:
                 if detail_level == "names":
                     matches.append(f"{server_name}/{tool['name']}")
                 elif detail_level == "brief":
-                    matches.append({
-                        "path": f"{server_name}/{tool['name']}",
-                        "description": tool["description"][:80]
-                    })
+                    matches.append(
+                        {
+                            "path": f"{server_name}/{tool['name']}",
+                            "description": tool["description"][:80],
+                        }
+                    )
                 else:  # full
-                    matches.append({
-                        "server": server_name,
-                        **tool
-                    })
+                    matches.append({"server": server_name, **tool})
 
     return {
         "query": query,
         "detail_level": detail_level,
         "count": len(matches),
-        "matches": matches
+        "matches": matches,
     }
 
 

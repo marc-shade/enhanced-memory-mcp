@@ -246,6 +246,38 @@ Found by the test suite author while auditing why their isolation guards could
 be bypassed — a connection-level guard is structurally blind to `mkdir`, so this
 route was invisible to it.
 
+### 10. Tool discovery advertised five MCP servers that do not exist
+
+`sandbox/tool_discovery.py` held a fixed in-source `MCP_TOOL_REGISTRY` naming
+`voice-mode`, `arduino-surface`, `agent-runtime`, `safla-enhanced` and
+`sequential-thinking` alongside `enhanced-memory`. `init_tool_registry()` wrote
+those to `tool_registry/`, and `list_servers()` returned the directory names
+with no availability check. Agent code inside `execute_code` was therefore told
+it could call tools from five servers a standalone install does not have.
+
+The `enhanced-memory` entry was wrong too, in the opposite direction: it
+declared 6 tools while the server registers 188.
+
+The registry now defaults to **empty** — this module cannot know what an
+installation runs, so it claims nothing. Servers are declared by pointing
+`MEMORY_TOOL_REGISTRY_FILE` at a JSON file of the same shape, or by writing the
+`tool_registry/` tree directly. The six committed directories were removed;
+deleting them alone would not have worked, because `init_tool_registry()`
+regenerated them from the dict.
+
+Measured on a clean tree with no declaration:
+
+```
+list_servers()                            -> []
+list_tools("voice-mode")                  -> []
+get_tool_schema("voice-mode", "converse") -> None
+```
+
+and with `MEMORY_TOOL_REGISTRY_FILE` set to a one-server file,
+`list_servers() -> ['my-real-server']` with its tool and schema retrievable. A
+malformed or missing declaration file logs the specific reason and declares
+nothing, rather than emptying itself silently.
+
 ### Smaller items
 
 - `semantic_vector_tools.py` had `except Exception: pass` around retrieval
@@ -400,7 +432,7 @@ Measured on this branch, 2026-08-14:
 | Gate | Result |
 |---|---|
 | `python comprehensive_test.py` | **exit 0**, 0 failed (106 assertions in the default sandbox on this machine) |
-| `python -m pytest tests/ -q` | **122 passed, 0 failed, 0 skipped** |
+| `python -m pytest tests/ -q` | **138 passed, 0 failed, 0 skipped** |
 
 **Judge `comprehensive_test.py` by its exit code, not by its assertion count.**
 The count is mode-dependent by design: a default run makes four checks that a
@@ -460,7 +492,7 @@ assumption:
 
 | Daemon code | Result |
 |---|---|
-| fixed (shipping) | 102/102, exit 0 |
+| fixed (shipping) | 106/106, exit 0 |
 | schema fix reverted, both layers | **5 assertions fail, exit 1**, `table entities has no column named modality` |
 | `success` flag fix reverted alone | **7 assertions fail, exit 1** |
 
@@ -710,16 +742,13 @@ snapshot of its own moment, not as current status.
   from the source deployment and describe genuinely unimplemented functionality.
   They are left in place deliberately: removing the labels would make the code
   read as more finished than it is.
-- **The sandbox tool registry advertises MCP servers this release does not
-  ship.** `sandbox/tool_discovery.py` holds a fixed in-source `MCP_TOOL_REGISTRY`
-  naming `voice-mode`, `arduino-surface`, `agent-runtime`, `safla-enhanced` and
-  `sequential-thinking` alongside `enhanced-memory`, writes them to
-  `tool_registry/`, and `list_servers()` returns those directory names with no
-  availability check. Inside `execute_code`, tool discovery will therefore
-  report servers that are not installed. Deleting the JSON files is not a fix —
-  `init_tool_registry()` regenerates them from the dict. Left as-is rather than
-  half-fixed; making discovery reflect what is actually reachable is a design
-  change, not a cleanup.
+- **Tool discovery declares nothing by default, so it can under-report.** The
+  registry (fix 10 above) starts empty. An installation that runs other MCP
+  servers and does not declare them will have `list_servers()` return `[]` even
+  though those servers are reachable. That is the deliberate direction of the
+  error: silence is recoverable, a confident list of servers that do not exist
+  is not. Full reachability detection — asking each declared server whether it
+  is actually answering — was not built.
 - **The test suite proves contracts, not correctness at scale.** Both gates run
   a single client against a fresh database. `comprehensive_test.py` calls five
   of the 206 registered tools; a tool being listed is not evidence that it
