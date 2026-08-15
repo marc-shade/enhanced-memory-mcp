@@ -229,10 +229,20 @@ podman-compose up --build                 # core only
 podman-compose --profile qdrant up        # with the vector store
 ```
 
-On Fedora 44, `podman compose` (a space, not a hyphen) shims out to
-`docker-compose` and fails out of the box until you run
-`systemctl --user start podman.socket`. `podman-compose` works natively with no
-socket. Docker users run `docker compose up --build` as usual.
+Use the hyphen. On Fedora 44, `podman compose` (a space) hands off to an
+external provider, `/usr/libexec/docker/cli-plugins/docker-compose`, which needs
+a Docker-compatible API socket. With `podman.socket` inactive, which is the
+default, `podman compose up` fails:
+
+```
+failed to connect to the docker API at unix:///run/user/1000/podman/podman.sock:
+  connect: no such file or directory
+```
+
+`systemctl --user start podman.socket` fixes that, or just use `podman-compose`
+(1.6.0 here), which drives podman directly and needs no socket. Measured on
+Fedora 44 with podman 5.8.4: `podman compose up` failed as above, `podman-compose
+up -d` brought the stack up and the container reported `healthy`.
 
 The image runs both processes under `container-entrypoint.sh`, which starts the
 daemon, waits for the socket to answer, and only then starts the MCP server on
@@ -242,14 +252,25 @@ zeros forever.
 
 Notes that will save you time:
 
-- **`podman build` silently discards the `HEALTHCHECK`.** Podman defaults to the
-  OCI image format, which has no field for it, so the instruction is dropped
-  without a warning and the built image reports a null healthcheck. Nothing
-  tells you; `podman ps` simply never shows a health state. Either build with
-  `podman build --format docker`, or use compose (its service-level healthcheck
-  is defined in `compose.yaml` and works regardless of image format), or check
-  on demand with `podman exec <name> /app/healthcheck.sh --skip-mcp`. Docker
-  keeps the instruction.
+- **`podman build` discards the `HEALTHCHECK`.** Podman defaults to the OCI
+  image format, which has no field for it. It does warn, once, at build time:
+
+  ```
+  HEALTHCHECK is not supported for OCI image format and will be ignored.
+  Must use `docker` format
+  ```
+
+  Miss that line in the build output and nothing mentions it again: the image
+  carries no healthcheck and `podman ps` shows no health state, ever. Measured
+  on podman 5.8.4, Fedora 44: the OCI image's `.HealthCheck` inspects as `nil`,
+  and rebuilding with `podman build --format docker` gives
+  `[CMD /app/setup/lib/container-health.sh]`.
+
+  Three ways out, all verified: build with `--format docker`; use compose, whose
+  service-level healthcheck is defined in `compose.yaml` and applies regardless
+  of image format (a compose-managed container reports `healthy` from the same
+  image that inspects as `nil`); or check on demand with
+  `podman exec <name> /app/healthcheck.sh --skip-mcp`.
 - The MCP port is published on the **host loopback only**
   (`127.0.0.1:9106:9106`). Inside the container the server binds `0.0.0.0`,
   which is correct there and wrong on a workstation.
@@ -461,10 +482,13 @@ Written to be re-checked, not trusted.
 - Performance figures quoted in older revisions of this README have not been
   reproduced here and were removed rather than repeated. Nothing in this file
   claims a throughput, a latency or a compression ratio.
-- The container path was built and run with Docker and with Apple's `container`
-  on macOS/arm64. It has **not** been exercised with podman, and not on
-  linux/amd64. The Containerfile uses no engine-specific syntax, but that is an
-  expectation, not a measurement.
+- The container path is verified with podman 5.8.4 on Fedora 44, linux/amd64:
+  built, run, the full healthcheck green inside it, the supervision test
+  producing `Exited (1)` with the entrypoint naming which half died, and
+  `podman-compose` bringing the stack up healthy. It was also built and run
+  under Apple's `container` and under Docker on macOS/arm64 during development.
+  Not covered: any distribution other than Fedora 44, and rootful podman (all of
+  the above was rootless).
 - The service units are installed and started by the installer, which waits for
   the socket and fails loudly if it does not appear. Survival across a real
   reboot or logout has not been tested.
