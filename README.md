@@ -3,445 +3,385 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Tools](https://img.shields.io/badge/MCP_Tools-200%2B-informational)]()
+[![Tools](https://img.shields.io/badge/MCP_Tools-188_core-informational)]()
 
-A high-performance memory management system for AI agents built on the [Model Context Protocol](https://modelcontextprotocol.io/). Provides 200+ tools across compressed SQLite storage, 4-tier memory architecture, Git-like versioning, multi-strategy RAG, AGI cognitive phases, and modular tool loading with profile-based scaling.
+Persistent, searchable memory for AI agents, over the
+[Model Context Protocol](https://modelcontextprotocol.io/). Entities and their
+observations live in a compressed SQLite database with checksums and version
+history; a tiered store and a multi-strategy retrieval pipeline sit on top; and
+the whole thing is exposed to your client as MCP tools.
 
-## Features
+How many tools depends on what you installed, and the difference is not a bug:
+a tool whose backend is missing is not registered at all. A core install
+(`requirements.txt`) registers 188; adding the optional backends
+(`requirements-optional.txt`) brings it to 206. If you counted 188 after a
+plain `pip install -r requirements.txt`, nothing is broken.
 
-- **4-Tier Memory Architecture**: Core, Working, Reference, and Archive tiers with automatic promotion/demotion
-- **200+ MCP Tools**: Modular registration system with profile-based loading (full vs orchestrator mode)
-- **Advanced RAG Pipeline**: 4-tier retrieval strategy — hybrid search, re-ranking, query expansion, agentic RAG, GraphRAG
-- **Neural Memory Fabric (NMF)**: Letta-style memory blocks with open/edit/close semantics
-- **Git-Like Versioning**: Branch, diff, and restore memory states across sessions
-- **Real Compression**: 2.4x data reduction with zlib level 9, SHA256 checksums
-- **AGI Cognitive Phases**: Identity, temporal reasoning, emotional tagging, meta-cognition (4 phases)
-- **Intelligent Router**: Multi-provider LLM routing with uncertainty scoring
-- **Anti-Hallucination Engine**: Causal inference, strange loop detection, continuous learning
-- **Code Execution Sandbox**: RestrictedPython-based secure execution with PII tokenization
-- **Semantic Cache**: LLM reasoning result caching (30-40% hit rate in production)
-- **Manifold Working Memory**: High-dimensional working memory with trajectory compression
-- **Triple-Signal Search**: Three-way ranking combining BM25, vector similarity, and graph proximity
-- **Entropy Scoring**: Information-theoretic importance scoring for memory prioritization
-- **Tool Usage Analytics**: Track which tools are invoked to optimize profile loading
-- **Cluster Intelligence**: Multi-node coordination via cluster brain and SAFLA remote integration
+Both figures were measured on Python 3.11.11 through `tools/list` over stdio,
+in one virtualenv, before and after installing the optional set.
 
-## Performance
+Everything core runs locally with no API keys and no network. The optional
+vector stack (Qdrant plus ollama) upgrades recall from keyword matching to
+meaning-based, and its absence degrades gracefully rather than breaking.
 
-Based on production testing:
-- **Write Speed**: ~0.04ms per entity
-- **Read Speed**: ~0.01ms per query
-- **Compression**: 2.4x average reduction
-- **Semantic Cache Hit Rate**: 30-40%
-- **Storage**: SQLite database at `~/.claude/enhanced_memories/memory.db`
+## The one thing to know first
 
-## Installation
+**This is two processes, not one.** Nearly every support question about this
+project comes from running only half of it.
 
-### Prerequisites
+```
+   your MCP client  (Claude Code, Claude Desktop, an SDK, curl)
+            |
+            |   stdio JSON-RPC, one server process per client session
+            v
+   +-------------------------------------------------------+
+   |  MCP server            server.py                       |
+   |  start with            setup/bin/mcp-server.sh          |
+   +-------------------------------------------------------+
+            |
+            |   JSON over a Unix socket: $MEMORY_DB_SOCKET_PATH
+            |   (default /tmp/memory-db.sock)
+            v
+   +-------------------------------------------------------+
+   |  memory-db daemon      memory_db_service.py            |
+   |  start with            setup/bin/memory-db-daemon.sh    |
+   |  REQUIRED. Owns the database file exclusively so that   |
+   |  several clients can share it without corrupting it.    |
+   +-------------------------------------------------------+
+            |
+            v
+     memory.db   (SQLite, default ~/.claude/enhanced_memories/)
 
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-### Quick Start
+   optional, off to the side:
+     Qdrant  http://localhost:6333    vector index for semantic recall
+     ollama  http://127.0.0.1:11434   local embeddings that feed that index
+```
+
+The daemon is not optional and it is not started for you by the MCP server.
+Without it, the server still starts, still answers, and returns objects like
+these:
+
+```json
+{"query": "anything", "count": 0, "results": [],
+ "error": "Memory-DB service error: [Errno 2] No such file or directory"}
+
+{"error": "Memory-DB service error: ...", "entities": {"total": 0},
+ "compression": {"ratio": "N/A"}}
+```
+
+Well formed, parseable, and empty. An agent reading that concludes your memory
+is empty rather than deaf. `./healthcheck.sh` exists to tell the two apart.
+
+## Prerequisites
+
+- Python 3.11 or newer. On some macOS machines a bare `python3` is
+  still 3.9, so the installer looks for versioned names first.
+- git, and about 2 GB of disk for the virtual environment.
+- Optional: podman or docker, if you want the container path or a local Qdrant.
+- Optional: [ollama](https://ollama.com), for local embeddings.
+
+No sudo is required at any point. Nothing is installed system wide.
+
+## Quick start
 
 ```bash
-git clone https://github.com/marc-shade/enhanced-memory-mcp.git
+git clone <this-repo> enhanced-memory-mcp
 cd enhanced-memory-mcp
-uv venv --python 3.11 .venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
+
+# 1. venv, dependencies, .env, database directory. Idempotent, re-runnable.
+setup/setup.sh
+
+# 2. start the daemon (foreground). Leave it running, or install it as a
+#    background service: setup/service/install-services.sh
+setup/bin/memory-db-daemon.sh &
+
+# 3. prove the install works before you trust it
+./healthcheck.sh
 ```
 
-### Configure in Claude Code
+A healthy run ends with `Required checks passed.` and exit code 0. Anything else
+is a real problem: see [Troubleshooting](#troubleshooting).
 
-Add to your `~/.claude.json`:
+Then register the server with your MCP client. In `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "enhanced-memory": {
-      "command": "python3",
-      "args": ["/path/to/enhanced-memory-mcp/server.py"]
+      "command": "/absolute/path/to/enhanced-memory-mcp/setup/bin/mcp-server.sh"
     }
   }
 }
 ```
 
-### Configure in Claude Desktop
+Point the client at the **launcher**, not at `python server.py`. The launcher
+applies this checkout's `.env`, which is what guarantees the MCP server and the
+daemon resolve the same database file. A client that execs python directly
+inherits only whatever environment that client happened to have, and the two
+processes drift apart silently. See
+[the split brain trap](#the-server-and-the-daemon-disagree-about-the-database).
 
-Add to your Claude Desktop MCP configuration:
+### The alternative: one shared HTTP server
+
+stdio spawns one server process per client session, which is what desktop
+clients expect. If you would rather run a single shared server over HTTP, use
+the SSE transport:
+
+```bash
+MCP_TRANSPORT=sse setup/bin/mcp-server.sh     # or setup/bin/mcp-server-sse.sh
+```
 
 ```json
 {
   "mcpServers": {
-    "enhanced-memory": {
-      "command": "/path/to/enhanced-memory-mcp/.venv/bin/python3",
-      "args": ["/path/to/enhanced-memory-mcp/server.py"]
-    }
+    "enhanced-memory": { "type": "sse", "url": "http://127.0.0.1:9106/sse" }
   }
 }
 ```
 
-## Architecture
+There is no authentication on that port. Keep `MCP_HOST` at `127.0.0.1`.
 
-### Memory Tiers
+## Configuration
 
-| Tier | Purpose | Access Pattern |
-|------|---------|----------------|
-| **Core** | System roles, AI agent library, execution patterns | Pre-loaded on startup, sub-ms access |
-| **Working** | Active projects, current context, agent assignments | Session-scoped, frequent read/write |
-| **Reference** | Documentation, code patterns, error solutions | Full-text search, lazy loaded |
-| **Archive** | Historical data, metrics, decision logs | Maximum compression, date-partitioned |
-
-### Module Architecture
-
-```
-server.py                    # Main FastMCP entry point
-├── server/                  # Core server modules
-│   ├── config.py            # Configuration and logging
-│   ├── database.py          # SQLite connection management
-│   ├── compression.py       # zlib compression engine
-│   ├── compaction.py        # Entity compaction and cleanup
-│   ├── integrity.py         # SHA256 integrity verification
-│   ├── versioning.py        # Git-like memory versioning
-│   └── modules.py           # Profile-based module loader
-├── router/                  # Intelligent LLM routing
-│   ├── router.py            # Multi-provider router
-│   ├── intelligent_router.py # Uncertainty-aware routing
-│   ├── uncertainty.py       # Uncertainty scoring
-│   └── providers/           # Provider implementations
-├── sandbox/                 # Code execution sandbox
-│   ├── executor.py          # RestrictedPython execution
-│   ├── security.py          # Safety checks
-│   ├── pii_tokenizer.py     # PII detection and tokenization
-│   ├── lazy_loader.py       # Deferred module loading
-│   └── tool_discovery.py    # Dynamic tool discovery
-├── agi/                     # AGI cognitive modules (22 files)
-│   ├── consolidation.py     # Sleep-like memory consolidation
-│   ├── metacognition.py     # Self-awareness tracking
-│   ├── belief_tracking.py   # Probabilistic belief states
-│   ├── temporal_reasoning.py # Causal chains
-│   ├── emotional_memory.py  # Emotional tagging
-│   └── ...
-├── *_tools.py (31 files)    # MCP tool modules
-└── test_*.py (67 files)     # Test suite
-```
-
-### RAG Strategy Pipeline
-
-| Tier | Strategy | Tools | File |
-|------|----------|-------|------|
-| 1 | Hybrid Search (BM25 + Vector) | `search_hybrid` | `hybrid_search_tools_nmf.py` |
-| 1 | Re-ranking (Cross-Encoder) | `search_with_reranking` | `reranking_tools_nmf.py` |
-| 2 | Query Expansion | `search_with_query_expansion` | `query_expansion_tools.py` |
-| 2 | Multi-Query RAG | `search_with_multi_query` | `multi_query_rag_tools.py` |
-| 3.1 | Contextual Retrieval | `generate_context_for_chunk` | `contextual_retrieval_tools.py` |
-| 3.2 | Context-Aware Chunking | `chunk_document_semantic` | `context_aware_chunking.py` |
-| 3.3 | Hierarchical RAG | `search_hierarchical` | `hierarchical_rag_tools.py` |
-| 4.1 | Agentic + Self-Reflective RAG | `agentic_retrieve` | `agentic_rag_tools.py` |
-| 4.2 | GraphRAG | `graph_enhanced_search` | `graphrag_tools.py` |
-| 4.3 | Visual Memory | `store_visual_episode` | `visual_memory_tools.py` |
-| -- | Triple-Signal Search | `triple_signal_search` | `triple_signal_tools.py` |
-| -- | Semantic Cache | `semantic_cache_get`, `agi_cached_reasoning` | `semantic_cache_tools.py` |
-| -- | FACT Cache | `fact_search` | `fact_integration.py` |
-| -- | Unified Search | `unified_search` | `unified_search_api.py` |
-
-### Memory Profiles
-
-Control tool loading via the `MEMORY_PROFILE` environment variable:
+Configuration is environment variables. `setup/setup.sh` writes a `.env` from
+[`.env.example`](.env.example), which documents every setting inline. A variable
+already set in your environment beats the file, so a one-off override works as
+you would expect:
 
 ```bash
-# Full mode (default): All 200+ tools loaded
-MEMORY_PROFILE=full python3 server.py
-
-# Orchestrator mode: ~15 essential tools for coordination
-MEMORY_PROFILE=orchestrator python3 server.py
+MEMORY_DB_SOCKET_PATH=/tmp/other.sock ./healthcheck.sh
 ```
 
-Orchestrator mode loads only: `nmf_tools`, `safla_remote_integration`, `fact_integration`, `unified_search_api`, `semantic_cache_tools`, `reasoning_bank`.
+| Variable | Default | Purpose |
+|---|---|---|
+| `ENHANCED_MEMORY_DIR` | `~/.claude/enhanced_memories` | Directory holding `memory.db`. |
+| `ENHANCED_MEMORY_DB_PATH` | (unset) | Full path to the database file. Overrides the directory setting. |
+| `MEMORY_DB_SOCKET_PATH` | `/tmp/memory-db.sock` | Unix socket between the two processes. Keep it short, see the AF_UNIX note below. |
+| `MCP_TRANSPORT` | `stdio` | `stdio`, `sse`, or `streamable-http`. |
+| `MCP_HOST` | `127.0.0.1` | HTTP transports only. Do not expose this to a network. |
+| `MCP_PORT` | `9106` | HTTP transports only. |
+| `ENHANCED_MEMORY_SURFACE` | `frontdoor` | `frontdoor` registers every tool and marks five as always-loaded (`search_nodes`, `semantic_recall`, `create_entities`, `get_memory_status`, `execute_code`), leaving the rest for the client's tool search; `consolidated` exposes 7 and hides the rest behind one dispatcher; `full` registers everything and marks nothing. |
+| `MEMORY_PROFILE` | `full` | `minimal` skips the optional integrations and starts faster. |
+| `MEMORY_QDRANT_URL` | `http://localhost:6333` | Optional vector store. |
+| `MEMORY_OLLAMA_URL` | `http://127.0.0.1:11434` | Optional embedding provider. |
+| `MEMORY_EMBED_MODEL` | `embeddinggemma` | Embedding model to pull and use. |
+| `MEMORY_LOW_CONF_THRESHOLD` | `0.50` | Score under which a result is flagged low confidence. |
+| `EXPECTED_TOOL_COUNT` | (unset) | Pins the tool count `./healthcheck.sh` requires. |
 
-### Database Schema
+`ENHANCED_MEMORY_SURFACE` and `MEMORY_PROFILE` both change how many tools
+`tools/list` returns, and so does which optional dependencies are installed:
+tools whose backend is missing are not registered. A core-only install and an
+install with the optional extras report different counts from the same code. An
+expected tool count is only meaningful next to all three.
 
-Primary tables in `~/.claude/enhanced_memories/memory.db`:
+## Optional services, and what you lose without them
 
-```sql
--- Core memory storage with compression and versioning
-CREATE TABLE entities (
-    id INTEGER PRIMARY KEY,
-    name TEXT UNIQUE NOT NULL,
-    entity_type TEXT NOT NULL,
-    tier TEXT DEFAULT 'working',
-    compressed_data BLOB,
-    original_size INTEGER,
-    compressed_size INTEGER,
-    compression_ratio REAL,
-    checksum TEXT,
-    created_at TIMESTAMP,
-    accessed_at TIMESTAMP,
-    access_count INTEGER DEFAULT 0
-);
+Neither is required. Both are worth having.
 
--- Entity relationships with causal tracking
-CREATE TABLE relations (
-    id INTEGER PRIMARY KEY,
-    from_entity TEXT NOT NULL,
-    to_entity TEXT NOT NULL,
-    relation_type TEXT NOT NULL,
-    weight REAL DEFAULT 1.0,
-    causal INTEGER DEFAULT 0,
-    created_at TIMESTAMP,
-    UNIQUE(from_entity, to_entity, relation_type)
-);
+| | Present | Absent |
+|---|---|---|
+| **Qdrant** | Search ranks by meaning: a query about "permission gating" can surface an entity that never uses those words. | Search still works and still returns results, but ranking falls back to lexical matching. Nothing errors, which is why it is easy not to notice. |
+| **ollama** | Generates the embeddings Qdrant indexes. | Qdrant has nothing to index, so recall stays lexical even with Qdrant running. |
 
--- Git-like version history
-CREATE TABLE entity_versions (
-    id INTEGER PRIMARY KEY,
-    entity_name TEXT NOT NULL,
-    version INTEGER NOT NULL,
-    branch TEXT DEFAULT 'main',
-    compressed_data BLOB,
-    checksum TEXT,
-    created_at TIMESTAMP
-);
-```
-
-Additional tables: `observations`, `entity_branches`, `working_memory`, `episodic_memory`, `semantic_memory`, `procedural_memory`, `visual_episodes`.
-
-## API Examples
-
-### Create Entities
-```python
-await create_entities({
-    "entities": [
-        {
-            "name": "project_alpha",
-            "entityType": "project",
-            "observations": ["Architecture uses microservices", "Deployed on Kubernetes"]
-        }
-    ]
-})
-```
-
-### Search Nodes
-```python
-await search_nodes({
-    "query": "microservices architecture",
-    "entity_types": ["project"],
-    "limit": 10
-})
-```
-
-### Unified Search (Intelligent Routing)
-```python
-await unified_search({
-    "query": "How does authentication work?",
-    "strategy": "auto"  # Automatically selects best RAG strategy
-})
-```
-
-### Agentic RAG (Self-Reflective Retrieval)
-```python
-await agentic_retrieve({
-    "query": "memory consolidation patterns",
-    "max_iterations": 3,
-    "quality_threshold": 0.7
-})
-```
-
-### Neural Memory Fabric
-```python
-# Open a memory block for editing
-await nmf_open_block({"block_id": "working_context"})
-
-# Edit the block
-await nmf_edit_block({
-    "block_id": "working_context",
-    "content": "Current focus: implementing authentication module"
-})
-
-# Recall related memories
-await nmf_recall({"query": "authentication patterns"})
-
-# Close the block
-await nmf_close_block({"block_id": "working_context"})
-```
-
-### Semantic Cache
-```python
-# Cache an LLM reasoning result
-await semantic_cache_store({
-    "query": "Explain transformer attention mechanisms",
-    "result": "Transformers use self-attention to...",
-    "ttl_hours": 24
-})
-
-# Retrieve cached result (fuzzy match)
-await semantic_cache_get({
-    "query": "How do transformer attention heads work?"
-})
-```
-
-### Memory Versioning
-```python
-# Create a branch
-await memory_branch({"branch_name": "experiment-v2"})
-
-# Make changes, then diff
-await memory_diff({"branch": "experiment-v2", "base": "main"})
-
-# Revert if needed
-await memory_revert({"entity_name": "project_alpha", "version": 3})
-```
-
-## Tool Modules
-
-### Core Tools (always loaded)
-
-| Module | Tools | Description |
-|--------|-------|-------------|
-| `server/` | `create_entities`, `search_nodes`, `get_memory_status` | Core CRUD + versioning |
-
-### AGI Cognitive Tools
-
-| Module | Phase | Description |
-|--------|-------|-------------|
-| `agi_tools.py` | Phase 1 | Identity, action tracking, agent registry |
-| `agi_tools_phase2.py` | Phase 2 | Temporal reasoning, sleep-like consolidation |
-| `agi_tools_phase3.py` | Phase 3 | Emotional tagging, associative networks |
-| `agi_tools_phase4.py` | Phase 4 | Meta-cognition, self-improvement cycles |
-
-### RAG & Search Tools
-
-| Module | Description |
-|--------|-------------|
-| `hybrid_search_tools_nmf.py` | BM25 + vector hybrid search |
-| `reranking_tools_nmf.py` | Cross-encoder re-ranking (ms-marco-MiniLM) |
-| `query_expansion_tools.py` | LLM-powered query expansion |
-| `multi_query_rag_tools.py` | Multi-perspective query generation |
-| `contextual_retrieval_tools.py` | Context-enhanced chunk retrieval |
-| `hierarchical_rag_tools.py` | Multi-level document indexing |
-| `agentic_rag_tools.py` | Autonomous self-reflective retrieval |
-| `graphrag_tools.py` | Graph-enhanced search |
-| `triple_signal_tools.py` | Three-way ranking (BM25 + vector + graph) |
-| `visual_memory_tools.py` | Visual episode storage and similarity search |
-
-### Memory Management Tools
-
-| Module | Description |
-|--------|-------------|
-| `nmf_tools.py` | Neural Memory Fabric (Letta-style blocks) |
-| `reasoning_tools.py` | 75/15 rule prioritization |
-| `semantic_cache_tools.py` | LLM reasoning result caching |
-| `fact_integration.py` | Fast cache-first fact retrieval |
-| `unified_search_api.py` | Intelligent search strategy routing |
-| `reasoning_bank.py` | Persistent learning from reasoning outcomes |
-| `manifold_working_memory_tools.py` | High-dimensional working memory |
-| `trajectory_compression.py` | Memory trajectory compression |
-| `entropy_scoring.py` | Information-theoretic importance scoring |
-| `lru_cache_layer.py` | LRU caching for hot entities |
-
-### Intelligence Tools
-
-| Module | Description |
-|--------|-------------|
-| `anti_hallucination.py` | Hallucination detection and prevention |
-| `causal_inference.py` | Causal relationship discovery |
-| `strange_loops.py` | Self-referential loop detection |
-| `continuous_learning.py` | Online learning from interactions |
-| `model_router.py` | Multi-provider LLM routing |
-| `activation_field_tools.py` | Memory activation field dynamics |
-| `procedural_evolution_tools.py` | Procedural memory evolution |
-| `routing_learning_tools.py` | Learned query routing optimization |
-| `surprise_consolidation_tools.py` | Surprise-based memory consolidation |
-| `provenance.py` | Provenance tracking and L-Score validation |
-
-### Integration Tools
-
-| Module | Description |
-|--------|-------------|
-| `safla_tools.py` | SAFLA 4-tier memory integration |
-| `safla_remote_integration.py` | Remote SAFLA cluster bridge |
-| `cluster_brain_tools.py` | Multi-node cluster intelligence |
-| `sleeptime_tools.py` | Letta sleeptime compute integration |
-| `tool_usage_logger.py` | Tool invocation analytics |
-
-## Testing
+Provision either or both:
 
 ```bash
-# Run comprehensive test suite
-python3 comprehensive_test.py
-
-# RAG integration tests (22 tests)
-python3 test_rag_integration_comprehensive.py
-
-# Test specific subsystems
-python3 test_graphrag_integration.py
-python3 test_manifold_working_memory.py
-python3 test_triple_signal_search.py
-python3 test_surprise_consolidation.py
-python3 test_trajectory_compression.py
-python3 test_anti_hallucination.py
-python3 test_causal_inference.py
-
-# AGI phase tests
-python3 test_agi_phase1.py
-python3 test_agi_phase2.py
-python3 test_agi_phase3.py
-python3 test_agi_phase4.py
-
-# Code execution sandbox
-python3 test_advanced_tool_use.py
+setup/setup.sh --with-qdrant     # container on 127.0.0.1:6333, named volume
+setup/setup.sh --with-ollama     # verifies ollama, pulls the embedding model
 ```
 
-## Adding New Tools
+`./healthcheck.sh` reports both as OPTIONAL and never fails the gate on their
+absence. Pass `--require-optional` if you want the stricter contract.
 
-1. Create `{feature}_tools.py` with the registration pattern:
+## Running in a container
 
-```python
-def register_{feature}_tools(app, *args):
-    @app.tool()
-    async def my_new_tool(param: str) -> str:
-        """Tool description shown in MCP."""
-        return result
+The delivery path for shared environments. Podman first, docker compatible.
+
+```bash
+podman compose up --build                 # core only
+podman compose --profile qdrant up        # with the vector store
 ```
 
-2. Register in `server/modules.py`:
+The image runs both processes under `container-entrypoint.sh`, which starts the
+daemon, waits for the socket to answer, and only then starts the MCP server on
+the SSE transport. If either process exits, the container exits, because a live
+MCP server next to a dead daemon is exactly the state that returns well formed
+zeros forever.
 
-```python
-if should_load_module("{feature}_tools"):
-    try:
-        from {feature}_tools import register_{feature}_tools
-        register_{feature}_tools(app)
-    except Exception as e:
-        logger.warning(f"{feature} integration skipped: {e}")
+Notes that will save you time:
+
+- The MCP port is published on the **host loopback only**
+  (`127.0.0.1:9106:9106`). Inside the container the server binds `0.0.0.0`,
+  which is correct there and wrong on a workstation.
+- The database lives in the named volume `enhanced-memory-data`. Without a
+  volume, your memory dies with the container.
+- ollama runs on your host, and a container cannot reach it at `127.0.0.1`.
+  Uncomment `MEMORY_OLLAMA_URL` in `compose.yaml`
+  (`host.containers.internal` for podman, `host.docker.internal` for docker).
+- Verify a running container the same way you verify a host install. Use the
+  absolute path: not every engine resolves a relative one against `WORKDIR`.
+  ```bash
+  podman exec enhanced-memory /app/healthcheck.sh --skip-mcp
+  ```
+- Your local `.env` is not configuration for the container. The image ships an
+  empty one on purpose, and everything real comes from the runtime environment
+  in `compose.yaml`. `.containerignore` and `.dockerignore` exclude the file,
+  but not every engine honours them (Apple's `container build` did not, verified
+  2026-08-14), so the Containerfile also empties it in a discarded build stage
+  and then fails the build if a populated one survives.
+
+## Running as a background service
+
+```bash
+setup/service/install-services.sh              # daemon only
+setup/service/install-services.sh --with-sse   # and a shared SSE server
+setup/service/uninstall-services.sh
 ```
 
-3. Add to `tool_catalog.py` for progressive tool discovery.
-4. Write tests in `test_{feature}.py`.
+launchd user agents on macOS (`~/Library/LaunchAgents`), systemd user units on
+Linux (`~/.config/systemd/user`). No root, no system units. Every path is
+rendered from this checkout's location, so two checkouts can coexist if you give
+them different `--label-prefix` values and different sockets.
 
-## Environment Variables
+The installer waits for the socket and fails loudly with a log tail if the
+service does not come up. Logs land in `~/Library/Logs/enhanced-memory` or
+`${XDG_STATE_HOME:-~/.local/state}/enhanced-memory/log`, deliberately not in the
+checkout: launchd cannot create a log file on an external volume at spawn time
+and the job dies with exit 78 before your code ever runs.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MEMORY_PROFILE` | `full` | Tool loading profile (`full` or `orchestrator`) |
-| `TOOL_USAGE_LOGGING` | `true` | Enable tool invocation analytics |
-| `AGENTIC_SYSTEM_PATH` | `~/agentic-system` | Root path for agentic system |
-| `OLLAMA_HOST` | `localhost:11434` | Ollama server for LLM operations |
-| `QDRANT_HOST` | `localhost` | Qdrant vector database host |
-| `QDRANT_PORT` | `6333` | Qdrant vector database port |
-| `ANTHROPIC_API_KEY` | -- | For contextual prefix generation |
-| `OPENAI_API_KEY` | -- | For query expansion (optional) |
+On Linux, user units stop at logout unless you enable lingering:
 
-## Dependencies
+```bash
+loginctl enable-linger $USER
+```
 
-Key dependencies (see `requirements.txt` for full list):
+## Verify your install
 
-- `fastmcp` — MCP protocol implementation
-- `sentence-transformers` — Cross-encoder re-ranking (ms-marco-MiniLM-L-6-v2)
-- `qdrant-client` — Hybrid search with BM25 + vector
-- `RestrictedPython` — Secure sandbox code execution
-- `anthropic` — Claude API for contextual retrieval
-- `numpy` — Vector operations and entropy scoring
+Two gates, in this order.
+
+```bash
+./healthcheck.sh                 # the post-install gate
+python3 comprehensive_test.py    # the functional suite (needs the daemon running)
+```
+
+Judge `comprehensive_test.py` by its exit code, not by a pass count. The number
+of checks it runs depends on which optional backends are importable, so any
+figure printed in a README would be wrong on some machines.
+
+`./healthcheck.sh` is built so that it can fail. It writes a probe entity
+through the daemon socket, searches it back, and deletes it. It treats an
+`error` or `daemon` key in any response as failure regardless of the rest of the
+payload, and it compares the database path the daemon reports against the one
+your environment resolves. It checks:
+
+1. venv, interpreter version, `.env`, socket path length, sources present
+2. daemon round trip (status, database agreement, write, read back, cleanup)
+   and a schema check: every literal `INSERT` in the two files that own this
+   database is compared against the live table definitions, because a column
+   the schema lacks fails every write while the daemon reports the failure per
+   row rather than raising
+3. MCP handshake over stdio, tool count, and that nothing polluted stdout
+4. Qdrant and ollama, marked OPTIONAL, never fatal
+
+Useful flags: `--skip-mcp` for a fast daemon-only check, `--expect-tools N` to
+pin the count, `--require-optional` to demand the vector stack.
+
+## Troubleshooting
+
+### Every tool returns zeros, or an `error` field
+
+The daemon is not running. This is the common case by a wide margin.
+
+```json
+{"count": 0, "results": [], "error": "Memory-DB service error: ..."}
+```
+
+```bash
+setup/bin/memory-db-daemon.sh          # foreground, watch it
+./healthcheck.sh --skip-mcp            # confirm the round trip
+```
+
+### The server and the daemon disagree about the database
+
+Symptom: writes appear to succeed but searches never find them, or
+`get_memory_status` reports a count that does not match what you stored. The two
+processes resolved different files, and neither one errors.
+
+`./healthcheck.sh` detects this directly:
+
+```
+FAIL db-agreement  SPLIT BRAIN: daemon holds /path/A/memory.db,
+                   this environment resolves /path/B/memory.db
+```
+
+Cause: something started one process with a different `ENHANCED_MEMORY_DIR`,
+`ENHANCED_MEMORY_DB_PATH`, or `HOME` than the other. Usually an MCP client
+configured to exec `python server.py` directly, bypassing the launcher that
+applies `.env`. Fix the client config to use `setup/bin/mcp-server.sh`, then
+restart both processes.
+
+### `OSError` when the daemon starts, with no useful message
+
+The socket path is too long. AF_UNIX caps the path string at 104 bytes on macOS
+and 108 on Linux, and `bind()` fails with an error that mentions neither the cap
+nor the path. Deep checkouts hit this the moment the socket is placed inside
+them.
+
+Keep `MEMORY_DB_SOCKET_PATH` short and outside the checkout, for example
+`/tmp/em-myproject.sock`. `setup/setup.sh` measures it and refuses to continue
+if it is too long.
+
+### macOS: the service installs but the daemon never starts
+
+If the log shows `Operation not permitted` on the launcher path, the checkout is
+somewhere launchd is not allowed to execute from. Verified 2026-08-14: a
+checkout on an external volume under `/Volumes` installs and loads fine, then
+every spawn fails with EPERM, because launchd runs without the disk access your
+terminal has.
+
+Move the checkout to your home directory or another local path and reinstall,
+or grant Full Disk Access to launchd if the location is not negotiable. The
+installer surfaces this rather than hiding it: it waits for the socket, fails
+after 30 seconds, and prints the tail of the error log.
+
+### `ConnectionRefusedError` while the socket file exists
+
+A killed daemon left the file behind. The launcher removes a stale socket on
+start; if you are starting the daemon some other way, delete the file first.
+
+### The MCP client fails at the handshake with a JSON parse error
+
+Something printed to stdout, which belongs exclusively to the JSON-RPC stream on
+the stdio transport. `./healthcheck.sh` check 3 reports this as
+`FAIL mcp-stdout` along with the offending line.
+
+### `python3` is 3.9
+
+Common on macOS. Install a supported interpreter
+(`brew install python@3.11`) and re-run `setup/setup.sh`, which prefers
+versioned names. To force one: `setup/setup.sh --python /path/to/python3.11`.
+
+## Gaps and known issues
+
+Written to be re-checked, not trusted.
+
+- The healthcheck does not exercise the SSE transport, does not call individual
+  tools (it lists them), does not test concurrent access from several clients,
+  and does not measure recall quality with or without the vector stack.
+- Performance figures quoted in older revisions of this README have not been
+  reproduced here and were removed rather than repeated. Nothing in this file
+  claims a throughput, a latency or a compression ratio.
+- The container path was built and run with Docker and with Apple's `container`
+  on macOS/arm64. It has **not** been exercised with podman, and not on
+  linux/amd64. The Containerfile uses no engine-specific syntax, but that is an
+  expectation, not a measurement.
+- The service units are installed and started by the installer, which waits for
+  the socket and fails loudly if it does not appear. Survival across a real
+  reboot or logout has not been tested.
+- The tool count varies with the surface, the profile and which optional
+  dependencies are installed. Treat any single number as specific to one
+  machine's configuration.
 
 ## License
 
