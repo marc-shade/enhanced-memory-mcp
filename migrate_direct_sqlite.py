@@ -17,8 +17,7 @@ from neural_memory_fabric import get_nmf
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ async def main():
 
     # Count entities
     cursor.execute("SELECT COUNT(*) as count FROM entities")
-    total = cursor.fetchone()['count']
+    total = cursor.fetchone()["count"]
     print(f"✅ Found {total} entities to migrate")
 
     if total == 0:
@@ -76,12 +75,14 @@ async def main():
             import zlib
             import pickle
 
-            compressed_bytes = entity['compressed_data']
+            compressed_bytes = entity["compressed_data"]
 
             # Skip if NULL
             if compressed_bytes is None:
                 failed += 1
-                logger.warning(f"Entity {entity['id']} ({entity['name']}) has NULL compressed_data")
+                logger.warning(
+                    f"Entity {entity['id']} ({entity['name']}) has NULL compressed_data"
+                )
                 continue
 
             # Decompress and unpickle
@@ -89,35 +90,44 @@ async def main():
             entity_data = pickle.loads(decompressed_bytes)
 
             # Extract observations
-            observations = entity_data.get('observations', [])
+            observations = entity_data.get("observations", [])
 
             # Create content for embedding
             content = f"Name: {entity['name']}\nType: {entity['entity_type']}\n"
-            content += "\n".join(f"- {obs}" for obs in observations[:5])  # First 5 observations
+            content += "\n".join(
+                f"- {obs}" for obs in observations[:5]
+            )  # First 5 observations
 
             # Store in NMF (generates embeddings automatically)
             await nmf.remember(
                 content=content,
                 agent_id="migration",
                 metadata={
-                    "original_id": entity['id'],
-                    "name": entity['name'],
-                    "type": entity['entity_type'],
-                    "tier": entity['tier'],
-                    "tags": [entity['entity_type'], entity['tier']],  # Include tags in metadata
-                    "source": "sqlite_migration"
-                }
+                    "original_id": entity["id"],
+                    "name": entity["name"],
+                    "type": entity["entity_type"],
+                    "tier": entity["tier"],
+                    "tags": [
+                        entity["entity_type"],
+                        entity["tier"],
+                    ],  # Include tags in metadata
+                    "source": "sqlite_migration",
+                },
             )
 
             successful += 1
 
             # Progress update every 50 entities
             if i % 50 == 0:
-                print(f"   Progress: {i}/{len(entities)} ({i/len(entities)*100:.1f}%) - {successful} successful")
+                print(
+                    f"   Progress: {i}/{len(entities)} ({i / len(entities) * 100:.1f}%) - {successful} successful"
+                )
 
         except Exception as e:
             failed += 1
-            logger.error(f"Failed to migrate entity {entity['id']} ({entity['name']}): {e}")
+            logger.error(
+                f"Failed to migrate entity {entity['id']} ({entity['name']}): {e}"
+            )
 
     # Final report
     print("\n" + "=" * 70)
@@ -126,7 +136,7 @@ async def main():
     print(f"Total entities: {total}")
     print(f"✅ Successful: {successful}")
     print(f"❌ Failed: {failed}")
-    print(f"Success rate: {successful/total*100:.1f}%")
+    print(f"Success rate: {successful / total * 100:.1f}%")
 
     conn.close()
 

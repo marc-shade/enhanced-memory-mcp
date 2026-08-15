@@ -51,55 +51,60 @@ class AgentFileExporter:
     def export_entities(
         self,
         agent_id: str,
-        include_tiers: List[str] = ["episodic", "semantic", "procedural", "working"]
+        include_tiers: List[str] = ["episodic", "semantic", "procedural", "working"],
     ) -> List[Dict[str, Any]]:
         """Export entities associated with agent"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         # Get entities with observations
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT e.id, e.name, e.entity_type, e.tier, e.created_at
             FROM entities e
             WHERE e.tier IN ({})
             ORDER BY e.created_at DESC
             LIMIT 1000
-        '''.format(','.join(['?'] * len(include_tiers))), include_tiers)
+        """.format(",".join(["?"] * len(include_tiers))),
+            include_tiers,
+        )
 
         entities = []
         for row in cursor.fetchall():
             entity_id = row[0]
 
             # Get observations
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT content, created_at
                 FROM observations
                 WHERE entity_id = ?
                 ORDER BY created_at
-            ''', (entity_id,))
+            """,
+                (entity_id,),
+            )
 
             observations = [
                 {"content": obs_row[0], "timestamp": obs_row[1]}
                 for obs_row in cursor.fetchall()
             ]
 
-            entities.append({
-                "id": entity_id,
-                "name": row[1],
-                "entity_type": row[2],
-                "tier": row[3],
-                "created_at": row[4],
-                "observations": observations
-            })
+            entities.append(
+                {
+                    "id": entity_id,
+                    "name": row[1],
+                    "entity_type": row[2],
+                    "tier": row[3],
+                    "created_at": row[4],
+                    "observations": observations,
+                }
+            )
 
         conn.close()
         return entities
 
     def export_agent(
-        self,
-        agent_id: str,
-        include_entities: bool = True,
-        entity_limit: int = 1000
+        self, agent_id: str, include_entities: bool = True, entity_limit: int = 1000
     ) -> Dict[str, Any]:
         """
         Export complete agent state.
@@ -134,22 +139,19 @@ class AgentFileExporter:
                 "memory_blocks": memory_blocks,
                 "entities": entities,
                 "entity_count": len(entities),
-                "block_count": len(memory_blocks)
+                "block_count": len(memory_blocks),
             },
             "metadata": {
                 "exporter": "enhanced-memory-mcp",
                 "database_path": str(self.db_path),
-                "cluster_node": os.environ.get("NODE_ID", socket.gethostname())
-            }
+                "cluster_node": os.environ.get("NODE_ID", socket.gethostname()),
+            },
         }
 
         return agent_file
 
     def save_agent_file(
-        self,
-        agent_id: str,
-        output_path: Path,
-        compress: bool = True
+        self, agent_id: str, output_path: Path, compress: bool = True
     ) -> Dict[str, Any]:
         """
         Export agent and save to .af file.
@@ -170,11 +172,11 @@ class AgentFileExporter:
 
         if compress:
             # Compress with gzip
-            with gzip.open(output_path, 'wt', encoding='utf-8') as f:
+            with gzip.open(output_path, "wt", encoding="utf-8") as f:
                 f.write(json_data)
         else:
             # Save uncompressed
-            with open(output_path, 'w', encoding='utf-8') as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(json_data)
 
         file_size = output_path.stat().st_size
@@ -190,7 +192,7 @@ class AgentFileExporter:
             "file_size_kb": file_size / 1024,
             "compressed": compress,
             "blocks_exported": agent_data["agent"]["block_count"],
-            "entities_exported": agent_data["agent"]["entity_count"]
+            "entities_exported": agent_data["agent"]["entity_count"],
         }
 
 
@@ -205,11 +207,11 @@ class AgentFileImporter:
         """Load .af file and parse"""
         try:
             # Try gzip first
-            with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+            with gzip.open(file_path, "rt", encoding="utf-8") as f:
                 agent_data = json.load(f)
         except gzip.BadGzipFile:
             # Not compressed, load as plain JSON
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 agent_data = json.load(f)
 
         logger.info(f"📥 Loaded agent file: {file_path}")
@@ -219,9 +221,7 @@ class AgentFileImporter:
         return agent_data
 
     def import_memory_blocks(
-        self,
-        agent_id: str,
-        memory_blocks: List[Dict[str, Any]]
+        self, agent_id: str, memory_blocks: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Import memory blocks for an agent"""
         imported = []
@@ -234,24 +234,19 @@ class AgentFileImporter:
                 description=block.get("description", ""),
                 initial_value=block.get("value", ""),
                 limit=block.get("chars_limit", 2000),
-                read_only=block.get("read_only", False)
+                read_only=block.get("read_only", False),
             )
 
             if result["success"]:
                 imported.append(block["label"])
             else:
-                skipped.append({"label": block["label"], "reason": result.get("error", "unknown")})
+                skipped.append(
+                    {"label": block["label"], "reason": result.get("error", "unknown")}
+                )
 
-        return {
-            "imported": imported,
-            "skipped": skipped,
-            "count": len(imported)
-        }
+        return {"imported": imported, "skipped": skipped, "count": len(imported)}
 
-    def import_entities(
-        self,
-        entities: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def import_entities(self, entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Import entities into database"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -262,24 +257,34 @@ class AgentFileImporter:
         for entity in entities:
             try:
                 # Insert entity
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO entities (name, entity_type, tier, created_at)
                     VALUES (?, ?, ?, ?)
-                ''', (
-                    entity["name"],
-                    entity["entity_type"],
-                    entity["tier"],
-                    entity.get("created_at", datetime.now().isoformat())
-                ))
+                """,
+                    (
+                        entity["name"],
+                        entity["entity_type"],
+                        entity["tier"],
+                        entity.get("created_at", datetime.now().isoformat()),
+                    ),
+                )
 
                 entity_id = cursor.lastrowid
 
                 # Insert observations
                 for obs in entity.get("observations", []):
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                         INSERT INTO observations (entity_id, content, created_at)
                         VALUES (?, ?, ?)
-                    ''', (entity_id, obs["content"], obs.get("timestamp", datetime.now().isoformat())))
+                    """,
+                        (
+                            entity_id,
+                            obs["content"],
+                            obs.get("timestamp", datetime.now().isoformat()),
+                        ),
+                    )
 
                 imported.append(entity["name"])
 
@@ -289,17 +294,13 @@ class AgentFileImporter:
         conn.commit()
         conn.close()
 
-        return {
-            "imported": imported,
-            "skipped": skipped,
-            "count": len(imported)
-        }
+        return {"imported": imported, "skipped": skipped, "count": len(imported)}
 
     def import_agent(
         self,
         file_path: Path,
         new_agent_id: Optional[str] = None,
-        import_entities: bool = True
+        import_entities: bool = True,
     ) -> Dict[str, Any]:
         """
         Import complete agent from .af file.
@@ -322,8 +323,7 @@ class AgentFileImporter:
 
         # Import memory blocks
         blocks_result = self.import_memory_blocks(
-            agent_id=agent_id,
-            memory_blocks=agent_data["agent"]["memory_blocks"]
+            agent_id=agent_id, memory_blocks=agent_data["agent"]["memory_blocks"]
         )
 
         logger.info(f"   Imported {blocks_result['count']} memory blocks")
@@ -342,7 +342,7 @@ class AgentFileImporter:
             "blocks_imported": blocks_result["count"],
             "blocks_skipped": len(blocks_result["skipped"]),
             "entities_imported": entities_result["count"],
-            "entities_skipped": len(entities_result["skipped"])
+            "entities_skipped": len(entities_result["skipped"]),
         }
 
 
@@ -357,9 +357,7 @@ def test_agent_file():
 
     print("\nExporting agent...")
     export_result = exporter.save_agent_file(
-        agent_id="test_agent",
-        output_path=output_path,
-        compress=True
+        agent_id="test_agent", output_path=output_path, compress=True
     )
     print(json.dumps(export_result, indent=2))
 
@@ -368,9 +366,7 @@ def test_agent_file():
 
     print("\nImporting agent...")
     import_result = importer.import_agent(
-        file_path=output_path,
-        new_agent_id="test_agent_imported",
-        import_entities=True
+        file_path=output_path, new_agent_id="test_agent_imported", import_entities=True
     )
     print(json.dumps(import_result, indent=2))
 

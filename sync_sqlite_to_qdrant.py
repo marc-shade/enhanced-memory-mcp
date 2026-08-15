@@ -18,8 +18,7 @@ from neural_memory_fabric import get_nmf
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -49,13 +48,15 @@ def get_all_entities_from_sqlite() -> List[Dict[str, Any]]:
 
     entities = []
     for row in cursor.fetchall():
-        entities.append({
-            'id': row['id'],
-            'name': row['name'],
-            'entity_type': row['entity_type'],
-            'tier': row['tier'] or 'working',
-            'observations': row['observations'] or ''
-        })
+        entities.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "entity_type": row["entity_type"],
+                "tier": row["tier"] or "working",
+                "observations": row["observations"] or "",
+            }
+        )
 
     conn.close()
     return entities
@@ -70,16 +71,16 @@ async def sync_entity_to_qdrant(nmf, entity: Dict[str, Any]) -> bool:
         # Store in NMF (which generates embeddings and stores in Qdrant)
         result = await nmf.remember(
             content=content,
-            agent_id='default_agent',
+            agent_id="default_agent",
             metadata={
-                'sqlite_id': entity['id'],
-                'name': entity['name'],
-                'entity_type': entity['entity_type'],
-                'tier': entity['tier']
-            }
+                "sqlite_id": entity["id"],
+                "name": entity["name"],
+                "entity_type": entity["entity_type"],
+                "tier": entity["tier"],
+            },
         )
 
-        return result.get('success', False)
+        return result.get("success", False)
 
     except Exception as e:
         logger.error(f"Failed to sync entity {entity['id']}: {e}")
@@ -96,10 +97,11 @@ async def main():
     print("\n[1/4] Initializing Neural Memory Fabric...")
     try:
         nmf = await get_nmf()
-        print(f"✅ NMF initialized")
+        print("✅ NMF initialized")
     except Exception as e:
         print(f"❌ Failed to initialize NMF: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -114,7 +116,7 @@ async def main():
             return 0
 
         # Show sample
-        print(f"\n   Sample entities:")
+        print("\n   Sample entities:")
         for entity in entities[:3]:
             print(f"   - ID {entity['id']}: {entity['name']} ({entity['entity_type']})")
         if len(entities) > 3:
@@ -138,8 +140,10 @@ async def main():
             elapsed = time.time() - start_time
             rate = i / elapsed if elapsed > 0 else 0
             eta = (len(entities) - i) / rate if rate > 0 else 0
-            print(f"   Progress: {i}/{len(entities)} ({i/len(entities)*100:.1f}%) "
-                  f"- {rate:.1f} entities/sec - ETA: {eta:.0f}s")
+            print(
+                f"   Progress: {i}/{len(entities)} ({i / len(entities) * 100:.1f}%) "
+                f"- {rate:.1f} entities/sec - ETA: {eta:.0f}s"
+            )
 
         # Sync entity
         if await sync_entity_to_qdrant(nmf, entity):
@@ -151,12 +155,13 @@ async def main():
     elapsed = time.time() - start_time
 
     # Verify
-    print(f"\n[4/4] Verifying sync...")
+    print("\n[4/4] Verifying sync...")
     try:
         import requests
-        resp = requests.get('http://localhost:6333/collections/enhanced_memory')
+
+        resp = requests.get("http://localhost:6333/collections/enhanced_memory")
         data = resp.json()
-        points_count = data['result']['points_count']
+        points_count = data["result"]["points_count"]
         print(f"✅ Qdrant collection has {points_count} points")
     except Exception as e:
         print(f"⚠️  Could not verify: {e}")
@@ -171,19 +176,20 @@ async def main():
     print(f"Failed: {failed_count}")
     print(f"Qdrant points: {points_count}")
     print(f"Time elapsed: {elapsed:.1f} seconds")
-    print(f"Rate: {len(entities)/elapsed:.1f} entities/sec")
+    print(f"Rate: {len(entities) / elapsed:.1f} entities/sec")
 
     if success_count == len(entities):
-        print(f"\n✅ All entities synced successfully!")
+        print("\n✅ All entities synced successfully!")
         return 0
     elif success_count > 0:
         print(f"\n⚠️  Partial sync: {failed_count} entities failed")
         return 1
     else:
-        print(f"\n❌ Sync failed completely")
+        print("\n❌ Sync failed completely")
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import asyncio
+
     sys.exit(asyncio.run(main()))

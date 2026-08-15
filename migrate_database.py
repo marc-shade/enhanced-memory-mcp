@@ -16,29 +16,76 @@ DB_PATH = MEMORY_DIR / "memory.db"
 # All migrations to apply
 MIGRATIONS = [
     # Add improvement_delta to improvement_cycles
-    ("improvement_cycles", "improvement_delta", "ALTER TABLE improvement_cycles ADD COLUMN improvement_delta REAL DEFAULT 0.0"),
-
+    (
+        "improvement_cycles",
+        "improvement_delta",
+        "ALTER TABLE improvement_cycles ADD COLUMN improvement_delta REAL DEFAULT 0.0",
+    ),
     # Add validation_results to improvement_cycles
-    ("improvement_cycles", "validation_results", "ALTER TABLE improvement_cycles ADD COLUMN validation_results TEXT DEFAULT '{}'"),
-
+    (
+        "improvement_cycles",
+        "validation_results",
+        "ALTER TABLE improvement_cycles ADD COLUMN validation_results TEXT DEFAULT '{}'",
+    ),
     # Add improvement_percentage to improvement_cycles
-    ("improvement_cycles", "improvement_percentage", "ALTER TABLE improvement_cycles ADD COLUMN improvement_percentage REAL DEFAULT 0.0"),
-
+    (
+        "improvement_cycles",
+        "improvement_percentage",
+        "ALTER TABLE improvement_cycles ADD COLUMN improvement_percentage REAL DEFAULT 0.0",
+    ),
     # Ensure reasoning_strategies has all needed columns
-    ("reasoning_strategies", "times_used", "ALTER TABLE reasoning_strategies ADD COLUMN times_used INTEGER DEFAULT 0"),
-    ("reasoning_strategies", "failure_count", "ALTER TABLE reasoning_strategies ADD COLUMN failure_count INTEGER DEFAULT 0"),
-    ("reasoning_strategies", "last_used", "ALTER TABLE reasoning_strategies ADD COLUMN last_used TIMESTAMP"),
-    ("reasoning_strategies", "last_success", "ALTER TABLE reasoning_strategies ADD COLUMN last_success TIMESTAMP"),
-
+    (
+        "reasoning_strategies",
+        "times_used",
+        "ALTER TABLE reasoning_strategies ADD COLUMN times_used INTEGER DEFAULT 0",
+    ),
+    (
+        "reasoning_strategies",
+        "failure_count",
+        "ALTER TABLE reasoning_strategies ADD COLUMN failure_count INTEGER DEFAULT 0",
+    ),
+    (
+        "reasoning_strategies",
+        "last_used",
+        "ALTER TABLE reasoning_strategies ADD COLUMN last_used TIMESTAMP",
+    ),
+    (
+        "reasoning_strategies",
+        "last_success",
+        "ALTER TABLE reasoning_strategies ADD COLUMN last_success TIMESTAMP",
+    ),
     # Memory versions table fixes
-    ("memory_versions", "parent_version_id", "ALTER TABLE memory_versions ADD COLUMN parent_version_id INTEGER"),
-
+    (
+        "memory_versions",
+        "parent_version_id",
+        "ALTER TABLE memory_versions ADD COLUMN parent_version_id INTEGER",
+    ),
     # Add missing indexes
-    ("idx_reasoning_agent", None, "CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON reasoning_strategies(agent_id)"),
-    ("idx_improvement_agent", None, "CREATE INDEX IF NOT EXISTS idx_improvement_agent ON improvement_cycles(agent_id)"),
-    ("idx_action_outcomes_agent", None, "CREATE INDEX IF NOT EXISTS idx_action_outcomes_agent ON action_outcomes(agent_id)"),
-    ("idx_action_outcomes_type", None, "CREATE INDEX IF NOT EXISTS idx_action_outcomes_type ON action_outcomes(action_type)"),
-    ("idx_entity_version", None, "CREATE INDEX IF NOT EXISTS idx_entity_version ON memory_versions(entity_id, version_number)"),
+    (
+        "idx_reasoning_agent",
+        None,
+        "CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON reasoning_strategies(agent_id)",
+    ),
+    (
+        "idx_improvement_agent",
+        None,
+        "CREATE INDEX IF NOT EXISTS idx_improvement_agent ON improvement_cycles(agent_id)",
+    ),
+    (
+        "idx_action_outcomes_agent",
+        None,
+        "CREATE INDEX IF NOT EXISTS idx_action_outcomes_agent ON action_outcomes(agent_id)",
+    ),
+    (
+        "idx_action_outcomes_type",
+        None,
+        "CREATE INDEX IF NOT EXISTS idx_action_outcomes_type ON action_outcomes(action_type)",
+    ),
+    (
+        "idx_entity_version",
+        None,
+        "CREATE INDEX IF NOT EXISTS idx_entity_version ON memory_versions(entity_id, version_number)",
+    ),
 ]
 
 # Tables that should exist
@@ -60,7 +107,6 @@ REQUIRED_TABLES = [
         last_used TIMESTAMP,
         last_success TIMESTAMP
     )""",
-
     """CREATE TABLE IF NOT EXISTS improvement_cycles (
         cycle_id INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id TEXT NOT NULL,
@@ -83,7 +129,6 @@ REQUIRED_TABLES = [
         improvement_percentage REAL DEFAULT 0.0,
         validation_results TEXT DEFAULT '{}'
     )""",
-
     """CREATE TABLE IF NOT EXISTS memory_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         entity_id INTEGER NOT NULL,
@@ -98,7 +143,6 @@ REQUIRED_TABLES = [
         parent_version_id INTEGER,
         FOREIGN KEY (entity_id) REFERENCES entities (id)
     )""",
-
     """CREATE TABLE IF NOT EXISTS action_outcomes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         agent_id TEXT DEFAULT 'default_agent',
@@ -129,7 +173,9 @@ def column_exists(cursor, table_name, column_name):
 
 def table_exists(cursor, table_name):
     """Check if a table exists"""
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
+    )
     return cursor.fetchone() is not None
 
 
@@ -171,8 +217,13 @@ def run_migrations():
             print(f"  [OK] Applied: {sql[:60]}...")
 
         except sqlite3.OperationalError as e:
-            if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
-                print(f"  [SKIP] Already exists: {table_or_index}.{column if column else 'index'}")
+            if (
+                "duplicate column" in str(e).lower()
+                or "already exists" in str(e).lower()
+            ):
+                print(
+                    f"  [SKIP] Already exists: {table_or_index}.{column if column else 'index'}"
+                )
             else:
                 errors.append(f"{table_or_index}: {e}")
                 print(f"  [ERROR] {table_or_index}: {e}")
@@ -188,7 +239,7 @@ def run_migrations():
 
     conn.close()
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Migrations applied: {migrations_applied}")
     print(f"Errors: {len(errors)}")
 

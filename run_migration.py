@@ -14,12 +14,13 @@ MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
 DB_PATH = MEMORY_DIR / "memory.db"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
+
 def init_migration_tracking():
     """Create migrations tracking table"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute('''
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS schema_migrations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             migration_name TEXT UNIQUE NOT NULL,
@@ -27,21 +28,23 @@ def init_migration_tracking():
             success BOOLEAN DEFAULT 1,
             error_message TEXT
         )
-    ''')
+    """)
 
     conn.commit()
     conn.close()
+
 
 def get_applied_migrations():
     """Get list of already applied migrations"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute('SELECT migration_name FROM schema_migrations WHERE success = 1')
+    cursor.execute("SELECT migration_name FROM schema_migrations WHERE success = 1")
     applied = {row[0] for row in cursor.fetchall()}
 
     conn.close()
     return applied
+
 
 def get_pending_migrations():
     """Get list of migrations that need to be applied"""
@@ -58,6 +61,7 @@ def get_pending_migrations():
             pending.append(migration_file)
 
     return pending
+
 
 def apply_migration(migration_file: Path) -> tuple[bool, str]:
     """
@@ -79,7 +83,7 @@ def apply_migration(migration_file: Path) -> tuple[bool, str]:
         # SQLite doesn't support multiple statements in execute()
         # We need to split and execute individually
         # But ALTER TABLE might fail if column exists, so use try/except per statement
-        statements = [s.strip() for s in sql_content.split(';') if s.strip()]
+        statements = [s.strip() for s in sql_content.split(";") if s.strip()]
 
         for statement in statements:
             if not statement:
@@ -97,8 +101,8 @@ def apply_migration(migration_file: Path) -> tuple[bool, str]:
 
         # Record successful migration
         cursor.execute(
-            'INSERT INTO schema_migrations (migration_name, success) VALUES (?, 1)',
-            (migration_name,)
+            "INSERT INTO schema_migrations (migration_name, success) VALUES (?, 1)",
+            (migration_name,),
         )
         conn.commit()
         conn.close()
@@ -113,8 +117,8 @@ def apply_migration(migration_file: Path) -> tuple[bool, str]:
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute(
-                'INSERT INTO schema_migrations (migration_name, success, error_message) VALUES (?, 0, ?)',
-                (migration_name, error_msg)
+                "INSERT INTO schema_migrations (migration_name, success, error_message) VALUES (?, 0, ?)",
+                (migration_name, error_msg),
             )
             conn.commit()
             conn.close()
@@ -122,6 +126,7 @@ def apply_migration(migration_file: Path) -> tuple[bool, str]:
             pass
 
         return False, error_msg
+
 
 def show_status():
     """Show migration status"""
@@ -143,6 +148,7 @@ def show_status():
 
     print()
 
+
 def run_migrations(auto_confirm=False):
     """Run all pending migrations"""
     pending = get_pending_migrations()
@@ -158,7 +164,7 @@ def run_migrations(auto_confirm=False):
 
     if not auto_confirm:
         response = input("Apply these migrations? [y/N]: ")
-        if response.lower() not in ['y', 'yes']:
+        if response.lower() not in ["y", "yes"]:
             print("❌ Migrations cancelled")
             return False
 
@@ -173,24 +179,25 @@ def run_migrations(auto_confirm=False):
         success, error = apply_migration(migration_file)
 
         if success:
-            print(f"  ✅ Applied successfully")
+            print("  ✅ Applied successfully")
             success_count += 1
         else:
             print(f"  ❌ Failed: {error}")
-            print(f"\n⚠️  Migration failed. Stopping here.")
+            print("\n⚠️  Migration failed. Stopping here.")
             return False
 
     print("\n" + "=" * 60)
     print(f"✨ Successfully applied {success_count}/{len(pending)} migrations")
     return True
 
+
 def main():
     """Main entry point"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Run database migrations')
-    parser.add_argument('--status', action='store_true', help='Show migration status')
-    parser.add_argument('--auto', action='store_true', help='Auto-confirm migrations')
+    parser = argparse.ArgumentParser(description="Run database migrations")
+    parser.add_argument("--status", action="store_true", help="Show migration status")
+    parser.add_argument("--auto", action="store_true", help="Auto-confirm migrations")
 
     args = parser.parse_args()
 
@@ -203,5 +210,6 @@ def main():
         success = run_migrations(auto_confirm=args.auto)
         sys.exit(0 if success else 1)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

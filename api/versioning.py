@@ -11,9 +11,7 @@ DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
 
 
 def diff(
-    entity_name: str,
-    version1: Optional[int] = None,
-    version2: Optional[int] = None
+    entity_name: str, version1: Optional[int] = None, version2: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get diff between two versions of a memory.
@@ -37,8 +35,7 @@ def diff(
 
     # Get entity ID and current version
     cursor.execute(
-        'SELECT id, current_version FROM entities WHERE name = ?',
-        (entity_name,)
+        "SELECT id, current_version FROM entities WHERE name = ?", (entity_name,)
     )
     row = cursor.fetchone()
     if not row:
@@ -54,11 +51,14 @@ def diff(
         version1 = current - 1 if current > 1 else current
 
     # Get diff from version 2
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT diff_from_previous, commit_message, created_at, author
         FROM memory_versions
         WHERE entity_id = ? AND version_number = ?
-    ''', (entity_id, version2))
+    """,
+        (entity_id, version2),
+    )
 
     diff_data = cursor.fetchone()
     conn.close()
@@ -73,7 +73,7 @@ def diff(
         "diff": diff_data[0] or "",
         "message": diff_data[1],
         "timestamp": diff_data[2],
-        "author": diff_data[3]
+        "author": diff_data[3],
     }
 
 
@@ -93,13 +93,14 @@ def revert(entity_name: str, version: int) -> Dict[str, Any]:
         # Returns: {"reverted": True, "new_version": 8}
     """
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get entity ID
-    cursor.execute('SELECT id FROM entities WHERE name = ?', (entity_name,))
+    cursor.execute("SELECT id FROM entities WHERE name = ?", (entity_name,))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -108,11 +109,14 @@ def revert(entity_name: str, version: int) -> Dict[str, Any]:
     entity_id = row[0]
 
     # Get old version data
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT compressed_data
         FROM memory_versions
         WHERE entity_id = ? AND version_number = ?
-    ''', (entity_id, version))
+    """,
+        (entity_id, version),
+    )
 
     old_data = cursor.fetchone()
     if not old_data:
@@ -121,18 +125,19 @@ def revert(entity_name: str, version: int) -> Dict[str, Any]:
 
     # Decompress old data
     from server import decompress_data
+
     data = decompress_data(old_data[0])
 
     # Create new version with reverted data
     from server import create_version
+
     new_version_id = create_version(
-        entity_id,
-        data,
-        f"Reverted to version {version}",
-        "system"
+        entity_id, data, f"Reverted to version {version}", "system"
     )
 
-    cursor.execute('SELECT version_number FROM memory_versions WHERE id = ?', (new_version_id,))
+    cursor.execute(
+        "SELECT version_number FROM memory_versions WHERE id = ?", (new_version_id,)
+    )
     new_version = cursor.fetchone()[0]
 
     conn.commit()
@@ -142,14 +147,12 @@ def revert(entity_name: str, version: int) -> Dict[str, Any]:
         "reverted": True,
         "entity": entity_name,
         "reverted_to": version,
-        "new_version": new_version
+        "new_version": new_version,
     }
 
 
 def branch(
-    entity_name: str,
-    branch_name: str,
-    description: Optional[str] = None
+    entity_name: str, branch_name: str, description: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Create experimental branch of entity.
@@ -171,8 +174,7 @@ def branch(
 
     # Get entity ID and current version
     cursor.execute(
-        'SELECT id, current_version FROM entities WHERE name = ?',
-        (entity_name,)
+        "SELECT id, current_version FROM entities WHERE name = ?", (entity_name,)
     )
     row = cursor.fetchone()
     if not row:
@@ -182,10 +184,13 @@ def branch(
     entity_id, current_version = row
 
     # Get current version ID
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT id FROM memory_versions
         WHERE entity_id = ? AND version_number = ? AND is_current = 1
-    ''', (entity_id, current_version))
+    """,
+        (entity_id, current_version),
+    )
 
     version_row = cursor.fetchone()
     if not version_row:
@@ -195,18 +200,24 @@ def branch(
     base_version_id = version_row[0]
 
     # Create branch
-    cursor.execute('''
+    cursor.execute(
+        """
         INSERT INTO memory_branches
         (entity_id, branch_name, base_version_id, description)
         VALUES (?, ?, ?, ?)
-    ''', (entity_id, branch_name, base_version_id, description))
+    """,
+        (entity_id, branch_name, base_version_id, description),
+    )
 
     branch_id = cursor.lastrowid
 
     # Update entity to use new branch
-    cursor.execute('''
+    cursor.execute(
+        """
         UPDATE entities SET current_branch = ? WHERE id = ?
-    ''', (branch_name, entity_id))
+    """,
+        (branch_name, entity_id),
+    )
 
     conn.commit()
     conn.close()
@@ -216,7 +227,7 @@ def branch(
         "entity": entity_name,
         "branch": branch_name,
         "base_version": current_version,
-        "description": description
+        "description": description,
     }
 
 
@@ -242,42 +253,43 @@ def history(entity_name: str, limit: int = 10) -> List[Dict[str, Any]]:
     cursor = conn.cursor()
 
     # Get entity ID
-    cursor.execute('SELECT id FROM entities WHERE name = ?', (entity_name,))
+    cursor.execute("SELECT id FROM entities WHERE name = ?", (entity_name,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         raise ValueError(f"Entity not found: {entity_name}")
 
-    entity_id = row['id']
+    entity_id = row["id"]
 
     # Get version history
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT version_number, commit_message, author, created_at, branch_name
         FROM memory_versions
         WHERE entity_id = ?
         ORDER BY version_number DESC
         LIMIT ?
-    ''', (entity_id, limit))
+    """,
+        (entity_id, limit),
+    )
 
     versions = []
     for row in cursor.fetchall():
-        versions.append({
-            "version": row['version_number'],
-            "message": row['commit_message'],
-            "author": row['author'],
-            "timestamp": row['created_at'],
-            "branch": row['branch_name']
-        })
+        versions.append(
+            {
+                "version": row["version_number"],
+                "message": row["commit_message"],
+                "author": row["author"],
+                "timestamp": row["created_at"],
+                "branch": row["branch_name"],
+            }
+        )
 
     conn.close()
     return versions
 
 
-def commit(
-    entity_name: str,
-    message: str,
-    author: str = "agent"
-) -> Dict[str, Any]:
+def commit(entity_name: str, message: str, author: str = "agent") -> Dict[str, Any]:
     """
     Create a commit (version snapshot) of current entity state.
 
@@ -294,13 +306,14 @@ def commit(
         # Returns: {"version": 8, "commit_id": 234}
     """
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get entity ID
-    cursor.execute('SELECT id FROM entities WHERE name = ?', (entity_name,))
+    cursor.execute("SELECT id FROM entities WHERE name = ?", (entity_name,))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -309,26 +322,26 @@ def commit(
     entity_id = row[0]
 
     # Get current observations
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT content FROM observations
         WHERE entity_id = ?
         ORDER BY created_at
-    ''', (entity_id,))
+    """,
+        (entity_id,),
+    )
 
     observations = [row[0] for row in cursor.fetchall()]
 
     # Create version
     from server import create_version
+
     version_id = create_version(
-        entity_id,
-        {"observations": observations},
-        message,
-        author
+        entity_id, {"observations": observations}, message, author
     )
 
     cursor.execute(
-        'SELECT version_number FROM memory_versions WHERE id = ?',
-        (version_id,)
+        "SELECT version_number FROM memory_versions WHERE id = ?", (version_id,)
     )
     version_number = cursor.fetchone()[0]
 
@@ -340,5 +353,5 @@ def commit(
         "version": version_number,
         "entity": entity_name,
         "message": message,
-        "author": author
+        "author": author,
     }

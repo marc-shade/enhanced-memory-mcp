@@ -28,7 +28,7 @@ def register_agent_file_tools(app, db_path):
         agent_id: str,
         filename: str = None,
         include_entities: bool = True,
-        compress: bool = True
+        compress: bool = True,
     ) -> Dict[str, Any]:
         """
         Export agent state to .af file for backup or transfer.
@@ -59,16 +59,12 @@ def register_agent_file_tools(app, db_path):
         output_path = EXPORT_DIR / filename
 
         return exporter.save_agent_file(
-            agent_id=agent_id,
-            output_path=output_path,
-            compress=compress
+            agent_id=agent_id, output_path=output_path, compress=compress
         )
 
     @app.tool()
     async def import_agent_from_file(
-        file_path: str,
-        new_agent_id: str = None,
-        import_entities: bool = True
+        file_path: str, new_agent_id: str = None, import_entities: bool = True
     ) -> Dict[str, Any]:
         """
         Import agent state from .af file.
@@ -89,7 +85,7 @@ def register_agent_file_tools(app, db_path):
         return importer.import_agent(
             file_path=Path(file_path),
             new_agent_id=new_agent_id,
-            import_entities=import_entities
+            import_entities=import_entities,
         )
 
     @app.tool()
@@ -107,18 +103,20 @@ def register_agent_file_tools(app, db_path):
 
         for af_file in EXPORT_DIR.glob("*.af"):
             stat = af_file.stat()
-            files.append({
-                "filename": af_file.name,
-                "path": str(af_file),
-                "size_kb": stat.st_size / 1024,
-                "modified": stat.st_mtime
-            })
+            files.append(
+                {
+                    "filename": af_file.name,
+                    "path": str(af_file),
+                    "size_kb": stat.st_size / 1024,
+                    "modified": stat.st_mtime,
+                }
+            )
 
         return {
             "success": True,
             "export_directory": str(EXPORT_DIR),
             "count": len(files),
-            "files": sorted(files, key=lambda x: x["modified"], reverse=True)
+            "files": sorted(files, key=lambda x: x["modified"], reverse=True),
         }
 
     logger.info("✅ Agent File tools registered (3 tools)")

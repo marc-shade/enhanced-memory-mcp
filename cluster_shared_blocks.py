@@ -45,7 +45,7 @@ def _get_node_description(node_id: str) -> str:
     descriptions = {
         "builder": "Linux builder node for compilation, testing, containers",
         "orchestrator": "Orchestrator node for coordination, monitoring, routing",
-        "researcher": "Researcher node for analysis, documentation, research"
+        "researcher": "Researcher node for analysis, documentation, research",
     }
     return descriptions.get(node_id, f"{node_id} cluster node")
 
@@ -64,16 +64,15 @@ def setup_cluster_shared_blocks() -> dict:
     """
     manager = MemoryBlockManager(DB_PATH)
 
-    results = {
-        "blocks_created": [],
-        "attachments_created": []
-    }
+    results = {"blocks_created": [], "attachments_created": []}
 
     # Load cluster nodes dynamically
     cluster_nodes = _load_cluster_nodes()
 
     # Build cluster configuration description
-    node_descriptions = "\n".join([f"- {node_id}: {_get_node_description(node_id)}" for node_id in cluster_nodes])
+    node_descriptions = "\n".join(
+        [f"- {node_id}: {_get_node_description(node_id)}" for node_id in cluster_nodes]
+    )
 
     # Block 1: cluster_context (coordination state)
     context_result = manager.create_shared_block(
@@ -90,25 +89,28 @@ Active Goals:
 Status: Phase 3 in progress
 Last Update: System initialization
 """,
-        limit=5000
+        limit=5000,
     )
 
     if context_result["success"]:
-        results["blocks_created"].append({
-            "label": "cluster_context",
-            "block_id": context_result["shared_block_id"]
-        })
+        results["blocks_created"].append(
+            {"label": "cluster_context", "block_id": context_result["shared_block_id"]}
+        )
     else:
         # Block already exists, get its ID
         existing_block = manager.get_shared_block("cluster_context")
         if existing_block:
-            results["blocks_created"].append({
-                "label": "cluster_context",
-                "block_id": existing_block["shared_block_id"]
-            })
+            results["blocks_created"].append(
+                {
+                    "label": "cluster_context",
+                    "block_id": existing_block["shared_block_id"],
+                }
+            )
 
     # Build initial status string
-    status_lines = "\n".join([f"- {node_id}: Online (initialized)" for node_id in cluster_nodes])
+    status_lines = "\n".join(
+        [f"- {node_id}: Online (initialized)" for node_id in cluster_nodes]
+    )
 
     # Block 2: cluster_status (health monitoring)
     status_result = manager.create_shared_block(
@@ -123,44 +125,49 @@ Services: Operational
 
 Last Health Check: System initialization
 """,
-        limit=5000
+        limit=5000,
     )
 
     if status_result["success"]:
-        results["blocks_created"].append({
-            "label": "cluster_status",
-            "block_id": status_result["shared_block_id"]
-        })
+        results["blocks_created"].append(
+            {"label": "cluster_status", "block_id": status_result["shared_block_id"]}
+        )
     else:
         # Block already exists, get its ID
         existing_block = manager.get_shared_block("cluster_status")
         if existing_block:
-            results["blocks_created"].append({
-                "label": "cluster_status",
-                "block_id": existing_block["shared_block_id"]
-            })
+            results["blocks_created"].append(
+                {
+                    "label": "cluster_status",
+                    "block_id": existing_block["shared_block_id"],
+                }
+            )
 
     # Block 3: cluster_learnings (collective insights)
     learnings_result = manager.create_shared_block(
         label="cluster_learnings",
         description="Collective insights and learnings across all cluster nodes",
         initial_value="",
-        limit=8000  # Larger for collective learnings
+        limit=8000,  # Larger for collective learnings
     )
 
     if learnings_result["success"]:
-        results["blocks_created"].append({
-            "label": "cluster_learnings",
-            "block_id": learnings_result["shared_block_id"]
-        })
+        results["blocks_created"].append(
+            {
+                "label": "cluster_learnings",
+                "block_id": learnings_result["shared_block_id"],
+            }
+        )
     else:
         # Block already exists, get its ID
         existing_block = manager.get_shared_block("cluster_learnings")
         if existing_block:
-            results["blocks_created"].append({
-                "label": "cluster_learnings",
-                "block_id": existing_block["shared_block_id"]
-            })
+            results["blocks_created"].append(
+                {
+                    "label": "cluster_learnings",
+                    "block_id": existing_block["shared_block_id"],
+                }
+            )
 
     # Attach blocks to all node agents
     for node_id in cluster_nodes:
@@ -168,32 +175,30 @@ Last Health Check: System initialization
 
         for block_info in results["blocks_created"]:
             attach_result = manager.attach_shared_block(
-                agent_id=agent_id,
-                shared_block_id=block_info["block_id"]
+                agent_id=agent_id, shared_block_id=block_info["block_id"]
             )
 
             if attach_result["success"]:
-                results["attachments_created"].append({
-                    "agent_id": agent_id,
-                    "block_label": block_info["label"],
-                    "block_id": block_info["block_id"]
-                })
+                results["attachments_created"].append(
+                    {
+                        "agent_id": agent_id,
+                        "block_label": block_info["label"],
+                        "block_id": block_info["block_id"],
+                    }
+                )
 
     results["success"] = True
     results["total_blocks"] = len(results["blocks_created"])
     results["total_attachments"] = len(results["attachments_created"])
 
-    logger.info(f"✅ Cluster shared blocks setup complete:")
+    logger.info("✅ Cluster shared blocks setup complete:")
     logger.info(f"   - {results['total_blocks']} shared blocks created")
     logger.info(f"   - {results['total_attachments']} attachments created")
 
     return results
 
 
-def update_cluster_context(
-    update: str,
-    updated_by: str = None
-) -> dict:
+def update_cluster_context(update: str, updated_by: str = None) -> dict:
     """
     Update cluster context with new information.
 
@@ -205,6 +210,7 @@ def update_cluster_context(
         Update result
     """
     import socket
+
     if updated_by is None:
         updated_by = os.environ.get("NODE_ID", socket.gethostname())
 
@@ -214,11 +220,12 @@ def update_cluster_context(
     if not block:
         return {
             "success": False,
-            "error": "cluster_context block not found - run setup first"
+            "error": "cluster_context block not found - run setup first",
         }
 
     # Append update with timestamp and attribution
     from datetime import datetime
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     update_text = f"\n\n[{timestamp}] {updated_by}:\n{update}"
@@ -236,13 +243,10 @@ def get_cluster_overview() -> dict:
     overview = {
         "cluster_context": manager.get_shared_block("cluster_context"),
         "cluster_status": manager.get_shared_block("cluster_status"),
-        "cluster_learnings": manager.get_shared_block("cluster_learnings")
+        "cluster_learnings": manager.get_shared_block("cluster_learnings"),
     }
 
-    return {
-        "success": True,
-        "blocks": overview
-    }
+    return {"success": True, "blocks": overview}
 
 
 # Convenience function for testing
@@ -252,7 +256,7 @@ def test_cluster_shared_blocks():
 
     # Setup
     result = setup_cluster_shared_blocks()
-    print(f"\nSetup Results:")
+    print("\nSetup Results:")
     print(json.dumps(result, indent=2))
 
     # Update cluster context

@@ -34,7 +34,7 @@ DEFAULT_DB_PATH = Path.home() / ".claude" / "enhanced_memories" / "memory.db"
 class DatabasePool:
     """Thread-safe SQLite connection pool with retry logic"""
 
-    _instance: Optional['DatabasePool'] = None
+    _instance: Optional["DatabasePool"] = None
     _lock = threading.Lock()
 
     def __new__(cls, db_path: Path = DEFAULT_DB_PATH):
@@ -48,7 +48,7 @@ class DatabasePool:
         return cls._instance
 
     def __init__(self, db_path: Path = DEFAULT_DB_PATH):
-        if getattr(self, '_initialized', False):
+        if getattr(self, "_initialized", False):
             return
 
         self.db_path = db_path
@@ -65,7 +65,7 @@ class DatabasePool:
             self.db_path,
             timeout=SQLITE_BUSY_TIMEOUT / 1000,
             check_same_thread=False,
-            isolation_level=None  # Autocommit mode
+            isolation_level=None,  # Autocommit mode
         )
 
         # Configure for concurrent access
@@ -139,8 +139,9 @@ class DatabasePool:
                         pass
                     self._connection_times.pop(conn_id, None)
 
-    def execute_with_retry(self, sql: str, params: tuple = (),
-                           fetch: str = 'none') -> Any:
+    def execute_with_retry(
+        self, sql: str, params: tuple = (), fetch: str = "none"
+    ) -> Any:
         """Execute SQL with retry logic for locks
 
         Args:
@@ -159,11 +160,11 @@ class DatabasePool:
                     cursor = conn.cursor()
                     cursor.execute(sql, params)
 
-                    if fetch == 'one':
+                    if fetch == "one":
                         result = cursor.fetchone()
-                    elif fetch == 'all':
+                    elif fetch == "all":
                         result = cursor.fetchall()
-                    elif fetch == 'lastrowid':
+                    elif fetch == "lastrowid":
                         result = cursor.lastrowid
                     else:
                         result = None
@@ -176,7 +177,9 @@ class DatabasePool:
                 if "database is locked" in str(e):
                     if attempt < MAX_RETRIES - 1:
                         delay = RETRY_DELAY * (attempt + 1)
-                        logger.warning(f"Database locked, retry {attempt + 1}/{MAX_RETRIES} after {delay}s")
+                        logger.warning(
+                            f"Database locked, retry {attempt + 1}/{MAX_RETRIES} after {delay}s"
+                        )
                         time.sleep(delay)
                         continue
                 raise
@@ -205,7 +208,9 @@ class DatabasePool:
                 if "database is locked" in str(e):
                     if attempt < MAX_RETRIES - 1:
                         delay = RETRY_DELAY * (attempt + 1)
-                        logger.warning(f"Database locked, retry {attempt + 1}/{MAX_RETRIES}")
+                        logger.warning(
+                            f"Database locked, retry {attempt + 1}/{MAX_RETRIES}"
+                        )
                         time.sleep(delay)
                         continue
                 raise
@@ -236,7 +241,9 @@ class DatabasePool:
                 if "database is locked" in str(e):
                     if attempt < MAX_RETRIES - 1:
                         delay = RETRY_DELAY * (attempt + 1)
-                        logger.warning(f"Transaction locked, retry {attempt + 1}/{MAX_RETRIES}")
+                        logger.warning(
+                            f"Transaction locked, retry {attempt + 1}/{MAX_RETRIES}"
+                        )
                         time.sleep(delay)
                         continue
                 raise
@@ -283,7 +290,7 @@ def get_connection():
     return get_pool().get_connection()
 
 
-def execute_with_retry(sql: str, params: tuple = (), fetch: str = 'none') -> Any:
+def execute_with_retry(sql: str, params: tuple = (), fetch: str = "none") -> Any:
     """Convenience function for executing SQL with retry"""
     return get_pool().execute_with_retry(sql, params, fetch)
 

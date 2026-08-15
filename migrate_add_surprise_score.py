@@ -32,14 +32,14 @@ def migrate():
     cursor.execute("PRAGMA table_info(episodic_memory)")
     columns = [col[1] for col in cursor.fetchall()]
 
-    if 'surprise_score' not in columns:
+    if "surprise_score" not in columns:
         migrations.append("""
             ALTER TABLE episodic_memory
             ADD COLUMN surprise_score REAL DEFAULT 0.5
         """)
         logger.info("Will add surprise_score to episodic_memory")
 
-    if 'content' not in columns:
+    if "content" not in columns:
         # Add content column as alias for episode_data
         migrations.append("""
             ALTER TABLE episodic_memory
@@ -47,7 +47,7 @@ def migrate():
         """)
         logger.info("Will add content column to episodic_memory")
 
-    if 'memory_type' not in columns:
+    if "memory_type" not in columns:
         migrations.append("""
             ALTER TABLE episodic_memory
             ADD COLUMN memory_type TEXT DEFAULT 'episodic'
@@ -58,28 +58,28 @@ def migrate():
     cursor.execute("PRAGMA table_info(semantic_memory)")
     columns = [col[1] for col in cursor.fetchall()]
 
-    if 'surprise_score' not in columns:
+    if "surprise_score" not in columns:
         migrations.append("""
             ALTER TABLE semantic_memory
             ADD COLUMN surprise_score REAL DEFAULT 0.5
         """)
         logger.info("Will add surprise_score to semantic_memory")
 
-    if 'content' not in columns:
+    if "content" not in columns:
         migrations.append("""
             ALTER TABLE semantic_memory
             ADD COLUMN content TEXT
         """)
         logger.info("Will add content column to semantic_memory")
 
-    if 'memory_type' not in columns:
+    if "memory_type" not in columns:
         migrations.append("""
             ALTER TABLE semantic_memory
             ADD COLUMN memory_type TEXT DEFAULT 'semantic'
         """)
         logger.info("Will add memory_type column to semantic_memory")
 
-    if 'metadata' not in columns:
+    if "metadata" not in columns:
         migrations.append("""
             ALTER TABLE semantic_memory
             ADD COLUMN metadata TEXT
@@ -94,7 +94,7 @@ def migrate():
                 logger.info(f"Executed: {sql.strip()[:60]}...")
             except sqlite3.OperationalError as e:
                 if "duplicate column name" in str(e):
-                    logger.info(f"Column already exists, skipping")
+                    logger.info("Column already exists, skipping")
                 else:
                     logger.error(f"Migration failed: {e}")
                     raise
@@ -118,14 +118,14 @@ def verify_schema():
     cursor.execute("PRAGMA table_info(episodic_memory)")
     episodic_cols = {col[1] for col in cursor.fetchall()}
 
-    required_episodic = {'id', 'surprise_score', 'created_at'}
+    required_episodic = {"id", "surprise_score", "created_at"}
     missing_episodic = required_episodic - episodic_cols
 
     # Check semantic_memory
     cursor.execute("PRAGMA table_info(semantic_memory)")
     semantic_cols = {col[1] for col in cursor.fetchall()}
 
-    required_semantic = {'id', 'surprise_score', 'created_at'}
+    required_semantic = {"id", "surprise_score", "created_at"}
     missing_semantic = required_semantic - semantic_cols
 
     conn.close()

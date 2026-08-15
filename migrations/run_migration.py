@@ -9,6 +9,7 @@ from pathlib import Path
 MEMORY_DIR = Path.home() / ".claude" / "enhanced_memories"
 DB_PATH = MEMORY_DIR / "memory.db"
 
+
 def run_migration():
     """Apply always_include migration"""
     print(f"Running migration on {DB_PATH}")
@@ -21,16 +22,20 @@ def run_migration():
         cursor.execute("PRAGMA table_info(entities)")
         columns = [col[1] for col in cursor.fetchall()]
 
-        if 'always_include' in columns:
+        if "always_include" in columns:
             print("✓ Column 'always_include' already exists")
         else:
             print("Adding 'always_include' column...")
-            cursor.execute("ALTER TABLE entities ADD COLUMN always_include BOOLEAN DEFAULT 0")
+            cursor.execute(
+                "ALTER TABLE entities ADD COLUMN always_include BOOLEAN DEFAULT 0"
+            )
             print("✓ Column added successfully")
 
         # Create index
         print("Creating index...")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entities_always_include ON entities(always_include)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_entities_always_include ON entities(always_include)"
+        )
         print("✓ Index created successfully")
 
         conn.commit()
@@ -47,6 +52,7 @@ def run_migration():
         raise
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     run_migration()

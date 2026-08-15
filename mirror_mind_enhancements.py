@@ -34,18 +34,20 @@ DB_PATH = MEMORY_DIR / "memory.db"
 @dataclass
 class CentralityScores:
     """Centrality measures for a node in the knowledge graph"""
+
     entity_id: int
     entity_name: str
-    degree_centrality: float = 0.0       # Number of connections
-    pagerank: float = 0.0                 # Importance via link structure
+    degree_centrality: float = 0.0  # Number of connections
+    pagerank: float = 0.0  # Importance via link structure
     betweenness_centrality: float = 0.0  # Bridge between clusters
-    recency_weight: float = 1.0          # Time decay factor
-    combined_score: float = 0.0          # Weighted combination
+    recency_weight: float = 1.0  # Time decay factor
+    combined_score: float = 0.0  # Weighted combination
 
 
 @dataclass
 class CognitiveTrajectory:
     """Tracks evolution of knowledge over time"""
+
     entity_id: int
     entity_name: str
     first_encounter: datetime
@@ -59,9 +61,10 @@ class CognitiveTrajectory:
 @dataclass
 class DualManifold:
     """Represents the dual manifold architecture"""
+
     individual_manifold: Dict[str, Any]  # Personal knowledge space
     collective_manifold: Dict[str, Any]  # Shared domain knowledge
-    intersection_points: List[str]        # Where manifolds meet
+    intersection_points: List[str]  # Where manifolds meet
 
 
 class CentralityCalculator:
@@ -83,16 +86,16 @@ class CentralityCalculator:
         cursor = conn.cursor()
 
         # Get all entities
-        cursor.execute('SELECT id, name FROM entities')
+        cursor.execute("SELECT id, name FROM entities")
         id_to_name = {row[0]: row[1] for row in cursor.fetchall()}
 
         # Build adjacency list (bidirectional for undirected centrality)
         # Note: relations table may not have strength column - treat all as 1.0
         graph = defaultdict(set)
-        cursor.execute('''
+        cursor.execute("""
             SELECT from_entity_id, to_entity_id
             FROM relations
-        ''')
+        """)
 
         for row in cursor.fetchall():
             from_id, to_id = row
@@ -124,10 +127,7 @@ class CentralityCalculator:
         }
 
     def calculate_pagerank(
-        self,
-        damping: float = 0.85,
-        iterations: int = 100,
-        tolerance: float = 1e-6
+        self, damping: float = 0.85, iterations: int = 100, tolerance: float = 1e-6
     ) -> Dict[int, float]:
         """
         Calculate PageRank centrality
@@ -171,7 +171,9 @@ class CentralityCalculator:
 
         return pagerank
 
-    def calculate_betweenness_centrality(self, sample_size: int = 100) -> Dict[int, float]:
+    def calculate_betweenness_centrality(
+        self, sample_size: int = 100
+    ) -> Dict[int, float]:
         """
         Calculate betweenness centrality (approximation for large graphs)
 
@@ -187,6 +189,7 @@ class CentralityCalculator:
 
         # Sample nodes for approximation
         import random
+
         sample_nodes = random.sample(nodes, min(sample_size, len(nodes)))
 
         for source in sample_nodes:
@@ -239,7 +242,9 @@ class CentralityCalculator:
         recency = self._calculate_recency_weights()
 
         results = {}
-        all_entities = set(degree.keys()) | set(pagerank.keys()) | set(betweenness.keys())
+        all_entities = (
+            set(degree.keys()) | set(pagerank.keys()) | set(betweenness.keys())
+        )
 
         for entity_id in all_entities:
             d = degree.get(entity_id, 0.0)
@@ -258,12 +263,14 @@ class CentralityCalculator:
                 pagerank=p,
                 betweenness_centrality=b,
                 recency_weight=r,
-                combined_score=combined
+                combined_score=combined,
             )
 
         return results
 
-    def _calculate_recency_weights(self, half_life_days: float = 30.0) -> Dict[int, float]:
+    def _calculate_recency_weights(
+        self, half_life_days: float = 30.0
+    ) -> Dict[int, float]:
         """
         Calculate time decay weights using exponential decay
 
@@ -272,9 +279,9 @@ class CentralityCalculator:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute("""
             SELECT id, last_accessed, created_at FROM entities
-        ''')
+        """)
 
         recency = {}
         now = datetime.now()
@@ -286,7 +293,7 @@ class CentralityCalculator:
 
             if updated:
                 try:
-                    last_update = datetime.fromisoformat(updated.replace('Z', '+00:00'))
+                    last_update = datetime.fromisoformat(updated.replace("Z", "+00:00"))
                     days_ago = (now - last_update.replace(tzinfo=None)).days
                     weight = math.exp(-decay_constant * days_ago)
                 except:
@@ -303,9 +310,7 @@ class CentralityCalculator:
         """Get most central entities by combined score"""
         centralities = self.calculate_all_centralities()
         sorted_entities = sorted(
-            centralities.values(),
-            key=lambda x: x.combined_score,
-            reverse=True
+            centralities.values(), key=lambda x: x.combined_score, reverse=True
         )
         return sorted_entities[:limit]
 
@@ -329,7 +334,7 @@ class CognitiveTrajectoryTracker:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS cognitive_trajectories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 entity_id INTEGER NOT NULL,
@@ -341,17 +346,17 @@ class CognitiveTrajectoryTracker:
                 context TEXT,
                 FOREIGN KEY (entity_id) REFERENCES entities(id)
             )
-        ''')
+        """)
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_trajectory_entity
             ON cognitive_trajectories(entity_id)
-        ''')
+        """)
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_trajectory_time
             ON cognitive_trajectories(timestamp)
-        ''')
+        """)
 
         conn.commit()
         conn.close()
@@ -363,24 +368,27 @@ class CognitiveTrajectoryTracker:
         confidence: float = 0.5,
         importance: float = 0.5,
         related_concepts: List[str] = None,
-        context: str = None
+        context: str = None,
     ):
         """Record a point in the cognitive trajectory of an entity"""
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO cognitive_trajectories
             (entity_id, timestamp, confidence, importance, related_concepts, context)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            entity_id,
-            datetime.now().isoformat(),
-            confidence,
-            importance,
-            json.dumps(related_concepts or []),
-            context
-        ))
+        """,
+            (
+                entity_id,
+                datetime.now().isoformat(),
+                confidence,
+                importance,
+                json.dumps(related_concepts or []),
+                context,
+            ),
+        )
 
         conn.commit()
         conn.close()
@@ -391,7 +399,7 @@ class CognitiveTrajectoryTracker:
         cursor = conn.cursor()
 
         # Get entity name
-        cursor.execute('SELECT name FROM entities WHERE id = ?', (entity_id,))
+        cursor.execute("SELECT name FROM entities WHERE id = ?", (entity_id,))
         name_row = cursor.fetchone()
         if not name_row:
             conn.close()
@@ -400,12 +408,15 @@ class CognitiveTrajectoryTracker:
         entity_name = name_row[0]
 
         # Get trajectory points
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT timestamp, confidence, importance, related_concepts, access_count
             FROM cognitive_trajectories
             WHERE entity_id = ?
             ORDER BY timestamp ASC
-        ''', (entity_id,))
+        """,
+            (entity_id,),
+        )
 
         rows = cursor.fetchall()
         conn.close()
@@ -438,13 +449,10 @@ class CognitiveTrajectoryTracker:
             access_count=total_access,
             confidence_evolution=confidence_evolution,
             related_concepts_evolution=related_evolution,
-            importance_trajectory=importance_trajectory
+            importance_trajectory=importance_trajectory,
         )
 
-    def analyze_knowledge_evolution(
-        self,
-        time_window_days: int = 30
-    ) -> Dict[str, Any]:
+    def analyze_knowledge_evolution(self, time_window_days: int = 30) -> Dict[str, Any]:
         """
         Analyze how knowledge has evolved over time
 
@@ -456,7 +464,8 @@ class CognitiveTrajectoryTracker:
         cutoff = (datetime.now() - timedelta(days=time_window_days)).isoformat()
 
         # Get trajectory statistics
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT
                 e.name,
                 COUNT(*) as updates,
@@ -470,21 +479,26 @@ class CognitiveTrajectoryTracker:
             GROUP BY ct.entity_id
             ORDER BY updates DESC
             LIMIT 20
-        ''', (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         evolving_concepts = []
         for row in cursor.fetchall():
-            evolving_concepts.append({
-                'name': row[0],
-                'updates': row[1],
-                'avg_confidence': row[2],
-                'peak_importance': row[3],
-                'first_seen': row[4],
-                'last_seen': row[5]
-            })
+            evolving_concepts.append(
+                {
+                    "name": row[0],
+                    "updates": row[1],
+                    "avg_confidence": row[2],
+                    "peak_importance": row[3],
+                    "first_seen": row[4],
+                    "last_seen": row[5],
+                }
+            )
 
         # Find concepts with increasing confidence (learning)
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT
                 e.name,
                 ct.entity_id,
@@ -494,28 +508,36 @@ class CognitiveTrajectoryTracker:
             WHERE ct.timestamp > ?
             GROUP BY ct.entity_id
             HAVING COUNT(*) >= 3
-        ''', (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         learning_concepts = []
         for row in cursor.fetchall():
-            confs = [float(c) for c in row[2].split(',')]
+            confs = [float(c) for c in row[2].split(",")]
             # Check if trend is increasing
             if len(confs) >= 3:
-                trend = sum(b - a for a, b in zip(confs[:-1], confs[1:])) / (len(confs) - 1)
+                trend = sum(b - a for a, b in zip(confs[:-1], confs[1:])) / (
+                    len(confs) - 1
+                )
                 if trend > 0.05:  # Increasing confidence
-                    learning_concepts.append({
-                        'name': row[0],
-                        'confidence_trend': trend,
-                        'current_confidence': confs[-1]
-                    })
+                    learning_concepts.append(
+                        {
+                            "name": row[0],
+                            "confidence_trend": trend,
+                            "current_confidence": confs[-1],
+                        }
+                    )
 
         conn.close()
 
         return {
-            'time_window_days': time_window_days,
-            'most_active_concepts': evolving_concepts,
-            'learning_concepts': sorted(learning_concepts, key=lambda x: -x['confidence_trend']),
-            'total_trajectory_points': sum(c['updates'] for c in evolving_concepts)
+            "time_window_days": time_window_days,
+            "most_active_concepts": evolving_concepts,
+            "learning_concepts": sorted(
+                learning_concepts, key=lambda x: -x["confidence_trend"]
+            ),
+            "total_trajectory_points": sum(c["updates"] for c in evolving_concepts),
         }
 
 
@@ -537,10 +559,7 @@ class TemporalDistillationPipeline:
     def _get_connection(self):
         return sqlite3.connect(self.db_path)
 
-    def map_phase(
-        self,
-        time_window_hours: int = 24
-    ) -> List[Dict[str, Any]]:
+    def map_phase(self, time_window_hours: int = 24) -> List[Dict[str, Any]]:
         """
         Map phase: Extract patterns from recent episodic memories
 
@@ -552,58 +571,63 @@ class TemporalDistillationPipeline:
         cutoff = (datetime.now() - timedelta(hours=time_window_hours)).isoformat()
 
         # Get recent episodes
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT id, event_type, episode_data, significance_score, tags, created_at
             FROM episodic_memory
             WHERE created_at > ?
             ORDER BY significance_score DESC
-        ''', (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         episodes = []
         for row in cursor.fetchall():
             episode_data = json.loads(row[2]) if row[2] else {}
             tags = json.loads(row[4]) if row[4] else []
 
-            episodes.append({
-                'id': row[0],
-                'event_type': row[1],
-                'data': episode_data,
-                'significance': row[3],
-                'tags': tags,
-                'timestamp': row[5]
-            })
+            episodes.append(
+                {
+                    "id": row[0],
+                    "event_type": row[1],
+                    "data": episode_data,
+                    "significance": row[3],
+                    "tags": tags,
+                    "timestamp": row[5],
+                }
+            )
 
         conn.close()
 
         # Group by event type and extract patterns
         grouped = defaultdict(list)
         for ep in episodes:
-            grouped[ep['event_type']].append(ep)
+            grouped[ep["event_type"]].append(ep)
 
         patterns = []
         for event_type, eps in grouped.items():
             if len(eps) >= 2:  # Need multiple episodes for pattern
                 # Extract common tags
-                all_tags = [set(ep['tags']) for ep in eps]
+                all_tags = [set(ep["tags"]) for ep in eps]
                 common_tags = set.intersection(*all_tags) if all_tags else set()
 
                 # Calculate average significance
-                avg_sig = sum(ep['significance'] for ep in eps) / len(eps)
+                avg_sig = sum(ep["significance"] for ep in eps) / len(eps)
 
-                patterns.append({
-                    'event_type': event_type,
-                    'episode_count': len(eps),
-                    'common_tags': list(common_tags),
-                    'avg_significance': avg_sig,
-                    'episode_ids': [ep['id'] for ep in eps]
-                })
+                patterns.append(
+                    {
+                        "event_type": event_type,
+                        "episode_count": len(eps),
+                        "common_tags": list(common_tags),
+                        "avg_significance": avg_sig,
+                        "episode_ids": [ep["id"] for ep in eps],
+                    }
+                )
 
         return patterns
 
     def reduce_phase(
-        self,
-        patterns: List[Dict[str, Any]],
-        min_frequency: int = 2
+        self, patterns: List[Dict[str, Any]], min_frequency: int = 2
     ) -> List[Dict[str, Any]]:
         """
         Reduce phase: Consolidate patterns into semantic concepts
@@ -616,7 +640,7 @@ class TemporalDistillationPipeline:
         promoted_concepts = []
 
         for pattern in patterns:
-            if pattern['episode_count'] < min_frequency:
+            if pattern["episode_count"] < min_frequency:
                 continue
 
             concept_name = f"Pattern: {pattern['event_type']}"
@@ -629,49 +653,65 @@ class TemporalDistillationPipeline:
 
             # Check if concept exists
             cursor.execute(
-                'SELECT id, confidence_score FROM semantic_memory WHERE concept_name = ?',
-                (concept_name,)
+                "SELECT id, confidence_score FROM semantic_memory WHERE concept_name = ?",
+                (concept_name,),
             )
             existing = cursor.fetchone()
 
             # Confidence increases with more episodes
-            new_confidence = min(0.95, 0.5 + (pattern['episode_count'] * 0.1))
+            new_confidence = min(0.95, 0.5 + (pattern["episode_count"] * 0.1))
 
             if existing:
                 # Update existing concept
-                cursor.execute('''
+                cursor.execute(
+                    """
                     UPDATE semantic_memory
                     SET definition = ?, confidence_score = ?, updated_at = ?
                     WHERE id = ?
-                ''', (definition, new_confidence, datetime.now().isoformat(), existing[0]))
+                """,
+                    (
+                        definition,
+                        new_confidence,
+                        datetime.now().isoformat(),
+                        existing[0],
+                    ),
+                )
 
                 concept_id = existing[0]
             else:
                 # Create new concept
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO semantic_memory
                     (concept_name, concept_type, definition, confidence_score, created_at)
                     VALUES (?, ?, ?, ?, ?)
-                ''', (concept_name, concept_type, definition, new_confidence, datetime.now().isoformat()))
+                """,
+                    (
+                        concept_name,
+                        concept_type,
+                        definition,
+                        new_confidence,
+                        datetime.now().isoformat(),
+                    ),
+                )
 
                 concept_id = cursor.lastrowid
 
-            promoted_concepts.append({
-                'concept_id': concept_id,
-                'concept_name': concept_name,
-                'confidence': new_confidence,
-                'source_episodes': pattern['episode_count']
-            })
+            promoted_concepts.append(
+                {
+                    "concept_id": concept_id,
+                    "concept_name": concept_name,
+                    "confidence": new_confidence,
+                    "source_episodes": pattern["episode_count"],
+                }
+            )
 
         conn.commit()
         conn.close()
 
         return promoted_concepts
 
-    def distill_phase(
-        self,
-        promoted_concepts: List[Dict[str, Any]]
-    ):
+    def distill_phase(self, promoted_concepts: List[Dict[str, Any]]):
         """
         Distill phase: Update cognitive trajectories for promoted concepts
 
@@ -686,8 +726,7 @@ class TemporalDistillationPipeline:
         for concept in promoted_concepts:
             # Find the entity ID for this concept
             cursor.execute(
-                'SELECT id FROM entities WHERE name = ?',
-                (concept['concept_name'],)
+                "SELECT id FROM entities WHERE name = ?", (concept["concept_name"],)
             )
             entity_row = cursor.fetchone()
 
@@ -697,28 +736,29 @@ class TemporalDistillationPipeline:
                 importance = centrality.combined_score if centrality else 0.5
             else:
                 # Create entity for tracking
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO entities (name, entity_type, tier, created_at)
                     VALUES (?, 'concept', 'working', ?)
-                ''', (concept['concept_name'], datetime.now().isoformat()))
+                """,
+                    (concept["concept_name"], datetime.now().isoformat()),
+                )
                 entity_id = cursor.lastrowid
                 importance = 0.5
 
             # Record trajectory point
             self.trajectory.record_trajectory_point(
                 entity_id=entity_id,
-                confidence=concept['confidence'],
+                confidence=concept["confidence"],
                 importance=importance,
-                context=f"Distilled from {concept['source_episodes']} episodes"
+                context=f"Distilled from {concept['source_episodes']} episodes",
             )
 
         conn.commit()
         conn.close()
 
     def run_full_distillation(
-        self,
-        time_window_hours: int = 24,
-        min_frequency: int = 2
+        self, time_window_hours: int = 24, min_frequency: int = 2
     ) -> Dict[str, Any]:
         """
         Run complete temporal distillation pipeline
@@ -740,10 +780,10 @@ class TemporalDistillationPipeline:
         logger.info("Distill phase: Updated cognitive trajectories")
 
         return {
-            'success': True,
-            'patterns_found': len(patterns),
-            'concepts_promoted': len(concepts),
-            'promoted_concepts': concepts
+            "success": True,
+            "patterns_found": len(patterns),
+            "concepts_promoted": len(concepts),
+            "promoted_concepts": concepts,
         }
 
 
@@ -772,7 +812,7 @@ class DualManifoldArchitecture:
         cursor = conn.cursor()
 
         # Individual manifold: personal knowledge, experiences, preferences
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS individual_manifold (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_id TEXT NOT NULL,
@@ -785,10 +825,10 @@ class DualManifoldArchitecture:
                 updated_at TEXT,
                 FOREIGN KEY (entity_id) REFERENCES entities(id)
             )
-        ''')
+        """)
 
         # Collective manifold: shared domain knowledge, facts
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS collective_manifold (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 domain TEXT NOT NULL,
@@ -801,10 +841,10 @@ class DualManifoldArchitecture:
                 updated_at TEXT,
                 FOREIGN KEY (entity_id) REFERENCES entities(id)
             )
-        ''')
+        """)
 
         # Intersection points: where individual meets collective
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS manifold_intersections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 individual_id INTEGER NOT NULL,
@@ -815,7 +855,7 @@ class DualManifoldArchitecture:
                 FOREIGN KEY (individual_id) REFERENCES individual_manifold(id),
                 FOREIGN KEY (collective_id) REFERENCES collective_manifold(id)
             )
-        ''')
+        """)
 
         conn.commit()
         conn.close()
@@ -827,21 +867,29 @@ class DualManifoldArchitecture:
         content: str,
         entity_id: int = None,
         personal_weight: float = 1.0,
-        context: str = None
+        context: str = None,
     ) -> int:
         """Add knowledge to individual (personal) manifold"""
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO individual_manifold
             (agent_id, entity_id, knowledge_type, content, personal_weight,
              acquisition_context, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            self.agent_id, entity_id, knowledge_type, content,
-            personal_weight, context, datetime.now().isoformat()
-        ))
+        """,
+            (
+                self.agent_id,
+                entity_id,
+                knowledge_type,
+                content,
+                personal_weight,
+                context,
+                datetime.now().isoformat(),
+            ),
+        )
 
         manifold_id = cursor.lastrowid
         conn.commit()
@@ -855,17 +903,20 @@ class DualManifoldArchitecture:
         knowledge_type: str,
         content: str,
         entity_id: int = None,
-        consensus_score: float = 0.5
+        consensus_score: float = 0.5,
     ) -> int:
         """Add knowledge to collective (shared) manifold"""
         conn = self._get_connection()
         cursor = conn.cursor()
 
         # Check if similar knowledge exists
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT id, source_count FROM collective_manifold
             WHERE domain = ? AND knowledge_type = ? AND content = ?
-        ''', (domain, knowledge_type, content))
+        """,
+            (domain, knowledge_type, content),
+        )
 
         existing = cursor.fetchone()
 
@@ -874,19 +925,32 @@ class DualManifoldArchitecture:
             new_count = existing[1] + 1
             new_consensus = min(0.95, consensus_score + 0.1)
 
-            cursor.execute('''
+            cursor.execute(
+                """
                 UPDATE collective_manifold
                 SET source_count = ?, consensus_score = ?, updated_at = ?
                 WHERE id = ?
-            ''', (new_count, new_consensus, datetime.now().isoformat(), existing[0]))
+            """,
+                (new_count, new_consensus, datetime.now().isoformat(), existing[0]),
+            )
 
             manifold_id = existing[0]
         else:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO collective_manifold
                 (domain, entity_id, knowledge_type, content, consensus_score, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (domain, entity_id, knowledge_type, content, consensus_score, datetime.now().isoformat()))
+            """,
+                (
+                    domain,
+                    entity_id,
+                    knowledge_type,
+                    content,
+                    consensus_score,
+                    datetime.now().isoformat(),
+                ),
+            )
 
             manifold_id = cursor.lastrowid
 
@@ -896,8 +960,7 @@ class DualManifoldArchitecture:
         return manifold_id
 
     def find_intersections(
-        self,
-        similarity_threshold: float = 0.7
+        self, similarity_threshold: float = 0.7
     ) -> List[Dict[str, Any]]:
         """
         Find intersection points between individual and collective manifolds
@@ -909,7 +972,8 @@ class DualManifoldArchitecture:
         cursor = conn.cursor()
 
         # Simple intersection: same entity_id in both manifolds
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT
                 im.id as individual_id,
                 cm.id as collective_id,
@@ -923,27 +987,29 @@ class DualManifoldArchitecture:
             WHERE im.agent_id = ? AND im.entity_id IS NOT NULL
             ORDER BY strength DESC
             LIMIT 50
-        ''', (self.agent_id,))
+        """,
+            (self.agent_id,),
+        )
 
         intersections = []
         for row in cursor.fetchall():
-            intersections.append({
-                'individual_id': row[0],
-                'collective_id': row[1],
-                'personal_knowledge': row[2],
-                'domain_knowledge': row[3],
-                'personal_type': row[4],
-                'domain': row[5],
-                'strength': row[6]
-            })
+            intersections.append(
+                {
+                    "individual_id": row[0],
+                    "collective_id": row[1],
+                    "personal_knowledge": row[2],
+                    "domain_knowledge": row[3],
+                    "personal_type": row[4],
+                    "domain": row[5],
+                    "strength": row[6],
+                }
+            )
 
         conn.close()
         return intersections
 
     def generate_insight_at_intersection(
-        self,
-        individual_id: int,
-        collective_id: int
+        self, individual_id: int, collective_id: int
     ) -> Dict[str, Any]:
         """
         Generate insight at the intersection of individual and collective knowledge
@@ -955,22 +1021,28 @@ class DualManifoldArchitecture:
         cursor = conn.cursor()
 
         # Get individual knowledge
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT content, knowledge_type, acquisition_context
             FROM individual_manifold WHERE id = ?
-        ''', (individual_id,))
+        """,
+            (individual_id,),
+        )
         individual = cursor.fetchone()
 
         # Get collective knowledge
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT content, domain, knowledge_type, consensus_score
             FROM collective_manifold WHERE id = ?
-        ''', (collective_id,))
+        """,
+            (collective_id,),
+        )
         collective = cursor.fetchone()
 
         if not individual or not collective:
             conn.close()
-            return {'success': False, 'error': 'Knowledge not found'}
+            return {"success": False, "error": "Knowledge not found"}
 
         # Create intersection insight
         insight = (
@@ -986,21 +1058,30 @@ class DualManifoldArchitecture:
             strength += 0.2
 
         # Record intersection
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO manifold_intersections
             (individual_id, collective_id, intersection_strength, insight_generated, created_at)
             VALUES (?, ?, ?, ?, ?)
-        ''', (individual_id, collective_id, strength, insight, datetime.now().isoformat()))
+        """,
+            (
+                individual_id,
+                collective_id,
+                strength,
+                insight,
+                datetime.now().isoformat(),
+            ),
+        )
 
         intersection_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
         return {
-            'success': True,
-            'intersection_id': intersection_id,
-            'insight': insight,
-            'strength': strength
+            "success": True,
+            "intersection_id": intersection_id,
+            "insight": insight,
+            "strength": strength,
         }
 
     def get_manifold_summary(self) -> DualManifold:
@@ -1009,32 +1090,44 @@ class DualManifoldArchitecture:
         cursor = conn.cursor()
 
         # Individual manifold summary
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT knowledge_type, COUNT(*) as count, AVG(personal_weight) as avg_weight
             FROM individual_manifold WHERE agent_id = ?
             GROUP BY knowledge_type
-        ''', (self.agent_id,))
+        """,
+            (self.agent_id,),
+        )
 
         individual = {
-            'types': {row[0]: {'count': row[1], 'avg_weight': row[2]} for row in cursor.fetchall()}
+            "types": {
+                row[0]: {"count": row[1], "avg_weight": row[2]}
+                for row in cursor.fetchall()
+            }
         }
 
         # Collective manifold summary
-        cursor.execute('''
+        cursor.execute("""
             SELECT domain, COUNT(*) as count, AVG(consensus_score) as avg_consensus
             FROM collective_manifold
             GROUP BY domain
-        ''')
+        """)
 
         collective = {
-            'domains': {row[0]: {'count': row[1], 'avg_consensus': row[2]} for row in cursor.fetchall()}
+            "domains": {
+                row[0]: {"count": row[1], "avg_consensus": row[2]}
+                for row in cursor.fetchall()
+            }
         }
 
         # Intersection summary
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT COUNT(*) FROM manifold_intersections
             WHERE individual_id IN (SELECT id FROM individual_manifold WHERE agent_id = ?)
-        ''', (self.agent_id,))
+        """,
+            (self.agent_id,),
+        )
 
         cursor.fetchone()[0]
 
@@ -1042,16 +1135,17 @@ class DualManifoldArchitecture:
 
         # Find top intersection points
         intersections = self.find_intersections()
-        intersection_names = [i['domain'] for i in intersections[:10]]
+        intersection_names = [i["domain"] for i in intersections[:10]]
 
         return DualManifold(
             individual_manifold=individual,
             collective_manifold=collective,
-            intersection_points=intersection_names
+            intersection_points=intersection_names,
         )
 
 
 # === MCP TOOL REGISTRATION ===
+
 
 def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
     """Register Mirror Mind enhancement tools with FastMCP app"""
@@ -1077,19 +1171,19 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
         top_entities = centrality_calc.get_top_central_entities(limit)
 
         return {
-            'success': True,
-            'count': len(top_entities),
-            'entities': [
+            "success": True,
+            "count": len(top_entities),
+            "entities": [
                 {
-                    'name': e.entity_name,
-                    'pagerank': round(e.pagerank, 4),
-                    'degree': round(e.degree_centrality, 4),
-                    'betweenness': round(e.betweenness_centrality, 4),
-                    'recency': round(e.recency_weight, 4),
-                    'combined': round(e.combined_score, 4)
+                    "name": e.entity_name,
+                    "pagerank": round(e.pagerank, 4),
+                    "degree": round(e.degree_centrality, 4),
+                    "betweenness": round(e.betweenness_centrality, 4),
+                    "recency": round(e.recency_weight, 4),
+                    "combined": round(e.combined_score, 4),
                 }
                 for e in top_entities
-            ]
+            ],
         }
 
     @app.tool()
@@ -1108,32 +1202,32 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
         """
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute('SELECT id FROM entities WHERE name = ?', (entity_name,))
+        cursor.execute("SELECT id FROM entities WHERE name = ?", (entity_name,))
         row = cursor.fetchone()
         conn.close()
 
         if not row:
-            return {'success': False, 'error': 'Entity not found'}
+            return {"success": False, "error": "Entity not found"}
 
         trajectory = trajectory_tracker.get_trajectory(row[0])
 
         if not trajectory:
-            return {'success': False, 'error': 'No trajectory data'}
+            return {"success": False, "error": "No trajectory data"}
 
         return {
-            'success': True,
-            'entity': trajectory.entity_name,
-            'first_encounter': trajectory.first_encounter.isoformat(),
-            'last_update': trajectory.last_update.isoformat(),
-            'access_count': trajectory.access_count,
-            'confidence_evolution': [
-                {'time': t.isoformat(), 'confidence': c}
+            "success": True,
+            "entity": trajectory.entity_name,
+            "first_encounter": trajectory.first_encounter.isoformat(),
+            "last_update": trajectory.last_update.isoformat(),
+            "access_count": trajectory.access_count,
+            "confidence_evolution": [
+                {"time": t.isoformat(), "confidence": c}
                 for t, c in trajectory.confidence_evolution
             ],
-            'importance_trajectory': [
-                {'time': t.isoformat(), 'importance': i}
+            "importance_trajectory": [
+                {"time": t.isoformat(), "importance": i}
                 for t, i in trajectory.importance_trajectory
-            ]
+            ],
         }
 
     @app.tool()
@@ -1153,8 +1247,7 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
 
     @app.tool()
     async def run_temporal_distillation(
-        time_window_hours: int = 24,
-        min_frequency: int = 2
+        time_window_hours: int = 24, min_frequency: int = 2
     ) -> Dict[str, Any]:
         """
         Run temporal distillation pipeline (Mirror Mind map-reduce)
@@ -1178,7 +1271,7 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
         manifold: str,
         knowledge_type: str,
         domain: str = None,
-        weight: float = 0.5
+        weight: float = 0.5,
     ) -> Dict[str, Any]:
         """
         Add knowledge to dual manifold architecture
@@ -1195,29 +1288,26 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
         """
         dual = DualManifoldArchitecture(db_path=db_path)
 
-        if manifold == 'individual':
+        if manifold == "individual":
             manifold_id = dual.add_to_individual_manifold(
-                knowledge_type=knowledge_type,
-                content=content,
-                personal_weight=weight
+                knowledge_type=knowledge_type, content=content, personal_weight=weight
             )
-        elif manifold == 'collective':
+        elif manifold == "collective":
             if not domain:
-                return {'success': False, 'error': 'Domain required for collective manifold'}
+                return {
+                    "success": False,
+                    "error": "Domain required for collective manifold",
+                }
             manifold_id = dual.add_to_collective_manifold(
                 domain=domain,
                 knowledge_type=knowledge_type,
                 content=content,
-                consensus_score=weight
+                consensus_score=weight,
             )
         else:
-            return {'success': False, 'error': 'Invalid manifold type'}
+            return {"success": False, "error": "Invalid manifold type"}
 
-        return {
-            'success': True,
-            'manifold': manifold,
-            'id': manifold_id
-        }
+        return {"success": True, "manifold": manifold, "id": manifold_id}
 
     @app.tool()
     async def find_manifold_intersections() -> Dict[str, Any]:
@@ -1234,9 +1324,9 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
         intersections = dual.find_intersections()
 
         return {
-            'success': True,
-            'count': len(intersections),
-            'intersections': intersections
+            "success": True,
+            "count": len(intersections),
+            "intersections": intersections,
         }
 
     @app.tool()
@@ -1254,10 +1344,10 @@ def register_mirror_mind_tools(app, db_path: Path = DB_PATH):
         summary = dual.get_manifold_summary()
 
         return {
-            'success': True,
-            'individual_manifold': summary.individual_manifold,
-            'collective_manifold': summary.collective_manifold,
-            'intersection_points': summary.intersection_points
+            "success": True,
+            "individual_manifold": summary.individual_manifold,
+            "collective_manifold": summary.collective_manifold,
+            "intersection_points": summary.intersection_points,
         }
 
     logger.info("Mirror Mind enhancement tools registered")
@@ -1272,7 +1362,9 @@ if __name__ == "__main__":
     top = calc.get_top_central_entities(5)
     print(f"\nTop {len(top)} central entities:")
     for e in top:
-        print(f"  {e.entity_name}: PageRank={e.pagerank:.4f}, Combined={e.combined_score:.4f}")
+        print(
+            f"  {e.entity_name}: PageRank={e.pagerank:.4f}, Combined={e.combined_score:.4f}"
+        )
 
     # Test trajectory
     tracker = CognitiveTrajectoryTracker()
@@ -1284,14 +1376,18 @@ if __name__ == "__main__":
     # Test distillation
     pipeline = TemporalDistillationPipeline()
     result = pipeline.run_full_distillation(24, 2)
-    print(f"\nTemporal distillation:")
+    print("\nTemporal distillation:")
     print(f"  Patterns found: {result['patterns_found']}")
     print(f"  Concepts promoted: {result['concepts_promoted']}")
 
     # Test dual manifold
     dual = DualManifoldArchitecture()
     summary = dual.get_manifold_summary()
-    print(f"\nDual manifold summary:")
-    print(f"  Individual types: {list(summary.individual_manifold.get('types', {}).keys())}")
-    print(f"  Collective domains: {list(summary.collective_manifold.get('domains', {}).keys())}")
+    print("\nDual manifold summary:")
+    print(
+        f"  Individual types: {list(summary.individual_manifold.get('types', {}).keys())}"
+    )
+    print(
+        f"  Collective domains: {list(summary.collective_manifold.get('domains', {}).keys())}"
+    )
     print(f"  Intersection points: {len(summary.intersection_points)}")

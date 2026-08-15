@@ -58,9 +58,10 @@ class SleetimeAgent:
         self,
         agent_id: str = None,
         db_path: Path = DB_PATH,
-        consolidation_interval_hours: int = 1
+        consolidation_interval_hours: int = 1,
     ):
         import socket
+
         if agent_id is None:
             agent_id = os.environ.get("NODE_ID", socket.gethostname())
         self.agent_id = agent_id
@@ -85,13 +86,12 @@ class SleetimeAgent:
                 description="Recent insights and patterns learned from experiences",
                 initial_value="",
                 limit=3000,
-                read_only=False
+                read_only=False,
             )
             logger.info(f"   Created 'learnings' block for {self.agent_id}")
 
     def get_recent_episodic_memories(
-        self,
-        time_window_hours: int = 24
+        self, time_window_hours: int = 24
     ) -> List[Dict[str, Any]]:
         """
         Get episodic memories from the last N hours.
@@ -103,34 +103,39 @@ class SleetimeAgent:
 
         cutoff_time = datetime.now() - timedelta(hours=time_window_hours)
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT e.id, e.name, e.entity_type, o.content, o.created_at
             FROM entities e
             JOIN observations o ON e.id = o.entity_id
             WHERE e.tier = 'episodic'
               AND datetime(o.created_at) > datetime(?)
             ORDER BY o.created_at DESC
-        ''', (cutoff_time,))
+        """,
+            (cutoff_time,),
+        )
 
         memories = []
         for row in cursor.fetchall():
-            memories.append({
-                "entity_id": row[0],
-                "name": row[1],
-                "entity_type": row[2],
-                "observation": row[3],
-                "timestamp": row[4]
-            })
+            memories.append(
+                {
+                    "entity_id": row[0],
+                    "name": row[1],
+                    "entity_type": row[2],
+                    "observation": row[3],
+                    "timestamp": row[4],
+                }
+            )
 
         conn.close()
 
-        logger.info(f"   Retrieved {len(memories)} episodic memories from last {time_window_hours}h")
+        logger.info(
+            f"   Retrieved {len(memories)} episodic memories from last {time_window_hours}h"
+        )
         return memories
 
     def extract_patterns(
-        self,
-        memories: List[Dict[str, Any]],
-        min_frequency: int = 2
+        self, memories: List[Dict[str, Any]], min_frequency: int = 2
     ) -> List[Dict[str, Any]]:
         """
         Extract recurring patterns from episodic memories.
@@ -162,21 +167,22 @@ class SleetimeAgent:
                 failure_count = all_observations.lower().count("fail")
 
                 if success_count >= min_frequency or failure_count >= min_frequency:
-                    patterns.append({
-                        "type": entity_type,
-                        "frequency": len(group_memories),
-                        "success_count": success_count,
-                        "failure_count": failure_count,
-                        "observations": all_observations[:500]  # Sample
-                    })
+                    patterns.append(
+                        {
+                            "type": entity_type,
+                            "frequency": len(group_memories),
+                            "success_count": success_count,
+                            "failure_count": failure_count,
+                            "observations": all_observations[:500],  # Sample
+                        }
+                    )
 
-        logger.info(f"   Extracted {len(patterns)} patterns (min_frequency={min_frequency})")
+        logger.info(
+            f"   Extracted {len(patterns)} patterns (min_frequency={min_frequency})"
+        )
         return patterns
 
-    def create_semantic_concepts(
-        self,
-        patterns: List[Dict[str, Any]]
-    ) -> List[str]:
+    def create_semantic_concepts(self, patterns: List[Dict[str, Any]]) -> List[str]:
         """
         Convert patterns into semantic concepts.
 
@@ -188,30 +194,38 @@ class SleetimeAgent:
         cursor = conn.cursor()
 
         for pattern in patterns:
-            concept_name = f"concept_{pattern['type']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            concept_name = (
+                f"concept_{pattern['type']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
 
             # Create semantic entity
             try:
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO entities (name, entity_type, tier)
                     VALUES (?, ?, ?)
-                ''', (concept_name, "learned_concept", "semantic"))
+                """,
+                    (concept_name, "learned_concept", "semantic"),
+                )
 
                 entity_id = cursor.lastrowid
 
                 # Add observations
                 observation = f"""
-Pattern Type: {pattern['type']}
-Frequency: {pattern['frequency']} occurrences
-Success Rate: {pattern['success_count']} successes, {pattern['failure_count']} failures
-Sample: {pattern['observations']}
+Pattern Type: {pattern["type"]}
+Frequency: {pattern["frequency"]} occurrences
+Success Rate: {pattern["success_count"]} successes, {pattern["failure_count"]} failures
+Sample: {pattern["observations"]}
 Learned: {datetime.now().isoformat()}
                 """.strip()
 
-                cursor.execute('''
+                cursor.execute(
+                    """
                     INSERT INTO observations (entity_id, content)
                     VALUES (?, ?)
-                ''', (entity_id, observation))
+                """,
+                    (entity_id, observation),
+                )
 
                 concepts_created.append(concept_name)
                 logger.info(f"   Created semantic concept: {concept_name}")
@@ -227,8 +241,7 @@ Learned: {datetime.now().isoformat()}
         return concepts_created
 
     def discover_causal_relationships(
-        self,
-        memories: List[Dict[str, Any]]
+        self, memories: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
         Discover causal relationships from memory sequence.
@@ -249,18 +262,24 @@ Learned: {datetime.now().isoformat()}
             current_obs = current["observation"].lower()
             next_obs = next_memory["observation"].lower()
 
-            if ("action:" in current_obs or "attempting" in current_obs) and \
-               ("result:" in next_obs or "outcome:" in next_obs or "success" in next_obs or "fail" in next_obs):
-                causal_chains.append({
-                    "cause": current["name"],
-                    "effect": next_memory["name"],
-                    "cause_obs": current["observation"],
-                    "effect_obs": next_memory["observation"],
-                    "time_delta_seconds": (
-                        datetime.fromisoformat(next_memory["timestamp"]) -
-                        datetime.fromisoformat(current["timestamp"])
-                    ).total_seconds()
-                })
+            if ("action:" in current_obs or "attempting" in current_obs) and (
+                "result:" in next_obs
+                or "outcome:" in next_obs
+                or "success" in next_obs
+                or "fail" in next_obs
+            ):
+                causal_chains.append(
+                    {
+                        "cause": current["name"],
+                        "effect": next_memory["name"],
+                        "cause_obs": current["observation"],
+                        "effect_obs": next_memory["observation"],
+                        "time_delta_seconds": (
+                            datetime.fromisoformat(next_memory["timestamp"])
+                            - datetime.fromisoformat(current["timestamp"])
+                        ).total_seconds(),
+                    }
+                )
 
         logger.info(f"   Discovered {len(causal_chains)} causal relationships")
         return causal_chains
@@ -269,7 +288,7 @@ Learned: {datetime.now().isoformat()}
         self,
         patterns: List[Dict[str, Any]],
         concepts: List[str],
-        causal_chains: List[Dict[str, Any]]
+        causal_chains: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """
         Update the agent's "learnings" memory block with new insights.
@@ -284,7 +303,9 @@ Learned: {datetime.now().isoformat()}
         if patterns:
             learning_summary += f"\n🔍 Patterns Identified: {len(patterns)}\n"
             for pattern in patterns[:3]:  # Top 3
-                success_rate = pattern['success_count'] / max(pattern['frequency'], 1) * 100
+                success_rate = (
+                    pattern["success_count"] / max(pattern["frequency"], 1) * 100
+                )
                 learning_summary += f"  - {pattern['type']}: {pattern['frequency']} occurrences, {success_rate:.0f}% success\n"
 
         if concepts:
@@ -299,18 +320,16 @@ Learned: {datetime.now().isoformat()}
 
         # Append to learnings block
         result = self.block_manager.append_to_block(
-            agent_id=self.agent_id,
-            label="learnings",
-            content=learning_summary
+            agent_id=self.agent_id, label="learnings", content=learning_summary
         )
 
-        logger.info(f"   Updated learnings block: {result['chars_current']}/{result['chars_limit']} chars")
+        logger.info(
+            f"   Updated learnings block: {result['chars_current']}/{result['chars_limit']} chars"
+        )
         return result
 
     def compress_old_memories(
-        self,
-        age_threshold_days: int = 30,
-        min_importance_threshold: float = 0.5
+        self, age_threshold_days: int = 30, min_importance_threshold: float = 0.5
     ) -> Dict[str, Any]:
         """
         Compress old low-importance memories to save space.
@@ -323,13 +342,16 @@ Learned: {datetime.now().isoformat()}
         cutoff_date = datetime.now() - timedelta(days=age_threshold_days)
 
         # Find old episodic memories
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT id, name
             FROM entities
             WHERE tier = 'episodic'
               AND datetime(created_at) < datetime(?)
               AND compressed_data IS NULL
-        ''', (cutoff_date,))
+        """,
+            (cutoff_date,),
+        )
 
         candidates = cursor.fetchall()
         compressed_count = 0
@@ -337,20 +359,19 @@ Learned: {datetime.now().isoformat()}
         # For now, just mark for compression (actual compression would happen here)
         # In production, this would use the caveman compression from compression_integration.py
 
-        logger.info(f"   Found {len(candidates)} candidates for compression (>{age_threshold_days} days old)")
+        logger.info(
+            f"   Found {len(candidates)} candidates for compression (>{age_threshold_days} days old)"
+        )
 
         conn.close()
 
         return {
             "candidates": len(candidates),
             "compressed": compressed_count,
-            "age_threshold_days": age_threshold_days
+            "age_threshold_days": age_threshold_days,
         }
 
-    def run_consolidation_cycle(
-        self,
-        time_window_hours: int = 24
-    ) -> Dict[str, Any]:
+    def run_consolidation_cycle(self, time_window_hours: int = 24) -> Dict[str, Any]:
         """
         Run full consolidation cycle (like sleep consolidation).
 
@@ -392,7 +413,7 @@ Learned: {datetime.now().isoformat()}
                 "learnings_updated": False,
                 "compression_candidates": 0,
                 "duration_seconds": 0.0,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         # Step 2: Extract patterns
@@ -405,7 +426,9 @@ Learned: {datetime.now().isoformat()}
         causal_chains = self.discover_causal_relationships(memories)
 
         # Step 5: Update learnings block
-        learnings_result = self.update_learnings_block(patterns, concepts, causal_chains)
+        learnings_result = self.update_learnings_block(
+            patterns, concepts, causal_chains
+        )
 
         # Step 6: Compress old memories
         compression_result = self.compress_old_memories(age_threshold_days=30)
@@ -424,10 +447,10 @@ Learned: {datetime.now().isoformat()}
             "learnings_updated": learnings_result["success"],
             "compression_candidates": compression_result["candidates"],
             "duration_seconds": duration,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
-        logger.info(f"✅ Consolidation cycle complete:")
+        logger.info("✅ Consolidation cycle complete:")
         logger.info(f"   - {len(memories)} memories processed")
         logger.info(f"   - {len(patterns)} patterns extracted")
         logger.info(f"   - {len(concepts)} concepts created")

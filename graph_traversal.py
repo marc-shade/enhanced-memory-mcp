@@ -21,21 +21,24 @@ from pathlib import Path
 
 class TraversalDirection(str, Enum):
     """Direction for graph traversal"""
+
     OUTBOUND = "outbound"  # Follow edges from entity
-    INBOUND = "inbound"    # Follow edges to entity
-    BOTH = "both"          # Traverse in both directions
+    INBOUND = "inbound"  # Follow edges to entity
+    BOTH = "both"  # Traverse in both directions
 
 
 class TraversalStrategy(str, Enum):
     """Strategy for multi-hop traversal"""
+
     BREADTH_FIRST = "breadth_first"  # Explore all neighbors at current depth first
-    DEPTH_FIRST = "depth_first"      # Explore as deep as possible before backtracking
-    CAUSAL_CHAIN = "causal_chain"    # Follow causal relationships specifically
+    DEPTH_FIRST = "depth_first"  # Explore as deep as possible before backtracking
+    CAUSAL_CHAIN = "causal_chain"  # Follow causal relationships specifically
 
 
 @dataclass
 class TraversalResult:
     """Result of a graph traversal operation"""
+
     entity_id: int
     entity_name: str
     entity_type: str
@@ -69,7 +72,7 @@ class GraphTraversal:
         relation_types: Optional[List[str]] = None,
         temporal_filter: Optional[Dict[str, datetime]] = None,
         strategy: TraversalStrategy = TraversalStrategy.BREADTH_FIRST,
-        min_strength: float = 0.0
+        min_strength: float = 0.0,
     ) -> List[TraversalResult]:
         """
         Traverse graph from entity with various filters and strategies
@@ -90,35 +93,50 @@ class GraphTraversal:
         cursor = conn.cursor()
 
         # Get root entity ID
-        cursor.execute('SELECT id, entity_type FROM entities WHERE name = ?', (entity_name,))
+        cursor.execute(
+            "SELECT id, entity_type FROM entities WHERE name = ?", (entity_name,)
+        )
         root = cursor.fetchone()
         if not root:
             conn.close()
             return []
 
-        root_id = root['id']
-        root['entity_type']
+        root_id = root["id"]
+        root["entity_type"]
 
         # Initialize traversal
         results = []
         visited: Set[int] = set()
-        queue: List[Tuple[int, int, List[str]]] = [(root_id, 0, [entity_name])]  # (entity_id, depth, path)
+        queue: List[Tuple[int, int, List[str]]] = [
+            (root_id, 0, [entity_name])
+        ]  # (entity_id, depth, path)
 
         # Choose traversal method based on strategy
         if strategy == TraversalStrategy.BREADTH_FIRST:
             results = self._breadth_first_traverse(
-                cursor, queue, visited, max_depth, direction,
-                relation_types, temporal_filter, min_strength
+                cursor,
+                queue,
+                visited,
+                max_depth,
+                direction,
+                relation_types,
+                temporal_filter,
+                min_strength,
             )
         elif strategy == TraversalStrategy.DEPTH_FIRST:
             results = self._depth_first_traverse(
-                cursor, queue, visited, max_depth, direction,
-                relation_types, temporal_filter, min_strength
+                cursor,
+                queue,
+                visited,
+                max_depth,
+                direction,
+                relation_types,
+                temporal_filter,
+                min_strength,
             )
         elif strategy == TraversalStrategy.CAUSAL_CHAIN:
             results = self._causal_chain_traverse(
-                cursor, root_id, visited, max_depth,
-                temporal_filter, min_strength
+                cursor, root_id, visited, max_depth, temporal_filter, min_strength
             )
 
         conn.close()
@@ -133,7 +151,7 @@ class GraphTraversal:
         direction: TraversalDirection,
         relation_types: Optional[List[str]],
         temporal_filter: Optional[Dict[str, datetime]],
-        min_strength: float
+        min_strength: float,
     ) -> List[TraversalResult]:
         """Breadth-first traversal implementation"""
         results = []
@@ -148,29 +166,35 @@ class GraphTraversal:
 
             # Get neighbors
             neighbors = self._get_neighbors(
-                cursor, current_id, direction, relation_types,
-                temporal_filter, min_strength
+                cursor,
+                current_id,
+                direction,
+                relation_types,
+                temporal_filter,
+                min_strength,
             )
 
             for neighbor in neighbors:
-                if neighbor['entity_id'] not in visited and depth < max_depth:
-                    new_path = path + [neighbor['entity_name']]
+                if neighbor["entity_id"] not in visited and depth < max_depth:
+                    new_path = path + [neighbor["entity_name"]]
 
                     # Add to results
-                    results.append(TraversalResult(
-                        entity_id=neighbor['entity_id'],
-                        entity_name=neighbor['entity_name'],
-                        entity_type=neighbor['entity_type'],
-                        depth=depth + 1,
-                        path=new_path,
-                        relationship_type=neighbor['relation_type'],
-                        relationship_timestamp=neighbor.get('created_at'),
-                        relationship_strength=neighbor.get('strength', 0.0),
-                        is_causal=neighbor.get('is_causal', False)
-                    ))
+                    results.append(
+                        TraversalResult(
+                            entity_id=neighbor["entity_id"],
+                            entity_name=neighbor["entity_name"],
+                            entity_type=neighbor["entity_type"],
+                            depth=depth + 1,
+                            path=new_path,
+                            relationship_type=neighbor["relation_type"],
+                            relationship_timestamp=neighbor.get("created_at"),
+                            relationship_strength=neighbor.get("strength", 0.0),
+                            is_causal=neighbor.get("is_causal", False),
+                        )
+                    )
 
                     # Add to queue for next level
-                    queue.append((neighbor['entity_id'], depth + 1, new_path))
+                    queue.append((neighbor["entity_id"], depth + 1, new_path))
 
         return results
 
@@ -183,7 +207,7 @@ class GraphTraversal:
         direction: TraversalDirection,
         relation_types: Optional[List[str]],
         temporal_filter: Optional[Dict[str, datetime]],
-        min_strength: float
+        min_strength: float,
     ) -> List[TraversalResult]:
         """Depth-first traversal implementation"""
         results = []
@@ -198,29 +222,35 @@ class GraphTraversal:
 
             # Get neighbors
             neighbors = self._get_neighbors(
-                cursor, current_id, direction, relation_types,
-                temporal_filter, min_strength
+                cursor,
+                current_id,
+                direction,
+                relation_types,
+                temporal_filter,
+                min_strength,
             )
 
             for neighbor in neighbors:
-                if neighbor['entity_id'] not in visited:
-                    new_path = path + [neighbor['entity_name']]
+                if neighbor["entity_id"] not in visited:
+                    new_path = path + [neighbor["entity_name"]]
 
                     # Add to results
-                    results.append(TraversalResult(
-                        entity_id=neighbor['entity_id'],
-                        entity_name=neighbor['entity_name'],
-                        entity_type=neighbor['entity_type'],
-                        depth=depth + 1,
-                        path=new_path,
-                        relationship_type=neighbor['relation_type'],
-                        relationship_timestamp=neighbor.get('created_at'),
-                        relationship_strength=neighbor.get('strength', 0.0),
-                        is_causal=neighbor.get('is_causal', False)
-                    ))
+                    results.append(
+                        TraversalResult(
+                            entity_id=neighbor["entity_id"],
+                            entity_name=neighbor["entity_name"],
+                            entity_type=neighbor["entity_type"],
+                            depth=depth + 1,
+                            path=new_path,
+                            relationship_type=neighbor["relation_type"],
+                            relationship_timestamp=neighbor.get("created_at"),
+                            relationship_strength=neighbor.get("strength", 0.0),
+                            is_causal=neighbor.get("is_causal", False),
+                        )
+                    )
 
                     # Push to stack for DFS
-                    queue.append((neighbor['entity_id'], depth + 1, new_path))
+                    queue.append((neighbor["entity_id"], depth + 1, new_path))
 
         return results
 
@@ -231,7 +261,7 @@ class GraphTraversal:
         visited: Set[int],
         max_depth: int,
         temporal_filter: Optional[Dict[str, datetime]],
-        min_strength: float
+        min_strength: float,
     ) -> List[TraversalResult]:
         """
         Follow causal chains (causes/caused_by relationships)
@@ -241,7 +271,7 @@ class GraphTraversal:
         queue = [(root_id, 0, [])]
 
         # Causal relationship types
-        causal_types = ['causes', 'caused_by', 'triggered_by', 'resulted_in']
+        causal_types = ["causes", "caused_by", "triggered_by", "resulted_in"]
 
         while queue:
             current_id, depth, path = queue.pop(0)
@@ -253,37 +283,42 @@ class GraphTraversal:
 
             # Get causal relationships only
             neighbors = self._get_neighbors(
-                cursor, current_id,
+                cursor,
+                current_id,
                 TraversalDirection.OUTBOUND,  # Follow forward causality
                 causal_types,
                 temporal_filter,
-                min_strength
+                min_strength,
             )
 
             # Filter to only truly causal relationships
-            causal_neighbors = [n for n in neighbors if n.get('is_causal', False)]
+            causal_neighbors = [n for n in neighbors if n.get("is_causal", False)]
 
             for neighbor in causal_neighbors:
-                if neighbor['entity_id'] not in visited:
-                    new_path = path + [(
-                        neighbor['entity_name'],
-                        neighbor['relation_type'],
-                        neighbor.get('causal_strength', 0.0)
-                    )]
+                if neighbor["entity_id"] not in visited:
+                    new_path = path + [
+                        (
+                            neighbor["entity_name"],
+                            neighbor["relation_type"],
+                            neighbor.get("causal_strength", 0.0),
+                        )
+                    ]
 
-                    results.append(TraversalResult(
-                        entity_id=neighbor['entity_id'],
-                        entity_name=neighbor['entity_name'],
-                        entity_type=neighbor['entity_type'],
-                        depth=depth + 1,
-                        path=[str(p) for p in new_path],
-                        relationship_type=neighbor['relation_type'],
-                        relationship_timestamp=neighbor.get('created_at'),
-                        relationship_strength=neighbor.get('strength', 0.0),
-                        is_causal=True
-                    ))
+                    results.append(
+                        TraversalResult(
+                            entity_id=neighbor["entity_id"],
+                            entity_name=neighbor["entity_name"],
+                            entity_type=neighbor["entity_type"],
+                            depth=depth + 1,
+                            path=[str(p) for p in new_path],
+                            relationship_type=neighbor["relation_type"],
+                            relationship_timestamp=neighbor.get("created_at"),
+                            relationship_strength=neighbor.get("strength", 0.0),
+                            is_causal=True,
+                        )
+                    )
 
-                    queue.append((neighbor['entity_id'], depth + 1, new_path))
+                    queue.append((neighbor["entity_id"], depth + 1, new_path))
 
         return results
 
@@ -294,7 +329,7 @@ class GraphTraversal:
         direction: TraversalDirection,
         relation_types: Optional[List[str]],
         temporal_filter: Optional[Dict[str, datetime]],
-        min_strength: float
+        min_strength: float,
     ) -> List[Dict[str, Any]]:
         """
         Get neighboring entities with filters
@@ -306,7 +341,7 @@ class GraphTraversal:
         # Build query based on direction
         if direction in [TraversalDirection.OUTBOUND, TraversalDirection.BOTH]:
             # Outbound: entity -> other
-            query = '''
+            query = """
                 SELECT
                     r.to_entity_id as entity_id,
                     e.name as entity_name,
@@ -320,14 +355,21 @@ class GraphTraversal:
                 FROM relations r
                 JOIN entities e ON r.to_entity_id = e.id
                 WHERE r.from_entity_id = ?
-            '''
-            neighbors.extend(self._execute_neighbor_query(
-                cursor, query, entity_id, relation_types, temporal_filter, min_strength
-            ))
+            """
+            neighbors.extend(
+                self._execute_neighbor_query(
+                    cursor,
+                    query,
+                    entity_id,
+                    relation_types,
+                    temporal_filter,
+                    min_strength,
+                )
+            )
 
         if direction in [TraversalDirection.INBOUND, TraversalDirection.BOTH]:
             # Inbound: other -> entity
-            query = '''
+            query = """
                 SELECT
                     r.from_entity_id as entity_id,
                     e.name as entity_name,
@@ -341,10 +383,17 @@ class GraphTraversal:
                 FROM relations r
                 JOIN entities e ON r.from_entity_id = e.id
                 WHERE r.to_entity_id = ?
-            '''
-            neighbors.extend(self._execute_neighbor_query(
-                cursor, query, entity_id, relation_types, temporal_filter, min_strength
-            ))
+            """
+            neighbors.extend(
+                self._execute_neighbor_query(
+                    cursor,
+                    query,
+                    entity_id,
+                    relation_types,
+                    temporal_filter,
+                    min_strength,
+                )
+            )
 
         return neighbors
 
@@ -355,7 +404,7 @@ class GraphTraversal:
         entity_id: int,
         relation_types: Optional[List[str]],
         temporal_filter: Optional[Dict[str, datetime]],
-        min_strength: float
+        min_strength: float,
     ) -> List[Dict[str, Any]]:
         """Execute neighbor query with filters"""
         params = [entity_id]
@@ -363,18 +412,18 @@ class GraphTraversal:
 
         # Relationship type filter
         if relation_types:
-            placeholders = ','.join(['?' for _ in relation_types])
+            placeholders = ",".join(["?" for _ in relation_types])
             filters.append(f"r.relation_type IN ({placeholders})")
             params.extend(relation_types)
 
         # Temporal filter
         if temporal_filter:
-            if 'from' in temporal_filter:
+            if "from" in temporal_filter:
                 filters.append("r.created_at >= ?")
-                params.append(temporal_filter['from'])
-            if 'to' in temporal_filter:
+                params.append(temporal_filter["from"])
+            if "to" in temporal_filter:
                 filters.append("r.created_at <= ?")
-                params.append(temporal_filter['to'])
+                params.append(temporal_filter["to"])
 
         # Strength filter
         if min_strength > 0:
@@ -389,10 +438,7 @@ class GraphTraversal:
         return [dict(row) for row in cursor.fetchall()]
 
     def get_connected_context(
-        self,
-        entity_name: str,
-        max_depth: int = 2,
-        min_strength: float = 0.3
+        self, entity_name: str, max_depth: int = 2, min_strength: float = 0.3
     ) -> Dict[str, Any]:
         """
         Get full connected context for an entity
@@ -405,7 +451,7 @@ class GraphTraversal:
             direction=TraversalDirection.BOTH,
             max_depth=max_depth,
             strategy=TraversalStrategy.BREADTH_FIRST,
-            min_strength=min_strength
+            min_strength=min_strength,
         )
 
         # Organize by depth
@@ -413,27 +459,28 @@ class GraphTraversal:
         for result in results:
             if result.depth not in context_by_depth:
                 context_by_depth[result.depth] = []
-            context_by_depth[result.depth].append({
-                'name': result.entity_name,
-                'type': result.entity_type,
-                'relationship': result.relationship_type,
-                'strength': result.relationship_strength,
-                'path': result.path
-            })
+            context_by_depth[result.depth].append(
+                {
+                    "name": result.entity_name,
+                    "type": result.entity_type,
+                    "relationship": result.relationship_type,
+                    "strength": result.relationship_strength,
+                    "path": result.path,
+                }
+            )
 
         return {
-            'root': entity_name,
-            'total_connected': len(results),
-            'max_depth_explored': max(context_by_depth.keys()) if context_by_depth else 0,
-            'context_by_depth': context_by_depth,
-            'causal_entities': [r for r in results if r.is_causal]
+            "root": entity_name,
+            "total_connected": len(results),
+            "max_depth_explored": max(context_by_depth.keys())
+            if context_by_depth
+            else 0,
+            "context_by_depth": context_by_depth,
+            "causal_entities": [r for r in results if r.is_causal],
         }
 
     def find_paths(
-        self,
-        from_entity: str,
-        to_entity: str,
-        max_depth: int = 5
+        self, from_entity: str, to_entity: str, max_depth: int = 5
     ) -> List[List[str]]:
         """
         Find all paths between two entities
@@ -443,14 +490,16 @@ class GraphTraversal:
         cursor = conn.cursor()
 
         # Get entity IDs
-        cursor.execute('SELECT id FROM entities WHERE name IN (?, ?)', (from_entity, to_entity))
+        cursor.execute(
+            "SELECT id FROM entities WHERE name IN (?, ?)", (from_entity, to_entity)
+        )
         entities = cursor.fetchall()
         if len(entities) != 2:
             conn.close()
             return []
 
-        from_id = entities[0]['id']
-        to_id = entities[1]['id']
+        from_id = entities[0]["id"]
+        to_id = entities[1]["id"]
 
         # BFS to find all paths
         paths = []
@@ -469,15 +518,13 @@ class GraphTraversal:
 
             # Get neighbors (outbound only for directed paths)
             neighbors = self._get_neighbors(
-                cursor, current_id,
-                TraversalDirection.OUTBOUND,
-                None, None, 0.0
+                cursor, current_id, TraversalDirection.OUTBOUND, None, None, 0.0
             )
 
             for neighbor in neighbors:
-                if neighbor['entity_id'] not in visited_in_path:
-                    new_path = path + [neighbor['entity_name']]
-                    queue.append((neighbor['entity_id'], new_path))
+                if neighbor["entity_id"] not in visited_in_path:
+                    new_path = path + [neighbor["entity_name"]]
+                    queue.append((neighbor["entity_id"], new_path))
 
         conn.close()
         return paths

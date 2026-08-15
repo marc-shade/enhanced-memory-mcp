@@ -52,7 +52,7 @@ class MemoryBlock:
         value: str = "",
         limit: int = 2000,
         read_only: bool = False,
-        agent_id: str = "default"
+        agent_id: str = "default",
     ):
         self.label = label
         self.description = description
@@ -71,7 +71,10 @@ class MemoryBlock:
         new_value = self.value + "\n" + content
 
         if len(new_value) > self.limit:
-            return False, f"Would exceed character limit ({len(new_value)} > {self.limit})"
+            return (
+                False,
+                f"Would exceed character limit ({len(new_value)} > {self.limit})",
+            )
 
         self.value = new_value
         self.updated_at = datetime.now()
@@ -88,7 +91,10 @@ class MemoryBlock:
         new_value = self.value.replace(old_content, new_content)
 
         if len(new_value) > self.limit:
-            return False, f"Would exceed character limit ({len(new_value)} > {self.limit})"
+            return (
+                False,
+                f"Would exceed character limit ({len(new_value)} > {self.limit})",
+            )
 
         self.value = new_value
         self.updated_at = datetime.now()
@@ -118,7 +124,7 @@ class MemoryBlock:
             "chars_current": len(self.value),
             "chars_remaining": self.limit - len(self.value),
             "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "updated_at": self.updated_at.isoformat(),
         }
 
     def render_xml(self, use_line_numbers: bool = False) -> str:
@@ -182,7 +188,7 @@ class MemoryBlockManager:
         cursor = conn.cursor()
 
         # Create memory_blocks table
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS memory_blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_id TEXT NOT NULL,
@@ -195,10 +201,10 @@ class MemoryBlockManager:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(agent_id, label)
             )
-        ''')
+        """)
 
         # Create shared_blocks table (for multi-agent)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS shared_blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 label TEXT NOT NULL,
@@ -209,10 +215,10 @@ class MemoryBlockManager:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(label)
             )
-        ''')
+        """)
 
         # Create block_attachments table (links agents to shared blocks)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS block_attachments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_id TEXT NOT NULL,
@@ -221,13 +227,21 @@ class MemoryBlockManager:
                 FOREIGN KEY (shared_block_id) REFERENCES shared_blocks (id) ON DELETE CASCADE,
                 UNIQUE(agent_id, shared_block_id)
             )
-        ''')
+        """)
 
         # Create indexes
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_memory_blocks_agent ON memory_blocks(agent_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_memory_blocks_label ON memory_blocks(label)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_shared_blocks_label ON shared_blocks(label)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_block_attachments_agent ON block_attachments(agent_id)')
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memory_blocks_agent ON memory_blocks(agent_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memory_blocks_label ON memory_blocks(label)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_shared_blocks_label ON shared_blocks(label)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_block_attachments_agent ON block_attachments(agent_id)"
+        )
 
         conn.commit()
         conn.close()
@@ -239,17 +253,20 @@ class MemoryBlockManager:
         description: str,
         initial_value: str = "",
         limit: int = 2000,
-        read_only: bool = False
+        read_only: bool = False,
     ) -> Dict[str, Any]:
         """Create a new memory block for an agent"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO memory_blocks (agent_id, label, description, value, char_limit, read_only)
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (agent_id, label, description, initial_value, limit, int(read_only)))
+            """,
+                (agent_id, label, description, initial_value, limit, int(read_only)),
+            )
 
             block_id = cursor.lastrowid
             conn.commit()
@@ -262,12 +279,12 @@ class MemoryBlockManager:
                 "description": description,
                 "chars_current": len(initial_value),
                 "chars_limit": limit,
-                "read_only": read_only
+                "read_only": read_only,
             }
         except sqlite3.IntegrityError:
             return {
                 "success": False,
-                "error": f"Block '{label}' already exists for agent '{agent_id}'"
+                "error": f"Block '{label}' already exists for agent '{agent_id}'",
             }
         finally:
             conn.close()
@@ -277,11 +294,14 @@ class MemoryBlockManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT label, description, value, char_limit, read_only, created_at, updated_at
             FROM memory_blocks
             WHERE agent_id = ? AND label = ?
-        ''', (agent_id, label))
+        """,
+            (agent_id, label),
+        )
 
         row = cursor.fetchone()
         conn.close()
@@ -295,7 +315,7 @@ class MemoryBlockManager:
             value=row[2],
             limit=row[3],
             read_only=bool(row[4]),
-            agent_id=agent_id
+            agent_id=agent_id,
         )
 
         # Set timestamps from database
@@ -309,39 +329,46 @@ class MemoryBlockManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT id, label, description, value, char_limit, read_only, created_at, updated_at
             FROM memory_blocks
             WHERE agent_id = ?
             ORDER BY created_at
-        ''', (agent_id,))
+        """,
+            (agent_id,),
+        )
 
         blocks = []
         for row in cursor.fetchall():
-            blocks.append({
-                "block_id": row[0],
-                "label": row[1],
-                "description": row[2],
-                "value": row[3],
-                "chars_current": len(row[3]),
-                "chars_limit": row[4],
-                "chars_remaining": row[4] - len(row[3]),
-                "read_only": bool(row[5]),
-                "created_at": row[6],
-                "updated_at": row[7]
-            })
+            blocks.append(
+                {
+                    "block_id": row[0],
+                    "label": row[1],
+                    "description": row[2],
+                    "value": row[3],
+                    "chars_current": len(row[3]),
+                    "chars_limit": row[4],
+                    "chars_remaining": row[4] - len(row[3]),
+                    "read_only": bool(row[5]),
+                    "created_at": row[6],
+                    "updated_at": row[7],
+                }
+            )
 
         conn.close()
         return blocks
 
-    def append_to_block(self, agent_id: str, label: str, content: str) -> Dict[str, Any]:
+    def append_to_block(
+        self, agent_id: str, label: str, content: str
+    ) -> Dict[str, Any]:
         """Append content to a block (like Letta's core_memory_append)"""
         block = self.get_block(agent_id, label)
 
         if not block:
             return {
                 "success": False,
-                "error": f"Block '{label}' not found for agent '{agent_id}'"
+                "error": f"Block '{label}' not found for agent '{agent_id}'",
             }
 
         success, message = block.append(content)
@@ -353,11 +380,14 @@ class MemoryBlockManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             UPDATE memory_blocks
             SET value = ?, updated_at = CURRENT_TIMESTAMP
             WHERE agent_id = ? AND label = ?
-        ''', (block.value, agent_id, label))
+        """,
+            (block.value, agent_id, label),
+        )
 
         conn.commit()
         conn.close()
@@ -368,15 +398,11 @@ class MemoryBlockManager:
             "label": label,
             "chars_current": len(block.value),
             "chars_limit": block.limit,
-            "chars_remaining": block.limit - len(block.value)
+            "chars_remaining": block.limit - len(block.value),
         }
 
     def replace_in_block(
-        self,
-        agent_id: str,
-        label: str,
-        old_content: str,
-        new_content: str
+        self, agent_id: str, label: str, old_content: str, new_content: str
     ) -> Dict[str, Any]:
         """Replace content in a block (like Letta's core_memory_replace)"""
         block = self.get_block(agent_id, label)
@@ -384,7 +410,7 @@ class MemoryBlockManager:
         if not block:
             return {
                 "success": False,
-                "error": f"Block '{label}' not found for agent '{agent_id}'"
+                "error": f"Block '{label}' not found for agent '{agent_id}'",
             }
 
         success, message = block.replace(old_content, new_content)
@@ -396,11 +422,14 @@ class MemoryBlockManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             UPDATE memory_blocks
             SET value = ?, updated_at = CURRENT_TIMESTAMP
             WHERE agent_id = ? AND label = ?
-        ''', (block.value, agent_id, label))
+        """,
+            (block.value, agent_id, label),
+        )
 
         conn.commit()
         conn.close()
@@ -411,7 +440,7 @@ class MemoryBlockManager:
             "label": label,
             "chars_current": len(block.value),
             "chars_limit": block.limit,
-            "chars_remaining": block.limit - len(block.value)
+            "chars_remaining": block.limit - len(block.value),
         }
 
     def render_blocks(self, agent_id: str, use_line_numbers: bool = False) -> str:
@@ -423,16 +452,21 @@ class MemoryBlockManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT label, description, value, char_limit, read_only
             FROM memory_blocks
             WHERE agent_id = ?
             ORDER BY created_at
-        ''', (agent_id,))
+        """,
+            (agent_id,),
+        )
 
         s = StringIO()
         s.write("<memory_blocks>\n")
-        s.write("The following memory blocks are currently engaged in your core memory unit:\n\n")
+        s.write(
+            "The following memory blocks are currently engaged in your core memory unit:\n\n"
+        )
 
         rows = cursor.fetchall()
         for idx, row in enumerate(rows):
@@ -442,7 +476,7 @@ class MemoryBlockManager:
                 value=row[2],
                 limit=row[3],
                 read_only=bool(row[4]),
-                agent_id=agent_id
+                agent_id=agent_id,
             )
 
             s.write(block.render_xml(use_line_numbers))
@@ -455,7 +489,9 @@ class MemoryBlockManager:
         conn.close()
         return s.getvalue()
 
-    def create_default_blocks(self, agent_id: str, node_id: str = None) -> Dict[str, Any]:
+    def create_default_blocks(
+        self, agent_id: str, node_id: str = None
+    ) -> Dict[str, Any]:
         """
         Create default blocks for a new agent.
 
@@ -470,6 +506,7 @@ class MemoryBlockManager:
             node_id: Optional node identifier (defaults to NODE_ID env var or hostname)
         """
         import socket
+
         if node_id is None:
             node_id = os.environ.get("NODE_ID", socket.gethostname())
 
@@ -492,7 +529,7 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             description="My identity, capabilities, and purpose",
             initial_value=identity_value,
             limit=2000,
-            read_only=False
+            read_only=False,
         )
         if result["success"]:
             blocks_created.append("identity")
@@ -504,7 +541,7 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             description="Information about the human user I'm working with",
             initial_value="The human is using Claude Code to work with the agentic system.",
             limit=2000,
-            read_only=False
+            read_only=False,
         )
         if result["success"]:
             blocks_created.append("human")
@@ -516,7 +553,7 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             description="Current work, goals, and active context",
             initial_value="Ready to assist with tasks.",
             limit=3000,  # Larger for task details
-            read_only=False
+            read_only=False,
         )
         if result["success"]:
             blocks_created.append("task")
@@ -528,7 +565,7 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             description="Recent insights and patterns learned from experiences",
             initial_value="",
             limit=3000,
-            read_only=False
+            read_only=False,
         )
         if result["success"]:
             blocks_created.append("learnings")
@@ -537,27 +574,26 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             "success": True,
             "agent_id": agent_id,
             "blocks_created": blocks_created,
-            "count": len(blocks_created)
+            "count": len(blocks_created),
         }
 
     # Shared Block Methods (for Multi-Agent)
 
     def create_shared_block(
-        self,
-        label: str,
-        description: str,
-        initial_value: str = "",
-        limit: int = 5000
+        self, label: str, description: str, initial_value: str = "", limit: int = 5000
     ) -> Dict[str, Any]:
         """Create a shared memory block (for multi-agent coordination)"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO shared_blocks (label, description, value, char_limit)
                 VALUES (?, ?, ?, ?)
-            ''', (label, description, initial_value, limit))
+            """,
+                (label, description, initial_value, limit),
+            )
 
             block_id = cursor.lastrowid
             conn.commit()
@@ -568,26 +604,28 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
                 "label": label,
                 "description": description,
                 "chars_current": len(initial_value),
-                "chars_limit": limit
+                "chars_limit": limit,
             }
         except sqlite3.IntegrityError:
-            return {
-                "success": False,
-                "error": f"Shared block '{label}' already exists"
-            }
+            return {"success": False, "error": f"Shared block '{label}' already exists"}
         finally:
             conn.close()
 
-    def attach_shared_block(self, agent_id: str, shared_block_id: int) -> Dict[str, Any]:
+    def attach_shared_block(
+        self, agent_id: str, shared_block_id: int
+    ) -> Dict[str, Any]:
         """Attach a shared block to an agent"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO block_attachments (agent_id, shared_block_id)
                 VALUES (?, ?)
-            ''', (agent_id, shared_block_id))
+            """,
+                (agent_id, shared_block_id),
+            )
 
             conn.commit()
 
@@ -595,12 +633,12 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
                 "success": True,
                 "agent_id": agent_id,
                 "shared_block_id": shared_block_id,
-                "message": "Shared block attached successfully"
+                "message": "Shared block attached successfully",
             }
         except sqlite3.IntegrityError:
             return {
                 "success": False,
-                "error": f"Shared block {shared_block_id} already attached to agent '{agent_id}'"
+                "error": f"Shared block {shared_block_id} already attached to agent '{agent_id}'",
             }
         finally:
             conn.close()
@@ -610,11 +648,14 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT id, label, description, value, char_limit, created_at, updated_at
             FROM shared_blocks
             WHERE label = ?
-        ''', (label,))
+        """,
+            (label,),
+        )
 
         row = cursor.fetchone()
         conn.close()
@@ -631,7 +672,7 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             "chars_limit": row[4],
             "chars_remaining": row[4] - len(row[3]),
             "created_at": row[5],
-            "updated_at": row[6]
+            "updated_at": row[6],
         }
 
     def update_shared_block(self, label: str, new_value: str) -> Dict[str, Any]:
@@ -639,25 +680,25 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
         block = self.get_shared_block(label)
 
         if not block:
-            return {
-                "success": False,
-                "error": f"Shared block '{label}' not found"
-            }
+            return {"success": False, "error": f"Shared block '{label}' not found"}
 
         if len(new_value) > block["chars_limit"]:
             return {
                 "success": False,
-                "error": f"Exceeds character limit ({len(new_value)} > {block['chars_limit']})"
+                "error": f"Exceeds character limit ({len(new_value)} > {block['chars_limit']})",
             }
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             UPDATE shared_blocks
             SET value = ?, updated_at = CURRENT_TIMESTAMP
             WHERE label = ?
-        ''', (new_value, label))
+        """,
+            (new_value, label),
+        )
 
         conn.commit()
         conn.close()
@@ -667,7 +708,7 @@ I record outcomes, identify knowledge gaps, and consolidate learnings.
             "label": label,
             "chars_current": len(new_value),
             "chars_limit": block["chars_limit"],
-            "message": "Shared block updated successfully"
+            "message": "Shared block updated successfully",
         }
 
 
@@ -685,14 +726,16 @@ def test_memory_blocks():
     print("\nListing blocks...")
     blocks = manager.list_blocks(agent_id="test_agent")
     for block in blocks:
-        print(f"  {block['label']}: {block['chars_current']}/{block['chars_limit']} chars")
+        print(
+            f"  {block['label']}: {block['chars_current']}/{block['chars_limit']} chars"
+        )
 
     # Append to task block
     print("\nAppending to task block...")
     result = manager.append_to_block(
         agent_id="test_agent",
         label="task",
-        content="Currently implementing Letta-style memory blocks in enhanced-memory MCP."
+        content="Currently implementing Letta-style memory blocks in enhanced-memory MCP.",
     )
     print(json.dumps(result, indent=2))
 
@@ -702,7 +745,7 @@ def test_memory_blocks():
         agent_id="test_agent",
         label="identity",
         old_content="Linux Builder",
-        new_content="Linux Builder with Letta integration"
+        new_content="Linux Builder with Letta integration",
     )
     print(json.dumps(result, indent=2))
 
@@ -716,7 +759,7 @@ def test_memory_blocks():
     result = manager.create_shared_block(
         label="cluster_context",
         description="Cluster-wide coordination context",
-        initial_value="Active Goal: Integrate Letta memory blocks\nStatus: In Progress"
+        initial_value="Active Goal: Integrate Letta memory blocks\nStatus: In Progress",
     )
     print(json.dumps(result, indent=2))
 
@@ -724,8 +767,7 @@ def test_memory_blocks():
     if result["success"]:
         print("\nAttaching shared block to agent...")
         attach_result = manager.attach_shared_block(
-            agent_id="test_agent",
-            shared_block_id=result["shared_block_id"]
+            agent_id="test_agent", shared_block_id=result["shared_block_id"]
         )
         print(json.dumps(attach_result, indent=2))
 

@@ -81,32 +81,34 @@ class ContextualEnrichmentMigration:
         """Load progress from file if exists."""
         if PROGRESS_FILE.exists():
             try:
-                with open(PROGRESS_FILE, 'r') as f:
+                with open(PROGRESS_FILE, "r") as f:
                     progress = json.load(f)
-                    self.processed_entities = progress.get('processed_entities', 0)
-                    self.enriched_entities = progress.get('enriched_entities', 0)
-                    self.skipped_entities = progress.get('skipped_entities', 0)
-                    self.failed_entities = progress.get('failed_entities', 0)
-                    self.total_input_tokens = progress.get('total_input_tokens', 0)
-                    self.total_output_tokens = progress.get('total_output_tokens', 0)
-                    self.total_cost = progress.get('total_cost', 0.0)
-                    logger.info(f"Resuming from previous run: {self.processed_entities} entities already processed")
+                    self.processed_entities = progress.get("processed_entities", 0)
+                    self.enriched_entities = progress.get("enriched_entities", 0)
+                    self.skipped_entities = progress.get("skipped_entities", 0)
+                    self.failed_entities = progress.get("failed_entities", 0)
+                    self.total_input_tokens = progress.get("total_input_tokens", 0)
+                    self.total_output_tokens = progress.get("total_output_tokens", 0)
+                    self.total_cost = progress.get("total_cost", 0.0)
+                    logger.info(
+                        f"Resuming from previous run: {self.processed_entities} entities already processed"
+                    )
             except Exception as e:
                 logger.warning(f"Could not load progress: {e}")
 
     def _save_progress(self):
         """Save progress to file."""
         progress = {
-            'processed_entities': self.processed_entities,
-            'enriched_entities': self.enriched_entities,
-            'skipped_entities': self.skipped_entities,
-            'failed_entities': self.failed_entities,
-            'total_input_tokens': self.total_input_tokens,
-            'total_output_tokens': self.total_output_tokens,
-            'total_cost': self.total_cost,
-            'last_update': datetime.now().isoformat()
+            "processed_entities": self.processed_entities,
+            "enriched_entities": self.enriched_entities,
+            "skipped_entities": self.skipped_entities,
+            "failed_entities": self.failed_entities,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "total_cost": self.total_cost,
+            "last_update": datetime.now().isoformat(),
         }
-        with open(PROGRESS_FILE, 'w') as f:
+        with open(PROGRESS_FILE, "w") as f:
             json.dump(progress, f, indent=2)
 
     def get_all_entities(self) -> List[Dict[str, Any]]:
@@ -124,27 +126,32 @@ class ContextualEnrichmentMigration:
 
         entities = []
         for row in cursor.fetchall():
-            entity_id = row['id']
+            entity_id = row["id"]
 
             # Get observations for this entity
             obs_cursor = conn.cursor()
-            obs_cursor.execute("""
+            obs_cursor.execute(
+                """
                 SELECT content
                 FROM observations
                 WHERE entity_id = ?
                 ORDER BY created_at
-            """, (entity_id,))
+            """,
+                (entity_id,),
+            )
 
             observations = [obs_row[0] for obs_row in obs_cursor.fetchall()]
 
             entity = {
-                'id': entity_id,
-                'name': row['name'],
-                'entityType': row['entity_type'],  # Convert to camelCase for consistency
-                'tier': row['tier'],
-                'observations': observations,
-                'created_at': row['created_at'],
-                'last_accessed': row['last_accessed']
+                "id": entity_id,
+                "name": row["name"],
+                "entityType": row[
+                    "entity_type"
+                ],  # Convert to camelCase for consistency
+                "tier": row["tier"],
+                "observations": observations,
+                "created_at": row["created_at"],
+                "last_accessed": row["last_accessed"],
             }
             entities.append(entity)
 
@@ -161,16 +168,20 @@ class ContextualEnrichmentMigration:
         Returns:
             Contextual prefix string or None if failed
         """
-        entity_type = entity.get('entityType', 'unknown')
-        entity_name = entity.get('name', 'unknown')
-        observations = entity.get('observations', [])
+        entity_type = entity.get("entityType", "unknown")
+        entity_name = entity.get("name", "unknown")
+        observations = entity.get("observations", [])
 
         try:
             # Use LLM-based prefix generator
-            prefix, input_tokens, output_tokens = await self.prefix_generator.generate_prefix(
+            (
+                prefix,
+                input_tokens,
+                output_tokens,
+            ) = await self.prefix_generator.generate_prefix(
                 entity_name=entity_name,
                 entity_type=entity_type,
-                observations=observations
+                observations=observations,
             )
 
             # Track tokens
@@ -211,37 +222,46 @@ class ContextualEnrichmentMigration:
 
             # Insert the contextual prefix as a new observation at the beginning
             # First, get min created_at to insert before it
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT MIN(created_at) FROM observations WHERE entity_id = ?
-            """, (entity['id'],))
+            """,
+                (entity["id"],),
+            )
             min_created = cursor.fetchone()[0]
 
             # Use an earlier timestamp if observations exist, otherwise use current time
             # Use SQL datetime format (YYYY-MM-DD HH:MM:SS) to match database format
             if min_created:
                 # Parse timestamp (handle both ISO and SQL formats)
-                if 'T' in min_created:
-                    dt = datetime.fromisoformat(min_created.replace('Z', '+00:00'))
+                if "T" in min_created:
+                    dt = datetime.fromisoformat(min_created.replace("Z", "+00:00"))
                 else:
-                    dt = datetime.strptime(min_created, '%Y-%m-%d %H:%M:%S')
+                    dt = datetime.strptime(min_created, "%Y-%m-%d %H:%M:%S")
 
                 # Subtract 1 second and format as SQL datetime
-                insert_time = (dt - timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+                insert_time = (dt - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
             else:
-                insert_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                insert_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # Insert the contextual prefix as first observation
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO observations (entity_id, content, created_at)
                 VALUES (?, ?, ?)
-            """, (entity['id'], prefix, insert_time))
+            """,
+                (entity["id"], prefix, insert_time),
+            )
 
             # Update last_accessed on entity
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE entities
                 SET last_accessed = ?
                 WHERE id = ?
-            """, (datetime.now().isoformat(), entity['id']))
+            """,
+                (datetime.now().isoformat(), entity["id"]),
+            )
 
             conn.commit()
             conn.close()
@@ -292,20 +312,24 @@ class ContextualEnrichmentMigration:
 
         if self.processed_entities > 0:
             logger.info(f"Resuming from entity {self.processed_entities + 1}")
-            entities = entities[self.processed_entities:]
+            entities = entities[self.processed_entities :]
 
         # Process in batches
         for i in range(0, len(entities), BATCH_SIZE):
-            batch = entities[i:i + BATCH_SIZE]
+            batch = entities[i : i + BATCH_SIZE]
             batch_num = (i // BATCH_SIZE) + 1
             total_batches = (len(entities) + BATCH_SIZE - 1) // BATCH_SIZE
 
-            logger.info(f"\nProcessing batch {batch_num}/{total_batches} ({len(batch)} entities)")
+            logger.info(
+                f"\nProcessing batch {batch_num}/{total_batches} ({len(batch)} entities)"
+            )
 
             await self.process_batch(batch)
 
             # Progress update
-            logger.info(f"Progress: {self.processed_entities}/{self.total_entities} entities processed")
+            logger.info(
+                f"Progress: {self.processed_entities}/{self.total_entities} entities processed"
+            )
             logger.info(f"  ✅ Enriched: {self.enriched_entities}")
             logger.info(f"  ⏭️  Skipped: {self.skipped_entities}")
             logger.info(f"  ❌ Failed: {self.failed_entities}")
@@ -339,8 +363,7 @@ class ContextualEnrichmentMigration:
 async def main():
     """Main entry point."""
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
     migration = ContextualEnrichmentMigration()
