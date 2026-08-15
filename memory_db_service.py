@@ -116,12 +116,70 @@ class MemoryDatabase:
             )
         """)
 
+        # Relations table. Historically only server.py created this (issue #6):
+        # a database born from this class had no relations table, so the daemon
+        # and any script importing MemoryDatabase directly failed with "no such
+        # table" the first time relations were touched. Every creation path must
+        # yield the same schema; DDL matches server.py exactly.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS relations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_entity_id INTEGER,
+                to_entity_id INTEGER,
+                relation_type TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (from_entity_id) REFERENCES entities (id),
+                FOREIGN KEY (to_entity_id) REFERENCES entities (id)
+            )
+        """)
+
         # Create indexes for performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_name ON entities(name)")
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_entity_type ON entities(entity_type)"
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_tier ON entities(tier)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_observations_entity "
+            "ON observations(entity_id)"
+        )
+
+        # FTS5 index over observation content + sync triggers (issue #7). Only
+        # migrations/phase0_spine_repair_2026_07.py used to create this, so a
+        # database born here answered every content query with a well-formed
+        # empty while name queries kept working -- indistinguishable from
+        # "nothing stored" for the caller. DDL matches the phase0 migration;
+        # the rebuild backfills the index when this runs against an existing
+        # database that predates it.
+        fts_exists = cursor.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='observations_fts'"
+        ).fetchone()
+        if not fts_exists:
+            cursor.execute(
+                """CREATE VIRTUAL TABLE observations_fts USING fts5(
+                     content, content='observations', content_rowid='id')"""
+            )
+            cursor.execute(
+                """CREATE TRIGGER obs_fts_ai AFTER INSERT ON observations BEGIN
+                     INSERT INTO observations_fts(rowid, content) VALUES (new.id, new.content);
+                   END"""
+            )
+            cursor.execute(
+                """CREATE TRIGGER obs_fts_ad AFTER DELETE ON observations BEGIN
+                     INSERT INTO observations_fts(observations_fts, rowid, content)
+                     VALUES('delete', old.id, old.content);
+                   END"""
+            )
+            cursor.execute(
+                """CREATE TRIGGER obs_fts_au AFTER UPDATE ON observations BEGIN
+                     INSERT INTO observations_fts(observations_fts, rowid, content)
+                     VALUES('delete', old.id, old.content);
+                     INSERT INTO observations_fts(rowid, content) VALUES (new.id, new.content);
+                   END"""
+            )
+            cursor.execute(
+                "INSERT INTO observations_fts(observations_fts) VALUES('rebuild')"
+            )
 
         # Converge databases created before the OmniMEM columns were added to
         # the CREATE TABLE above. CREATE TABLE IF NOT EXISTS does nothing to an
@@ -242,6 +300,7 @@ class MemoryDatabase:
             "updated": 0,
             "failed": 0,
             "count": 0,
+            "observations_deduped": 0,
             "results": [],
             "errors": [],
         }
@@ -326,8 +385,24 @@ class MemoryDatabase:
                         results["created"] += 1
                         entity_id = cursor.lastrowid
 
-                    # Store observations
+                    # Store observations. Exact-content duplicates are skipped
+                    # (issue #8): re-importing an unchanged entity used to
+                    # append its observations again, so an idempotent-looking
+                    # seed import multiplied rows (measured: 3 imports of a
+                    # 32-entity seed = 3 identical copies of every row) and
+                    # skewed FTS relevance toward whatever was re-imported.
+                    # Genuinely new observations on an existing entity still
+                    # append; the check also holds within one batch because
+                    # earlier inserts in this transaction are visible to it.
                     for obs in observations:
+                        cursor.execute(
+                            "SELECT 1 FROM observations "
+                            "WHERE entity_id = ? AND content = ? LIMIT 1",
+                            (entity_id, obs),
+                        )
+                        if cursor.fetchone():
+                            results["observations_deduped"] += 1
+                            continue
                         cursor.execute(
                             """
                             INSERT INTO observations (entity_id, content)
@@ -595,6 +670,14 @@ class MemoryDatabase:
                     ).fetchone()
                 )
 
+            # A search that cannot see observation content must say so (issue
+            # #7, same principle as the scope filter above): without the
+            # marker, zero content recall is indistinguishable from "nothing
+            # stored". Set on both degraded paths, surfaced in the response.
+            degraded = None
+            if not self._has_obs_fts:
+                degraded = "name-only (observations_fts missing)"
+
             rows = []
             if self._has_obs_fts:
                 # Quote each TOKEN, not the whole query. Wrapping the entire
@@ -636,6 +719,7 @@ class MemoryDatabase:
                     rows = cursor.fetchall()
                 except sqlite3.OperationalError:
                     rows = []  # FTS syntax edge case; name/type search still runs
+                    degraded = "name-only (FTS query error)"
 
             seen_ids = {r[0] for r in rows}
             if len(rows) < limit:
@@ -728,7 +812,7 @@ class MemoryDatabase:
             except Exception:
                 pass
 
-            return {
+            response = {
                 "success": True,
                 "query": query,
                 "count": len(results),
@@ -736,6 +820,9 @@ class MemoryDatabase:
                 "low_confidence": (not results) or results[0]["confidence"] <= 0.5,
                 "results": results,
             }
+            if degraded:
+                response["degraded"] = degraded
+            return response
 
         except Exception as e:
             logger.error(f"Error in search_nodes: {e}")
