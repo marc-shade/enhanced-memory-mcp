@@ -167,6 +167,7 @@ MEMORY_DB_SOCKET_PATH=/tmp/other.sock ./healthcheck.sh
 | `MEMORY_OLLAMA_URL` | `http://127.0.0.1:11434` | Optional embedding provider. |
 | `MEMORY_EMBED_MODEL` | `embeddinggemma` | Embedding model to pull and use. |
 | `MEMORY_LOW_CONF_THRESHOLD` | `0.50` | Score under which a result is flagged low confidence. |
+| `MEMORY_TOOL_REGISTRY_FILE` | (unset) | JSON file declaring which *other* MCP servers code inside `execute_code` may call. Unset means none are declared, which is the honest default for a package that cannot know what your machine runs. |
 | `EXPECTED_TOOL_COUNT` | (unset) | Pins the tool count `./healthcheck.sh` requires. |
 
 `ENHANCED_MEMORY_SURFACE` and `MEMORY_PROFILE` both change how many tools
