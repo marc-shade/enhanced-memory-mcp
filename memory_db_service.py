@@ -26,6 +26,8 @@ import pickle
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
+from socket_guard import SocketInUseError, claim_socket_path
+
 # Logging configuration
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +66,17 @@ class MemoryDatabase:
 
     def init_database(self):
         """Initialize SQLite database with all required tables"""
+        # Whoever creates the file sets its mode. setup.sh no longer chmods a
+        # database it did not create, so a new one has to be born 600 here
+        # rather than inheriting the umask (0644 on a default macOS or Linux
+        # account) and being tightened later, if anyone re-ran the installer.
+        existed = os.path.exists(self.db_path)
         conn = sqlite3.connect(self.db_path)
+        if not existed:
+            try:
+                os.chmod(self.db_path, 0o600)
+            except OSError as exc:
+                logger.warning("could not chmod 600 %s: %s", self.db_path, exc)
         cursor = conn.cursor()
 
         # Entities table
@@ -804,6 +816,8 @@ class MemoryDBServer:
         self.socket_path = socket_path
         self.db = MemoryDatabase(db_path)
         self.server = None
+        # Only a process that bound the socket itself may remove the file.
+        self._owns_socket = False
 
     async def handle_request(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -851,15 +865,19 @@ class MemoryDBServer:
             await writer.wait_closed()
 
     async def start(self):
-        """Start the Unix socket server"""
-        # Remove existing socket file
-        if os.path.exists(self.socket_path):
-            os.unlink(self.socket_path)
+        """Start the Unix socket server.
+
+        Raises SocketInUseError rather than unlinking a socket another daemon
+        is answering on -- see socket_guard for why that takeover is silent.
+        """
+        if claim_socket_path(self.socket_path):
+            logger.warning("removed stale socket file %s", self.socket_path)
 
         # Start server
         self.server = await asyncio.start_unix_server(
             self.handle_request, path=self.socket_path
         )
+        self._owns_socket = True
 
         # Set socket permissions
         os.chmod(self.socket_path, 0o666)
@@ -875,8 +893,12 @@ class MemoryDBServer:
             self.server.close()
             await self.server.wait_closed()
 
-        if os.path.exists(self.socket_path):
+        # Never unlink a socket this process did not bind: on a refused start
+        # the file belongs to the daemon that is still serving it, and removing
+        # it would take that daemon's clients down instead of taking them over.
+        if self._owns_socket and os.path.exists(self.socket_path):
             os.unlink(self.socket_path)
+            self._owns_socket = False
 
         logger.info("Memory-DB service stopped")
 
@@ -897,11 +919,17 @@ async def main():
 
     try:
         await server.start()
+    except SocketInUseError as exc:
+        # Loud and fatal on purpose: the alternative is a silent takeover whose
+        # only symptom is that somebody else's memory store reads as empty.
+        logger.error("%s", exc)
+        return 2
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received")
     finally:
         await server.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

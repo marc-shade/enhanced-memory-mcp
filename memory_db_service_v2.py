@@ -44,6 +44,8 @@ from typing import Dict, List, Any, Optional
 from collections import deque
 from contextlib import contextmanager
 
+from socket_guard import SocketInUseError, claim_socket_path
+
 # Reciprocal Rank Fusion, shared with the LongMemEval harness so the ranking
 # used in production is the one that was benchmarked. Guarded: a missing libs/
 # tree must degrade search_nodes to name-only matching, never stop the service
@@ -952,6 +954,8 @@ class MemoryDBServerV2:
         self.server = None
         self.request_count = 0
         self.error_count = 0
+        # Only a process that bound the socket itself may remove the file.
+        self._owns_socket = False
 
     async def handle_request(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -1018,13 +1022,18 @@ class MemoryDBServerV2:
             await writer.wait_closed()
 
     async def start(self):
-        """Start the server"""
-        if os.path.exists(self.socket_path):
-            os.unlink(self.socket_path)
+        """Start the server.
+
+        Shares the v1 daemon's default socket path, so it can hijack a running
+        v1 daemon just as easily -- same guard, same reason (socket_guard).
+        """
+        if claim_socket_path(self.socket_path):
+            logger.warning("removed stale socket file %s", self.socket_path)
 
         self.server = await asyncio.start_unix_server(
             self.handle_request, path=self.socket_path
         )
+        self._owns_socket = True
 
         os.chmod(self.socket_path, 0o666)
         logger.info(f"Memory-DB v2 listening on {self.socket_path}")
@@ -1040,8 +1049,10 @@ class MemoryDBServerV2:
 
         self.db.shutdown()
 
-        if os.path.exists(self.socket_path):
+        # Never unlink a socket this process did not bind (see v1's stop()).
+        if self._owns_socket and os.path.exists(self.socket_path):
             os.unlink(self.socket_path)
+            self._owns_socket = False
 
         logger.info(
             f"Memory-DB v2 stopped (requests: {self.request_count}, errors: {self.error_count})"
@@ -1062,11 +1073,15 @@ async def main():
 
     try:
         await server.start()
+    except SocketInUseError as exc:
+        logger.error("%s", exc)
+        return 2
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt")
     finally:
         await server.stop()
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

@@ -36,6 +36,12 @@ warn() { printf '%sWARN%s %s\n' "$C_YELLOW" "$C_OFF" "$*" >&2; }
 fail() { printf '%sFAIL%s %s\n' "$C_RED" "$C_OFF" "$*" >&2; }
 die()  { fail "$*"; exit 1; }
 
+# Octal permission bits of a path, for reporting what was left alone.
+# BSD stat and GNU stat disagree on the flag, so try both before giving up.
+file_mode() {
+    stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null || printf '?'
+}
+
 # --- .env ------------------------------------------------------------------
 
 # Load .env, exporting each assignment so both python processes inherit an

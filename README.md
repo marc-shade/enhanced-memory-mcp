@@ -94,6 +94,41 @@ is empty rather than deaf. `./healthcheck.sh` exists to tell the two apart.
 
 No sudo is required at any point. Nothing is installed system wide.
 
+## Already running an enhanced-memory system?
+
+Read this before step 2 below if this machine might already have one: an older
+checkout, a second clone, a service you installed months ago. By default every
+install wants the same two things — the socket `/tmp/memory-db.sock` and the
+database `~/.claude/enhanced_memories/memory.db` — and they cannot be shared.
+
+Check first:
+
+```bash
+lsof /tmp/memory-db.sock        # macOS or Linux
+ss -xl | grep memory-db.sock    # Linux
+pgrep -af memory_db_service.py
+```
+
+Anything listed means an install is live. Starting a second daemon on an
+occupied socket is refused: it exits nonzero and prints the socket path and the
+database the answering daemon is using, rather than taking the socket over.
+That is a guard, not coexistence — the second daemon does not run at all.
+
+To run two installs side by side, give this one its own everything in `.env`:
+
+```ini
+ENHANCED_MEMORY_DIR=/home/you/.enhanced-memory-second
+MEMORY_DB_SOCKET_PATH=/tmp/memory-db-second.sock
+# Only if you want the Neural Memory Fabric somewhere else again; by default it
+# follows ENHANCED_MEMORY_DIR:
+# NMF_SQLITE_PATH=/home/you/.enhanced-memory-second/nmf.db
+# NMF_FILES_ROOT=/home/you/.enhanced-memory-second/nmf_files
+```
+
+`ENHANCED_MEMORY_DIR` is the one that gets forgotten. Two daemons on two
+sockets sharing one `memory.db` is not coexistence: it is two exclusive owners
+of one file, which is exactly what the daemon exists to prevent.
+
 ## Quick start
 
 ```bash
@@ -113,6 +148,10 @@ setup/bin/memory-db-daemon.sh &
 
 A healthy run ends with `Required checks passed.` and exit code 0. Anything else
 is a real problem: see [Troubleshooting](#troubleshooting).
+
+Settings live in `.env`, which step 1 creates from `.env.example` only when
+`.env` is absent. **Editing that file is how a setting persists**; re-running
+`setup/setup.sh` never overwrites it.
 
 Then register the server with your MCP client. In `~/.claude.json`:
 
@@ -156,9 +195,12 @@ There is no authentication on that port. Keep `MCP_HOST` at `127.0.0.1`.
 ## Configuration
 
 Configuration is environment variables. `setup/setup.sh` writes a `.env` from
-[`.env.example`](.env.example), which documents every setting inline. A variable
-already set in your environment beats the file, so a one-off override works as
-you would expect:
+[`.env.example`](.env.example), which documents every setting inline. **Editing
+`.env` is the persistent mechanism**: the copy happens only when `.env` does not
+exist, so your edits survive every re-run of the installer (and, for the same
+reason, a new release's defaults do not arrive on their own — compare the two
+files after an upgrade). A variable already set in your environment beats the
+file for that one invocation:
 
 ```bash
 MEMORY_DB_SOCKET_PATH=/tmp/other.sock ./healthcheck.sh
@@ -168,7 +210,9 @@ MEMORY_DB_SOCKET_PATH=/tmp/other.sock ./healthcheck.sh
 |---|---|---|
 | `ENHANCED_MEMORY_DIR` | `~/.claude/enhanced_memories` | Directory holding `memory.db`. |
 | `ENHANCED_MEMORY_DB_PATH` | (unset) | Full path to the database file. Overrides the directory setting. |
-| `MEMORY_DB_SOCKET_PATH` | `/tmp/memory-db.sock` | Unix socket between the two processes. Keep it short, see the AF_UNIX note below. |
+| `MEMORY_DB_SOCKET_PATH` | `/tmp/memory-db.sock` | Unix socket between the two processes. Keep it short, see the AF_UNIX note below. Give a second install on the same machine its own. |
+| `NMF_SQLITE_PATH` | `$ENHANCED_MEMORY_DIR/nmf.db` | Optional. The Neural Memory Fabric database. It follows `ENHANCED_MEMORY_DIR` on its own; set this only to put it somewhere else. |
+| `NMF_FILES_ROOT` | `$ENHANCED_MEMORY_DIR/nmf_files` | Optional. The NMF file store, same rule. |
 | `MCP_TRANSPORT` | `stdio` | `stdio`, `sse`, or `streamable-http`. |
 | `MCP_HOST` | `127.0.0.1` | HTTP transports only. Do not expose this to a network. |
 | `MCP_PORT` | `9106` | HTTP transports only. |
@@ -207,6 +251,12 @@ setup/setup.sh --with-ollama     # verifies ollama, pulls the embedding model
 
 `./healthcheck.sh` reports both as OPTIONAL and never fails the gate on their
 absence. Pass `--require-optional` if you want the stricter contract.
+
+Already running a Qdrant? Point `MEMORY_QDRANT_URL` at it and skip
+`--with-qdrant` entirely; nothing here needs to own the instance. The port
+conflict discussed under the container profile below is specific to that
+profile, which publishes its own container on 6333 and cannot bind a port
+something else already holds. A host install only makes outbound requests.
 
 ### GraphRAG is optional and external
 
@@ -333,7 +383,10 @@ setup/service/uninstall-services.sh
 launchd user agents on macOS (`~/Library/LaunchAgents`), systemd user units on
 Linux (`~/.config/systemd/user`). No root, no system units. Every path is
 rendered from this checkout's location, so two checkouts can coexist if you give
-them different `--label-prefix` values and different sockets.
+them different `--label-prefix` values, different `MEMORY_DB_SOCKET_PATH`
+values, **and different `ENHANCED_MEMORY_DIR` values**. All three, not the first
+two: separate sockets alone leave both daemons opening the same `memory.db`,
+and each of them is meant to own that file exclusively.
 
 The installer waits for the socket and fails loudly with a log tail if the
 service does not come up. Logs land in `~/Library/Logs/enhanced-memory` or
@@ -489,8 +542,19 @@ after 30 seconds, and prints the tail of the error log.
 
 ### `ConnectionRefusedError` while the socket file exists
 
-A killed daemon left the file behind. The launcher removes a stale socket on
-start; if you are starting the daemon some other way, delete the file first.
+A killed daemon left the file behind. Start the daemon again and it removes the
+file itself, logging `removed stale socket <path>`; the launcher does the same
+before it execs. Do not delete a socket file by hand as a habit — a file that is
+still being served looks exactly like a stale one, and removing it cuts off
+every client of the daemon that owns it.
+
+### `REFUSING TO START: another daemon is already serving ...`
+
+Working as intended: something else is answering on that socket path. The
+message names the socket and, when the other daemon replies to a status
+request, the database it holds. Either stop that daemon, or give this one its
+own `MEMORY_DB_SOCKET_PATH` **and** `ENHANCED_MEMORY_DIR` — see
+[Already running an enhanced-memory system?](#already-running-an-enhanced-memory-system).
 
 ### The MCP client fails at the handshake with a JSON parse error
 

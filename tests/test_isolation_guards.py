@@ -47,8 +47,10 @@ class TestProductionDatabaseGuard:
     def test_sibling_files_in_the_real_directory_are_blocked(self):
         """The whole directory is off limits, not just memory.db.
 
-        neural_memory_fabric resolves nmf.db in the same directory, and it is
-        imported transitively by server.py.
+        neural_memory_fabric used to resolve nmf.db in the real directory no
+        matter what ENHANCED_MEMORY_DIR said; that is fixed at source now and
+        TestNeuralMemoryFabricStoragePaths asserts it. This stays as the
+        backstop for the next module that reinvents the same hardcoded path.
         """
         with pytest.raises(RuntimeError, match="real memory database"):
             sqlite3.connect(REAL_MEMORY_DB.parent / "nmf.db")
@@ -198,6 +200,91 @@ class TestSocketIsolation:
 
         with pytest.raises(FileNotFoundError):
             MemoryClient().get_memory_status_sync()
+
+
+class TestNeuralMemoryFabricStoragePaths:
+    """NMF must put nmf.db and nmf_files where the environment says.
+
+    Until 2026-08-15 the fallbacks were the literal string
+    ~/.claude/enhanced_memories/nmf.db, and the shipped nmf_config.yaml names
+    that same directory -- so an install pointed at its own ENHANCED_MEMORY_DIR
+    still wrote both backends into the operator's real store. The sqlite guard
+    above catches that inside this suite; these tests catch it at the source,
+    where it also protects real second installs.
+    """
+
+    @staticmethod
+    def _resolve(config_path=None):
+        from neural_memory_fabric import NeuralMemoryFabric
+
+        config = NeuralMemoryFabric._load_config(None, config_path)
+        return (
+            Path(config["storage"]["sqlite"]["path"]).expanduser(),
+            Path(config["storage"]["files"]["root"]).expanduser(),
+        )
+
+    @staticmethod
+    def _write_config(tmp_path, sqlite_path, files_root):
+        import yaml
+
+        config = tmp_path / "nmf_config.yaml"
+        config.write_text(
+            yaml.safe_dump(
+                {
+                    "storage": {
+                        "sqlite": {"path": str(sqlite_path)},
+                        "files": {"root": str(files_root)},
+                    }
+                }
+            )
+        )
+        return config
+
+    def test_shipped_config_does_not_reach_the_real_store(self):
+        """The config file as shipped, with the suite's ENHANCED_MEMORY_DIR."""
+        sqlite_path, files_root = self._resolve()
+        real_dir = REAL_MEMORY_DB.parent.expanduser().resolve()
+        override = Path(os.environ["ENHANCED_MEMORY_DIR"]).resolve()
+        for resolved in (sqlite_path.resolve(), files_root.resolve()):
+            assert real_dir not in resolved.parents and resolved != real_dir, (
+                f"NMF resolved {resolved} inside the operator's real store"
+            )
+            assert override in resolved.parents, (
+                f"NMF resolved {resolved}, which is not under ENHANCED_MEMORY_DIR"
+            )
+
+    def test_a_config_naming_the_default_directory_is_relocated(self, tmp_path):
+        """The default is what this repo ships, not a decision anyone made."""
+        config = self._write_config(
+            tmp_path,
+            REAL_MEMORY_DB.parent / "nmf.db",
+            REAL_MEMORY_DB.parent / "nmf_files",
+        )
+        sqlite_path, files_root = self._resolve(config)
+        override = Path(os.environ["ENHANCED_MEMORY_DIR"]).resolve()
+        # Resolve both sides: on macOS /tmp is a symlink to /private/tmp, so a
+        # raw comparison fails on paths that are in fact the same file.
+        assert sqlite_path.resolve() == (override / "nmf.db").resolve()
+        assert files_root.resolve() == (override / "nmf_files").resolve()
+
+    def test_a_deliberate_config_path_still_wins(self, tmp_path):
+        """An operator who named an existing directory keeps it."""
+        chosen = tmp_path / "chosen"
+        chosen.mkdir()
+        config = self._write_config(tmp_path, chosen / "nmf.db", chosen / "nmf_files")
+        sqlite_path, files_root = self._resolve(config)
+        assert sqlite_path == chosen / "nmf.db"
+        assert files_root == chosen / "nmf_files"
+
+    def test_the_env_overrides_beat_everything(self, tmp_path, monkeypatch):
+        chosen = tmp_path / "chosen"
+        chosen.mkdir()
+        config = self._write_config(tmp_path, chosen / "nmf.db", chosen / "nmf_files")
+        monkeypatch.setenv("NMF_SQLITE_PATH", str(tmp_path / "custom.db"))
+        monkeypatch.setenv("NMF_FILES_ROOT", str(tmp_path / "custom_files"))
+        sqlite_path, files_root = self._resolve(config)
+        assert sqlite_path == tmp_path / "custom.db"
+        assert files_root == tmp_path / "custom_files"
 
 
 def test_no_module_bypasses_the_sqlite_guard():

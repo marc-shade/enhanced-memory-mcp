@@ -139,13 +139,27 @@ load_env || true
 DB_PATH="$(resolve_db_path "$VENV_PY")"
 DB_DIR="$(dirname "$DB_PATH")"
 info "Preparing database directory ${DB_DIR}"
-mkdir -p "$DB_DIR"
-chmod 700 "$DB_DIR" 2>/dev/null || warn "could not chmod 700 $DB_DIR"
-if [ -f "$DB_PATH" ]; then
-    log "  existing database kept: $DB_PATH"
-    chmod 600 "$DB_PATH" 2>/dev/null || true
+
+# Harden what this run creates; leave what was already there alone. The earlier
+# form chmod'ed unconditionally, so an operator who had deliberately set 755 on
+# the directory and 644 on the database got 700/600 back -- under a line that
+# said the existing database was being kept. Either way, say what happened:
+# silence about a permission change is how the old behaviour went unnoticed.
+if [ -d "$DB_DIR" ]; then
+    log "  existing directory kept as-is: $DB_DIR (mode $(file_mode "$DB_DIR"))"
 else
-    log "  new database will be created on first daemon start: $DB_PATH"
+    mkdir -p "$DB_DIR"
+    if chmod 700 "$DB_DIR" 2>/dev/null; then
+        log "  created $DB_DIR (mode 700)"
+    else
+        warn "created $DB_DIR but could not chmod 700 it"
+    fi
+fi
+
+if [ -f "$DB_PATH" ]; then
+    log "  existing database kept as-is: $DB_PATH (mode $(file_mode "$DB_PATH"))"
+else
+    log "  new database will be created on first daemon start: $DB_PATH (mode 600)"
 fi
 
 info "Checking the daemon socket path"

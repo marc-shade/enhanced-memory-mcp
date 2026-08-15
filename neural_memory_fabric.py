@@ -18,6 +18,8 @@ from enum import Enum
 import sqlite3
 import yaml
 
+from memory_paths import DEFAULT_MEMORY_DIR, get_memory_paths
+
 logger = logging.getLogger("neural-memory-fabric")
 
 
@@ -124,17 +126,39 @@ class NeuralMemoryFabric:
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
 
-        # Redirect the NMF backends when the configured directory does not exist
-        # on this machine. The earlier form of this check tested Path("/mnt"),
-        # which exists on most Linux systems even when the configured directory
-        # under it does not -- so the redirect never fired there and the sqlite
-        # backend failed to open. Test the configured parent itself.
-        # NMF_SQLITE_PATH / NMF_FILES_ROOT override unconditionally.
+        # Where the NMF backends land. Two things are being reconciled here.
+        #
+        # A configured directory that does not exist on this machine has to be
+        # redirected or the sqlite backend cannot open. (The earlier form of
+        # this check tested Path("/mnt"), which exists on most Linux systems
+        # even when the configured directory under it does not, so the redirect
+        # never fired there. Test the configured parent itself.)
+        #
+        # And the redirect target must be the *canonical* memory directory --
+        # whatever ENHANCED_MEMORY_DIR / ENHANCED_MEMORY_DB_PATH resolve to --
+        # not ~/.claude/enhanced_memories literally. Hardcoding the literal
+        # meant a second install pointed at its own directory still wrote
+        # nmf.db and nmf_files into the operator's real store, which is the one
+        # place nothing else in this repo may touch.
+        #
+        # Precedence: NMF_SQLITE_PATH / NMF_FILES_ROOT, then a configured path
+        # the operator actually chose, then the canonical directory. A config
+        # value naming the default directory is what this repo ships rather
+        # than a decision anyone made, so it does not outrank the environment.
         storage = config.setdefault("storage", {})
         sqlite_cfg = storage.setdefault("sqlite", {})
         files_cfg = storage.setdefault("files", {})
+        memory_dir, _ = get_memory_paths()
 
-        def _resolve(cfg: dict, key: str, env_var: str, fallback: str) -> None:
+        def _is_shipped_default(parent: Path) -> bool:
+            if parent == DEFAULT_MEMORY_DIR:
+                return True
+            try:
+                return parent.resolve() == DEFAULT_MEMORY_DIR.resolve()
+            except OSError:
+                return False
+
+        def _resolve(cfg: dict, key: str, env_var: str, filename: str) -> None:
             override = os.environ.get(env_var)
             if override:
                 cfg[key] = override
@@ -142,19 +166,12 @@ class NeuralMemoryFabric:
             configured = cfg.get(key)
             if configured:
                 parent = Path(os.path.expanduser(str(configured))).parent
-                if parent.exists():
+                if parent.exists() and not _is_shipped_default(parent):
                     return
-            cfg[key] = fallback
+            cfg[key] = str(memory_dir / filename)
 
-        _resolve(
-            sqlite_cfg, "path", "NMF_SQLITE_PATH", "~/.claude/enhanced_memories/nmf.db"
-        )
-        _resolve(
-            files_cfg,
-            "root",
-            "NMF_FILES_ROOT",
-            "~/.claude/enhanced_memories/nmf_files",
-        )
+        _resolve(sqlite_cfg, "path", "NMF_SQLITE_PATH", "nmf.db")
+        _resolve(files_cfg, "root", "NMF_FILES_ROOT", "nmf_files")
 
         return config
 
