@@ -1,0 +1,87 @@
+# Enhanced Memory MCP, containerized. Podman first, Docker compatible.
+#
+#   podman compose up --build              # core only (SQLite, no vector recall)
+#   podman compose --profile qdrant up     # with the vector store
+#   docker compose up --build              # same file
+#
+# The service publishes the MCP SSE endpoint on the HOST LOOPBACK only. The
+# server has no authentication: anything that can reach the port can read and
+# write your entire memory store. Change the published address only if you
+# understand that.
+#
+# No `version:` key on purpose. It has been ignored by Compose v2 and podman
+# compose for years and only produces a warning.
+
+services:
+  enhanced-memory:
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        # Keep in step with the interpreter floor in setup/lib/common.sh.
+        PYTHON_VERSION: "${PYTHON_VERSION:-3.11}"
+        # 1 also installs requirements-optional.txt (much larger image).
+        WITH_OPTIONAL: "${WITH_OPTIONAL:-0}"
+    image: "${IMAGE_NAME:-enhanced-memory:local}"
+    container_name: enhanced-memory
+    restart: unless-stopped
+
+    # host:container. 0.0.0.0 inside the container is scoped to the container's
+    # network namespace; the 127.0.0.1 prefix here is what keeps it off the LAN.
+    ports:
+      - "127.0.0.1:${MCP_PORT:-9106}:9106"
+
+    environment:
+      # Both processes run in this one container and inherit this one block, so
+      # the split-brain trap that bites host installs cannot happen here.
+      ENHANCED_MEMORY_DIR: /data/enhanced_memories
+      MEMORY_DB_SOCKET_PATH: /tmp/memory-db.sock
+      MCP_TRANSPORT: "${MCP_TRANSPORT:-sse}"
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "9106"
+      ENHANCED_MEMORY_SURFACE: "${ENHANCED_MEMORY_SURFACE:-frontdoor}"
+      MEMORY_PROFILE: "${MEMORY_PROFILE:-full}"
+
+      # Only resolves when you start the qdrant profile. Without it the name does
+      # not exist, connection fails, and recall degrades from semantic to
+      # lexical rather than erroring.
+      MEMORY_QDRANT_URL: "${MEMORY_QDRANT_URL:-http://qdrant:6333}"
+
+      # Embeddings come from an ollama on the HOST, which a container cannot
+      # reach at 127.0.0.1. Uncomment the spelling your engine uses:
+      #   podman: http://host.containers.internal:11434
+      #   docker: http://host.docker.internal:11434
+      # MEMORY_OLLAMA_URL: "http://host.containers.internal:11434"
+      MEMORY_EMBED_MODEL: "${MEMORY_EMBED_MODEL:-embeddinggemma}"
+
+    volumes:
+      # Named volume: without it the database dies with the container.
+      - enhanced-memory-data:/data/enhanced_memories
+
+    healthcheck:
+      test: ["CMD", "/app/setup/lib/container-health.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional. Not started by a bare `up`; add --profile qdrant.
+  # Absent Qdrant, search still works and is lexical rather than semantic.
+  qdrant:
+    profiles: ["qdrant"]
+    image: docker.io/qdrant/qdrant:latest
+    container_name: enhanced-memory-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+# There is deliberately no depends_on between the two services. Qdrant is
+# optional, and a hard dependency would make the core stack refuse to start
+# without a component the system is designed to run without.
+
+volumes:
+  enhanced-memory-data:
+  qdrant-data:

@@ -1,0 +1,34 @@
+# Build context exclusions for podman (which prefers this filename over
+# .dockerignore). The pattern list below is kept in step with .dockerignore;
+# change both together.
+#
+# Do not rely on this file alone for secrecy. Apple's `container build` ignored
+# it entirely in a verified run on 2026-08-14, which is why the Containerfile
+# empties .env in a discarded stage as well.
+
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.benchmarks
+.coverage
+htmlcov
+
+# Never bake local configuration or credentials into an image. .env.example is
+# kept: it is the documentation of every setting.
+.env
+*.db
+*.db-wal
+*.db-shm
+*.sock
+
+.DS_Store
+*.swp
+*.log

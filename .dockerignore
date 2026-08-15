@@ -1,0 +1,29 @@
+# Build context exclusions. Podman reads .containerignore first and falls back to
+# this file, so one file covers podman, docker and Apple container.
+
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.benchmarks
+.coverage
+htmlcov
+
+# Never bake local configuration or credentials into an image. .env.example is
+# kept: it is the documentation of every setting.
+.env
+*.db
+*.db-wal
+*.db-shm
+*.sock
+
+.DS_Store
+*.swp
+*.log
