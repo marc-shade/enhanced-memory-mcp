@@ -3,7 +3,7 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![Tools](https://img.shields.io/badge/MCP_Tools-188_core-informational)]()
+[![Tools](https://img.shields.io/badge/MCP_Tools-186_core-informational)]()
 
 Persistent, searchable memory for AI agents, over the
 [Model Context Protocol](https://modelcontextprotocol.io/). Entities and their
@@ -13,12 +13,18 @@ the whole thing is exposed to your client as MCP tools.
 
 How many tools depends on what you installed, and the difference is not a bug:
 a tool whose backend is missing is not registered at all. A core install
-(`requirements.txt`) registers 188; adding the optional backends
-(`requirements-optional.txt`) brings it to 206. If you counted 188 after a
+(`requirements.txt`) registers 186; adding the optional backends
+(`requirements-optional.txt`) brings it to 204. If you counted 186 after a
 plain `pip install -r requirements.txt`, nothing is broken.
 
 Both figures were measured on Python 3.11.11 through `tools/list` over stdio,
-in one virtualenv, before and after installing the optional set.
+with `AGENTIC_SYSTEM_PATH` unset. That last condition is not pedantry. If that
+variable points at the separate system described under
+[GraphRAG](#graphrag-is-optional-and-external), seven more tools register and
+you get 193 and 211 instead. Earlier drafts of this file said 188 and 206
+because they were measured on machines that had it exported, and two of us
+reproduced the same wrong number without noticing we shared the cause. Unset it
+before you re-measure.
 
 Everything core runs locally with no API keys and no network. The optional
 vector stack (Qdrant plus ollama) upgrades recall from keyword matching to
