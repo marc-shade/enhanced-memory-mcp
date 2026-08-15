@@ -356,6 +356,10 @@ Two gates, in this order.
 python3 comprehensive_test.py    # the functional suite (needs the daemon running)
 ```
 
+A third, developer-facing suite lives under `tests/` and needs
+`pip install -r dev-requirements.txt` first — pytest deliberately ships in no
+runtime requirements file, and the two gates above run on the stdlib alone.
+
 Judge `comprehensive_test.py` by its exit code, not by a pass count. The number
 of checks depends on the mode it selects: with no `ENHANCED_MEMORY_*` or
 `MEMORY_DB_*` variables set it builds its own sandbox and runs everything, and

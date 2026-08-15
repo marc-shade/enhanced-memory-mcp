@@ -1,0 +1,8 @@
+# Development-only dependencies. NOT needed to run the server, the daemon,
+# comprehensive_test.py (stdlib-only by design), or healthcheck.sh.
+#
+# Needed for: pytest tests/  (the developer suite; see RELEASE_NOTES "Test suite")
+#
+# Pinned to the version the suite's shipped figures were verified with
+# (137 passed / 1 skipped on a fresh install, Linux and macOS).
+pytest==9.1.1

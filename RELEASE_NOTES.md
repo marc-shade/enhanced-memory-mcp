@@ -515,11 +515,14 @@ not a symlink on this machine" when `~/.claude/enhanced_memories` is a real
 directory. On a developer machine where that path is a symlink to another
 volume the test runs; under a fresh `HOME` it has nothing to resolve.
 
-**137 passed / 1 skipped is what a new installation sees.** 138 is what a
-machine with a symlinked memory directory sees. Same tree, same commit — which
-is exactly the count-versus-exit-code point the warning below makes, and the
-second time in this release that a number differed because of state on the
-measuring machine rather than anything in the code.
+**137 passed / 1 skipped is what a new installation sees once pytest is
+installed** (`pip install -r dev-requirements.txt` — pytest ships in no runtime
+requirements file, deliberately; the post-install gate `comprehensive_test.py`
+needs only the stdlib). 138 is what a machine with a symlinked memory directory
+sees. Same tree, same commit — which is exactly the count-versus-exit-code
+point the warning below makes, and the second time in this release that a
+number differed because of state on the measuring machine rather than anything
+in the code.
 
 Two gates ship, and they answer different questions.
 
