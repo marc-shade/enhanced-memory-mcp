@@ -240,33 +240,80 @@ The base schema in this repository ships `tier` only.
 
 ## Writing memories back
 
-There is no equally clean answer here, and it is more honest to say so than to
-supply a hook that half works.
+Writing is not a hook. That is a design decision, not a missing feature, and it
+is worth stating plainly because the asymmetry with recall looks like an
+oversight.
 
-Recall is a good fit for automation because the trigger is unambiguous: a
-prompt arrived, so search. Writing is not. No hook event corresponds to "a
-durable fact was established". `Stop` fires when a turn ends, whether or not
-anything was learned. `PostToolUse` fires constantly. Wiring writes to either
-produces a store that grows quickly and is mostly noise, which degrades recall
-for everything already in it.
+Recall automates cleanly because the trigger is unambiguous: a prompt arrived,
+so search. Writing has no such trigger. No hook event corresponds to "a durable
+fact was established". `Stop` fires when a turn ends, whether or not anything
+was learned. `PostToolUse` fires constantly. Wire writes to either and the store
+grows quickly and mostly with noise, which degrades recall for everything
+already in it. The judgment about what is worth keeping needs the context of the
+conversation, which is precisely what a hook does not have and the model does.
 
-The approaches in rough order of reliability:
+So the working arrangement splits the two: **the model decides and writes, and
+automation only does the mechanical part.** This is the configuration in
+production use, not a fallback for want of something better.
 
-1. **Ask the model to write, in your project instructions.** Least automatic,
-   most accurate, because the judgment about what is worth keeping stays where
-   the context is. This is the recommended starting point.
-2. **A `Stop` hook that asks a cheap model** whether the transcript contains a
-   durable fact, and writes only when it says yes. Real, and used in practice,
-   but you inherit that model's judgment and its cost on every turn.
-3. **Write on every turn.** Do not. The failure is not visible on day one; it
-   arrives weeks later as recall quality that no longer beats noise.
+### Tell the agent what qualifies
 
-Whichever you choose, deduplication matters. `create_entities` skips
-exact-duplicate observations per entity and reports the count as
-`observations_deduped`, so a re-run of the same import is idempotent. Re-worded
-near duplicates are stored by default and reported in `near_duplicates`,
-because a correction must never be silently dropped. Set
-`ENHANCED_MEMORY_NEAR_DUP_POLICY=skip` if an import pipeline should drop them.
+Put this in the instructions your client already loads per project
+(`CLAUDE.md`, `AGENTS.md`, or equivalent). Adapt the categories; the important
+part is that "what qualifies" is stated, because an agent left to infer it will
+either save nothing or save everything.
+
+```markdown
+## Memory
+
+Use `mcp__enhanced-memory__create_entities` to store a fact when it is durable
+and would not be obvious to someone reading the code fresh next month:
+
+- decisions and their rationale, especially rejected alternatives
+- constraints that are not visible in the repository
+- corrections, when something turned out not to work as documented
+- external references worth returning to
+
+Do not store: what the code already says, what git history already records,
+or anything that only matters inside the current conversation.
+
+Search first with `mcp__enhanced-memory__search_nodes` and update the existing
+entity rather than creating a near duplicate. State briefly what you saved.
+```
+
+That last line matters more than it looks. An instruction-driven trigger fails
+by silent omission, so make the write visible in the transcript; otherwise the
+only evidence that memory is working is the absence of evidence that it is not.
+
+### The file-then-sync variant
+
+Some deployments would rather author memories as files: reviewable in a pull
+request, versioned in git, editable by a human who does not want to call a tool
+to fix a typo. That works, and it is what the arrangement described above looks
+like at larger scale:
+
+1. The agent writes one markdown file per fact, into a directory you choose.
+2. A `SessionStart` hook syncs any new or changed file into the database, keyed
+   by a content hash so re-running it is idempotent.
+
+The hook is a mirror, not an author. It never decides anything and never
+creates a memory from a conversation; if the agent writes nothing, it has
+nothing to promote. Keep that boundary, because the moment a sync step starts
+inferring what to save you have rebuilt the noisy `Stop`-hook approach with
+extra steps.
+
+The tradeoff is real: files are reviewable and diffable, and they are also a
+second source of truth that can drift from the database if the sync stops
+running. If you take this route, make a failed sync loud.
+
+### Deduplication
+
+Whichever route you take, `create_entities` skips exact-duplicate observations
+per entity and reports the count as `observations_deduped`, so a re-run of the
+same import is idempotent. Re-worded near duplicates are stored by default and
+reported in `near_duplicates`, because a correction must never be silently
+dropped. Set `ENHANCED_MEMORY_NEAR_DUP_POLICY=skip` if an import pipeline
+should drop them.
 
 ## Gaps / not covered
 
@@ -283,8 +330,18 @@ because a correction must never be silently dropped. Set
   performs better on paraphrase and is a reasonable upgrade once the optional
   services are running, but it is not covered here and carries the same rule 2
   obligation, separately, because it queries a different index.
-- The write-back options above are described, not shipped or benchmarked. No
-  measurement of their precision is offered.
+- The write-back arrangement is described, not shipped. The instruction block
+  is a starting point, not a tuned prompt, and its recall of what deserves
+  saving has not been measured. Its failure mode is silent omission: an agent
+  that never writes looks identical to one with nothing worth writing, and no
+  gate here detects the difference. If that matters to you, audit the store's
+  growth rate rather than trusting the arrangement.
+- The tool names above assume the server is registered as `enhanced-memory`,
+  matching the README example. A different key changes the prefix.
+- The file-then-sync variant is described from a working implementation, but no
+  sync hook is shipped here and none was written for this document, so the
+  idempotent-content-hash detail is stated from that implementation rather than
+  from code in this repository.
 - Hook event names and the `settings.json` shape reflect Claude Code as of
   2026-08. Other MCP clients have different mechanisms, or none.
 - No claim is made that this configuration is optimal. It is the smallest thing
