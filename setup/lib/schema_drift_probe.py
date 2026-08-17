@@ -31,6 +31,12 @@ Deliberate limits, so the output is not read as more than it is:
 * A table absent from the database is skipped, not failed. Several are created
   lazily by the component that uses them, so absence here means "not created
   yet", not "wrong".
+* An FTS5 virtual table is modelled as SQLite accepts it, not as
+  PRAGMA table_info describes it: `rowid` and the control column named after
+  the table are allowed in addition to the declared columns. See FTS5_RE.
+  Without this the probe failed the sync triggers it was meant to protect
+  (issue #9), and a gate that fails on healthy installs trains people to
+  override it.
 
 So a PASS means: no literal INSERT names a column missing from a table that
 exists. It does not mean the schema is complete or correct.
@@ -53,6 +59,18 @@ INSERT_RE = re.compile(
     r"INSERT\s+(?:OR\s+\w+\s+)?INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)",
     re.IGNORECASE | re.DOTALL,
 )
+
+# An FTS5 virtual table accepts two column names that PRAGMA table_info never
+# reports, so modelling one by table_info alone rejects valid SQL:
+#
+#   rowid   the external-content rowid mapping, written by the sync triggers
+#   <table> the control column, named after the table itself, as in
+#           INSERT INTO observations_fts(observations_fts) VALUES('rebuild')
+#
+# Only fts5 is special-cased. fts3/fts4 additionally accept `docid` and are not
+# used by this repository; if one is added, extend this rather than widening the
+# allowed set for every table.
+FTS5_RE = re.compile(r"\bUSING\s+fts5\b", re.IGNORECASE)
 
 DEFAULT_SOURCES = ("memory_db_service.py", "server.py")
 
@@ -88,14 +106,15 @@ def statements(source: Path) -> List[Tuple[str, Set[str], int]]:
 def live_schema(db_path: Path) -> Dict[str, Set[str]]:
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=10)
     try:
-        tables = [
-            row[0]
-            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        ]
-        return {
-            table: {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
-            for table in tables
-        }
+        schema: Dict[str, Set[str]] = {}
+        for table, ddl in conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type='table'"
+        ).fetchall():
+            columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if ddl and FTS5_RE.search(ddl):
+                columns.update({"rowid", table})
+            schema[table] = columns
+        return schema
     finally:
         conn.close()
 
