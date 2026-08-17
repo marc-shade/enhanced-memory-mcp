@@ -172,6 +172,13 @@ inherits only whatever environment that client happened to have, and the two
 processes drift apart silently. See
 [the split brain trap](#the-server-and-the-daemon-disagree-about-the-database).
 
+At this point the install is complete and the tools work when called. Nothing
+calls them on its own: every session starts cold, and nothing is written back
+unless the agent chooses to. That is not a fault and no check reports it, so it
+is easy to mistake a working install for a working memory.
+[docs/AUTOMATION.md](docs/AUTOMATION.md) covers closing that gap, starting with
+a recall hook that runs on every prompt.
+
 ### The alternative: one shared HTTP server
 
 stdio spawns one server process per client session, which is what desktop
