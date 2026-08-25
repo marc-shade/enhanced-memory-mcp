@@ -228,6 +228,8 @@ MEMORY_DB_SOCKET_PATH=/tmp/other.sock ./healthcheck.sh
 | `MEMORY_QDRANT_URL` | `http://localhost:6333` | Optional vector store. |
 | `MEMORY_OLLAMA_URL` | `http://127.0.0.1:11434` | Optional embedding provider. |
 | `MEMORY_EMBED_MODEL` | `embeddinggemma` | Embedding model to pull and use. |
+| `ENRICHMENT_OLLAMA_URL` | `http://127.0.0.1:11434` | Optional. ollama daemon used to write the one `[Context: ...]` observation `create_entities` prepends to each new entity. Unreachable or missing model means the entity still stores, with a template prefix instead; the response's `contextual_enrichment.backend` says `ollama` or `template` for that call. |
+| `ENRICHMENT_OLLAMA_MODEL` | `gemma4:e4b-it-q8_0` | Model for that prefix. Any instruct model works; `ollama pull` it first or every call falls back to the template. |
 | `MEMORY_LOW_CONF_THRESHOLD` | `0.50` | Score under which a result is flagged low confidence. |
 | `MEMORY_TOOL_REGISTRY_FILE` | (unset) | JSON file declaring which *other* MCP servers code inside `execute_code` may call. Unset means none are declared, which is the honest default for a package that cannot know what your machine runs. |
 | `MEMORY_LOG_STDERR` | `1` | Send `WARNING` and above to stderr as well as the log file, so skipped tool groups are visible. Set `0` if your MCP client treats stderr as errors. |

@@ -118,16 +118,39 @@ def ensure_collection(client: QdrantClient, name: str, dim: int) -> None:
 def _rows(auto_only: bool):
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
-    q = "SELECT id, name, entity_type FROM entities"
+    # Mirror the canonical liveness filter every SQL search path applies
+    # (memory_db_service adds archived_at/superseded_by; the write-path
+    # indexer excludes the archive/quarantine tiers, and supersede EVICTS
+    # the Qdrant point). Without this, a backfill resurrects every hidden
+    # memory into the vector path that injects into prompts - it did,
+    # 2026-08-24: 2,048 points (filtered corpus) became 12,017 (whole
+    # store, incl. 8,414 archive-tier + 1,553 quarantine-tier entities).
+    q = "SELECT id, name, entity_type FROM entities WHERE " + LIVE_PREDICATE
     if auto_only:
-        q += " WHERE entity_type LIKE 'auto_memory/%'"
+        q += " AND entity_type LIKE 'auto_memory/%'"
     ents = conn.execute(q).fetchall()
     out = []
     for e in ents:
         obs = conn.execute(
             "SELECT content FROM observations WHERE entity_id=? LIMIT 8", (e["id"],)
         ).fetchall()
-        text = (e["name"] + ": " + " ".join(o["content"] for o in obs)).strip()
+        # Template contextual prefixes measurably HURT vague-query retrieval
+        # (2026-08-24 A/B, 30 targets + 400 distractors, embeddinggemma:
+        # top-1 0.53 with vs 0.60 without, MRR 0.644 vs 0.715; stripping
+        # improved 9/30 entities, hurt 2). Filter matches the template's
+        # rigid skeleton, BOTH halves required, so LLM-generated
+        # "[Context: ...]" prefixes - which measured best - stay embedded.
+        contents = [
+            o["content"]
+            for o in obs
+            if not (
+                o["content"].startswith("[Context: This is a ")
+                and "' with information about" in o["content"]
+            )
+        ]
+        if obs and not contents:
+            continue  # nothing but boilerplate: no document worth embedding
+        text = (e["name"] + ": " + " ".join(contents)).strip()
         if len(text) > 8:
             out.append((e["id"], e["name"], e["entity_type"], text[:4000]))
     conn.close()
@@ -156,11 +179,44 @@ def backfill(model: str, auto_only: bool) -> int:
     return 0
 
 
+LIVE_PREDICATE = (
+    "COALESCE(tier,'') NOT IN ('archive','quarantine')"
+    " AND archived_at IS NULL AND superseded_by IS NULL"
+)
+
+
+def _drop_dead(hits):
+    """Keep only hits whose entity is still live in sqlite.
+
+    The payload is a cache written at index time; archiving does not evict
+    the point (only supersede does), so a reader that trusts the payload
+    resurrects archived memories. Measured 2026-08-25: 42 freshly archived
+    ARC-era entities, and this CLI ranked one of them first while the
+    SQL-gated MCP tool and per-prompt hook were clean. Same predicate as
+    _rows, so the backfill and the reader agree on what "live" means.
+    """
+    ids = [int(h.id) for h in hits]
+    if not ids:
+        return []
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    marks = ",".join("?" * len(ids))
+    live = {
+        r[0]
+        for r in conn.execute(
+            f"SELECT id FROM entities WHERE id IN ({marks}) AND {LIVE_PREDICATE}", ids
+        )
+    }
+    conn.close()
+    return [h for h in hits if int(h.id) in live]
+
+
 def search(model: str, query: str, k: int) -> int:
     coll = collection_for(model)
     qv = embed([query], model)[0]
     client = QdrantClient(url=QDRANT)
-    hits = client.query_points(coll, query=qv, limit=k).points
+    # Over-fetch, then gate on the database: dead points may still be in the
+    # collection and must never reach the reader as a result.
+    hits = _drop_dead(client.query_points(coll, query=qv, limit=k * 3).points)[:k]
     print(f"query: {query!r}  (model={model}, coll={coll})")
     for h in hits:
         pl = h.payload or {}

@@ -171,6 +171,7 @@ optional integration point, not a dependency.
 | `ENHANCED_MEMORY_CONSOLIDATE` | Consolidation scheduling knob (see server.py) |
 | `MEMORY_QDRANT_URL` | Existing Qdrant for the optional vector path |
 | `OLLAMA_HOST` | Local embeddings for that index |
+| `ENRICHMENT_OLLAMA_URL` / `ENRICHMENT_OLLAMA_MODEL` | Local ollama that generates the `[Context: ...]` prefix on `create_entities` (default `http://127.0.0.1:11434`, `gemma4:e4b-it-q8_0`); any failure degrades to the template prefix and reports `backend: template` |
 | `AGENTIC_SYSTEM_PATH` | OPTIONAL: point at an agentic-system checkout to add its GraphRAG script tools (+7 tools; unset is the supported standalone mode - leave it unset when measuring tool counts) |
 
 ### Dependencies

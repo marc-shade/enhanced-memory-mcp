@@ -8,11 +8,23 @@ that help improve retrieval accuracy.
 Part of RAG Tier 1 Strategy - Week 1, Day 5-7
 """
 
-import os
+import asyncio
+import json
 import logging
+import os
+import urllib.error
+import urllib.request
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+# Local ollama backend (2026-08-24). The Anthropic branch below has been dead
+# by policy since creation (rules/intent-engineering.md bans direct AI SDK
+# calls, and no env supplies ANTHROPIC_API_KEY), so every one of the 2,429
+# prefixes ever stored was the template. Local ollama is the compliant LLM
+# path: plain HTTP to the same daemon that already serves embeddings.
+OLLAMA_URL = os.environ.get("ENRICHMENT_OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.environ.get("ENRICHMENT_OLLAMA_MODEL", "gemma4:e4b-it-q8_0")
 
 # Try to import Anthropic SDK
 try:
@@ -66,6 +78,12 @@ class ContextualPrefixGenerator:
         else:
             logger.warning("Anthropic SDK not available - using fallback mode")
 
+        # Local ollama fallback chain: anthropic (dead by policy) -> ollama
+        # -> template. Instance attrs so tests can point at a dead port.
+        self.ollama_url = OLLAMA_URL
+        self.ollama_model = OLLAMA_MODEL
+        self._backend = None  # set by generate_prefix: anthropic|ollama|template
+
         # Token tracking
         self.total_input_tokens = 0
         self.total_output_tokens = 0
@@ -90,8 +108,22 @@ class ContextualPrefixGenerator:
             Tuple of (prefix, input_tokens, output_tokens)
         """
         if not self.client:
-            # Fallback to heuristic-based prefix
-            return self._generate_fallback_prefix(entity_name, entity_type, observations)
+            # Compliant LLM path: local ollama over HTTP, run OFF the event
+            # loop (urllib blocks; sync work on the loop is the accept-then-
+            # stall mechanism proven on agent-runtime the same day this was
+            # written). Any failure degrades to the template, reported as
+            # backend="template", never as an LLM result.
+            try:
+                prefix, ti, to = await asyncio.to_thread(
+                    self._ollama_prefix, entity_name, entity_type, observations
+                )
+                self._backend = "ollama"
+                self.total_input_tokens += ti
+                self.total_output_tokens += to
+                return prefix, ti, to
+            except Exception as e:
+                logger.warning(f"ollama enrichment unavailable ({e}); template fallback")
+                return self._generate_fallback_prefix(entity_name, entity_type, observations)
 
         try:
             # Prepare context for LLM
@@ -145,6 +177,49 @@ Respond with ONLY the contextual prefix, nothing else."""
             # Fall back to heuristic
             return self._generate_fallback_prefix(entity_name, entity_type, observations)
 
+    def _ollama_prefix(
+        self, entity_name: str, entity_type: str, observations: list
+    ) -> tuple[str, int, int]:
+        """One-shot local-ollama generation. Raises on any failure."""
+        obs_lines = []
+        for i, obs in enumerate(observations[:3]):
+            text = str(obs)
+            obs_lines.append(f"  {i + 1}. {text[:200]}")
+        prompt = (
+            "Given this entity from a technical memory store, write ONE concise "
+            "sentence (under 40 words) describing what it is about, for a "
+            "retrieval system.\n"
+            f"Name: {entity_name}\nType: {entity_type}\n"
+            "Observations:\n" + "\n".join(obs_lines) + "\n"
+            "Respond with ONLY the sentence, no preamble."
+        )
+        req = urllib.request.Request(
+            self.ollama_url + "/api/generate",
+            data=json.dumps(
+                {
+                    "model": self.ollama_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    # gemma4 is a thinking model: with think enabled it spent
+                    # the whole num_predict budget reasoning and returned an
+                    # EMPTY response (done_reason=length, eval_count=80,
+                    # measured 2026-08-24). think:false is ignored by
+                    # non-thinking models, so it is safe to send always.
+                    "think": False,
+                    "options": {"temperature": 0, "num_predict": 120},
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+        text = (data.get("response") or "").strip().strip('"')
+        if not text:
+            raise ValueError("empty ollama response")
+        text = " ".join(text.split())[:300]
+        prefix = text if text.startswith("[Context:") else f"[Context: {text}]"
+        return prefix, int(data.get("prompt_eval_count") or 0), int(data.get("eval_count") or 0)
+
     def _generate_fallback_prefix(
         self,
         entity_name: str,
@@ -162,6 +237,7 @@ Respond with ONLY the contextual prefix, nothing else."""
         Returns:
             Tuple of (prefix, 0, 0) - no tokens used in fallback mode
         """
+        self._backend = "template"
         prefix = f"[Context: This is a {entity_type} entity named '{entity_name}'"
 
         if observations:
@@ -200,7 +276,8 @@ Respond with ONLY the contextual prefix, nothing else."""
             "estimated_cost_usd": self.get_cost_estimate(),
             "model": self.model,
             "anthropic_available": ANTHROPIC_AVAILABLE,
-            "using_fallback": not bool(self.client)
+            "backend": self._backend or ("anthropic" if self.client else "untried"),
+            "using_fallback": (self._backend or "template") == "template",
         }
 
 

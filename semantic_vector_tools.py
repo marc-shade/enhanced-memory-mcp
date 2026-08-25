@@ -1,9 +1,13 @@
 """Native vector (semantic) search MCP tool for enhanced-memory.
 
-Adds `semantic_recall`: embeds the query via the fedora ollama node
-(nomic-embed-text, 768d — the SAME model that backfilled the index) and searches
-the Qdrant `enhanced_memory` collection (unnamed 768d). Returns top matches by
-MEANING, complementing the substring-only `search_nodes`.
+Adds `semantic_recall`: embeds the query with `local_semantic_recall.DEFAULT_MODEL`
+(embeddinggemma 768d via local ollama since 2026-07-02; nomic-embed-text before
+that) and searches `collection_for(DEFAULT_MODEL)`, i.e. the Qdrant
+`enhanced_memory__embeddinggemma` collection. The bare `enhanced_memory`
+collection is the frozen legacy nomic index and is NOT what this tool reads
+(a stale version of this docstring said otherwise and cost an hour on
+2026-08-23: measuring the legacy collection produced a false "index is blind"
+finding). Returns top matches by MEANING, complementing `search_nodes`.
 
 Reuses `local_semantic_recall.embed` so query embeddings are byte-for-byte the
 same path as the backfill (no doc-vs-query model drift). Fail-soft: returns a
