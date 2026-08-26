@@ -6,10 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Enhanced Memory MCP Server - persistent, compressed, searchable memory for AI
 agents. SQLite storage behind a single-owner Unix-socket daemon, 4-tier
-architecture, Git-like versioning, and layered RAG retrieval. **186 tools with
-the core install, 204 with the optional backends** (`ENHANCED_MEMORY_SURFACE`
-controls how many are register-time visible; counts measured at e9ca30c - any
-tool-count claim without its environment stated is underspecified).
+architecture, Git-like versioning, and layered RAG retrieval. **206 tools
+listed over stdio from the repo venv with the optional backends installed**
+(measured 2026-08-26 at 141e00f, identical under the default and `full`
+`ENHANCED_MEMORY_SURFACE`: the surface stamps front-door `_meta`, it does not
+change registration). The core-only count was 186 at e9ca30c and has not been
+re-measured since the 2026-08-25 removals. Any tool-count claim without its
+environment stated is underspecified.
 
 Figures in this file were measured at commit `99dc95e`; re-measure before
 citing them elsewhere.
@@ -101,9 +104,10 @@ Registered in server.py's `__main__` block:
 | 4 | Visual Memory | `store_visual_episode`, `find_similar_visual` | `visual_memory_tools.py` |
 | - | Semantic Cache | `semantic_cache_get`, `semantic_cache_store`, `agi_cached_reasoning` | `semantic_cache_tools.py` |
 
-22 `*_tools*.py` files at the repo root; `agi/` holds 11 supporting modules
-(consolidation, metacognition, temporal reasoning, associative networks,
-action tracking, identity, and friends), all path-resolved through
+30 `*_tools*.py` files at the repo root; `agi/` holds 8 supporting modules
+(action_tracker, agent_identity, associative_network, consolidation,
+emotional_memory, metacognition, self_improvement, temporal_reasoning; counted
+2026-08-26 after the theater removals), all path-resolved through
 `memory_paths`.
 
 ### Tool Registration Pattern
@@ -176,7 +180,9 @@ optional integration point, not a dependency.
 
 Core (`requirements.txt`): `fastmcp`, `qdrant-client`-free stdlib path.
 Optional (`requirements-optional.txt`): `sentence-transformers` (re-ranking),
-`qdrant-client` (vector search), `anthropic` (contextual enrichment), torch.
+`qdrant-client` (vector search), `anthropic` (contextual enrichment ONLY when
+`ANTHROPIC_API_KEY` is set; otherwise the chain is local ollama, then the
+template prefix), torch.
 Dev (`dev-requirements.txt`): pytest. The two shipped gates run on the stdlib
 alone.
 
