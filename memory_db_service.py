@@ -265,7 +265,8 @@ class MemoryDatabase:
         "002_agi_phase2_temporal_reasoning.sql",
         "003_agi_phase3_emotional_associative.sql",
         "004_agi_phase4_metacognition.sql",
-        "add_agi_tables.sql",
+        # add_agi_tables.sql was an older duplicate of 001-004 (different
+        # action_outcomes shape, a table where 004 has a view); removed 2026-08-26.
     )
 
     def _apply_agi_migrations(self, cursor) -> None:
@@ -281,11 +282,18 @@ class MemoryDatabase:
             path = mig_dir / fname
             if not path.exists():
                 continue
-            for stmt in path.read_text().split(";"):
-                stmt = "\n".join(
-                    line for line in stmt.splitlines() if not line.strip().startswith("--")
-                ).strip()
-                if not stmt:
+            # Split with sqlite's own parser: trigger bodies contain "BEGIN ...
+            # END;" and a naive split on ";" fed half-statements to execute()
+            # (measured 2026-08-26: "incomplete input" on every node start).
+            buf = ""
+            for line in path.read_text().splitlines():
+                if line.strip().startswith("--"):
+                    continue
+                buf += line + "\n"
+                if not sqlite3.complete_statement(buf):
+                    continue
+                stmt, buf = buf.strip(), ""
+                if not stmt or stmt.rstrip(";").strip().upper() in ("BEGIN", "BEGIN TRANSACTION", "COMMIT", "END TRANSACTION"):
                     continue
                 try:
                     cursor.execute(stmt)
