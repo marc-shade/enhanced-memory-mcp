@@ -213,6 +213,7 @@ class MemoryDatabase:
         # calls failed with "no such table/column" on a fresh install while
         # passing on any migrated store (measured through the MCP protocol).
         self._converge_entity_columns(cursor)
+        self._converge_to_migration_ddl(cursor)
         self._apply_agi_migrations(cursor)
         self._ensure_version_tables(cursor)
 
@@ -302,6 +303,62 @@ class MemoryDatabase:
                     if "duplicate column" in msg or "already exists" in msg:
                         continue
                     logger.warning("migration %s: %s -- %s", fname, exc, stmt[:80])
+
+    def _converge_to_migration_ddl(self, cursor) -> None:
+        """Add columns a migration's CREATE TABLE declares but an older table lacks.
+
+        Tables created by earlier code with a different shape (fedora's
+        reasoning_strategies, 2026-08-26: usage_count/effective_contexts
+        instead of strategy_description/applicable_contexts/...) make every
+        tool that follows the migration's shape fail with "no such column".
+        Each CREATE TABLE IF NOT EXISTS is materialised in a scratch
+        in-memory database and its PRAGMA table_info compared with the real
+        table; missing columns are added with the declared type and default.
+        Columns are only ever added, never dropped or retyped.
+        """
+        mig_dir = Path(__file__).resolve().parent / "migrations"
+        scratch = sqlite3.connect(":memory:")
+        try:
+            for fname in self._AGI_MIGRATIONS:
+                path = mig_dir / fname
+                if not path.exists():
+                    continue
+                buf = ""
+                for line in path.read_text().splitlines():
+                    if line.strip().startswith("--"):
+                        continue
+                    buf += line + "\n"
+                    if not sqlite3.complete_statement(buf):
+                        continue
+                    stmt, buf = buf.strip(), ""
+                    if not stmt.upper().startswith("CREATE TABLE"):
+                        continue
+                    try:
+                        scratch.execute(stmt)
+                    except sqlite3.OperationalError:
+                        continue
+            for (name,) in scratch.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall():
+                real = cursor.execute(f"PRAGMA table_info({name})").fetchall()
+                if not real:
+                    continue  # table absent: the migration step creates it whole
+                have = {r[1] for r in real}
+                for _cid, col, ctype, _nn, dflt, pk in scratch.execute(
+                    f"PRAGMA table_info({name})"
+                ).fetchall():
+                    if col in have or pk:
+                        continue
+                    ddl = f'ALTER TABLE {name} ADD COLUMN "{col}" {ctype or ""}'
+                    if dflt is not None:
+                        ddl += f" DEFAULT {dflt}"
+                    try:
+                        cursor.execute(ddl)
+                        logger.info("Added missing %s.%s column (migration shape)", name, col)
+                    except sqlite3.OperationalError as exc:
+                        logger.warning("could not add %s.%s: %s", name, col, exc)
+        finally:
+            scratch.close()
 
     def _ensure_version_tables(self, cursor) -> None:
         cursor.execute(
