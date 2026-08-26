@@ -5,11 +5,13 @@
 # execute_code). Everything in requirements-optional.txt is genuinely optional:
 # each optional backend degrades with a logged reason rather than failing.
 #
-# Determined by installing these four into an empty Python 3.11 venv and booting
-# the server over stdio: 188 tools registered. Not copied from a working venv's
-# package list -- most of that list is transitive.
+# Determined by installing this file into an empty venv and booting the server
+# over stdio: 188 tools registered (Python 3.11, original measurement); 192 on
+# 2026-08-26 at 141e00f (Python 3.12) after the theater removals. Not copied
+# from a working venv's package list -- most of that list is transitive.
 #
-# Python: 3.11 verified. See RELEASE_NOTES.md for what was and was not tested.
+# Python: 3.11 and 3.12 verified. See RELEASE_NOTES.md for what was and was
+# not tested.
 
 # MCP protocol + server framework.
 fastmcp==2.14.1

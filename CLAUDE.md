@@ -10,8 +10,9 @@ architecture, Git-like versioning, and layered RAG retrieval. **206 tools
 listed over stdio from the repo venv with the optional backends installed**
 (measured 2026-08-26 at 141e00f, identical under the default and `full`
 `ENHANCED_MEMORY_SURFACE`: the surface stamps front-door `_meta`, it does not
-change registration). The core-only count was 186 at e9ca30c and has not been
-re-measured since the 2026-08-25 removals. Any tool-count claim without its
+change registration). **192 tools with only `requirements.txt` installed**
+(fresh Python 3.12 venv, same day, same commit; the re-ranking, hybrid/NMF
+and OmniMEM groups log a skip reason). Any tool-count claim without its
 environment stated is underspecified.
 
 Figures in this file were measured at commit `99dc95e`; re-measure before
