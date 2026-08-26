@@ -33,7 +33,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     @app.tool()
     def update_agent_skills(
         skill_updates: Dict[str, float], agent_id: str = "default_agent"
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Update agent skill levels (0.0 to 1.0)
 
@@ -48,7 +48,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     @app.tool()
     def add_agent_belief(
         belief: str, agent_id: str = "default_agent"
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Add a core belief/knowledge to agent identity
 
@@ -63,7 +63,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     @app.tool()
     def update_agent_personality(
         trait_updates: Dict[str, float], agent_id: str = "default_agent"
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Update agent personality traits (0.0 to 1.0)
 
@@ -78,7 +78,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     @app.tool()
     def set_agent_preference(
         key: str, value: Any, agent_id: str = "default_agent"
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Set an agent preference
 
@@ -97,7 +97,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
     @app.tool()
     def start_session(
         context_summary: Optional[str] = None, agent_id: str = "default_agent"
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Start a new session with context from previous session
 
@@ -115,7 +115,7 @@ def register_agi_tools(app: FastMCP, db_path: str):
         key_learnings: Optional[List[str]] = None,
         unfinished_work: Optional[Dict[str, Any]] = None,
         performance_metrics: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         End a session and record outcomes
 

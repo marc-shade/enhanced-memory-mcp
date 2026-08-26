@@ -90,7 +90,9 @@ def test_sse_server_arms_sigusr1_stack_dump(tmp_path):
                 break
             time.sleep(0.2)
         assert 'File "' in dumped, f"no stack frames after SIGUSR1:\n{dumped[-1500:]}"
-        assert "Thread" in dumped, "faulthandler dump should name threads"
+        # faulthandler prints "Current thread 0x..." for the only thread and
+        # "Thread 0x..." for the others; a single-threaded server has just the first.
+        assert "thread 0x" in dumped.lower(), "faulthandler dump should name threads"
         assert proc.poll() is None, "SIGUSR1 must dump, not terminate, an armed daemon"
     finally:
         proc.terminate()

@@ -18,6 +18,7 @@ import logging
 import os
 import signal
 import sqlite3
+import difflib
 import sys
 import hashlib
 import re  # noqa: F401  — used by search_nodes FTS tokenisation
@@ -206,9 +207,183 @@ class MemoryDatabase:
                 cursor.execute(ddl)
                 logger.info("Added missing entities.%s column", column)
 
+        # Converge to the full production entity schema and create the AGI and
+        # versioning tables. Until 2026-08-25 a database born here had 14 of
+        # the 40 entity columns and none of the AGI tables: 13 of 23 core tool
+        # calls failed with "no such table/column" on a fresh install while
+        # passing on any migrated store (measured through the MCP protocol).
+        self._converge_entity_columns(cursor)
+        self._apply_agi_migrations(cursor)
+        self._ensure_version_tables(cursor)
+
         conn.commit()
         conn.close()
         logger.info(f"Database initialized at {self.db_path}")
+
+    # Columns the production store carries beyond the CREATE TABLE above, with
+    # the defaults the migrations that introduced them used. Idempotent.
+    _ENTITY_EXTRA_COLUMNS = (
+        ("emotional_valence", "REAL DEFAULT 0.0"),
+        ("arousal_level", "REAL DEFAULT 0.0"),
+        ("salience_score", "REAL DEFAULT 0.5"),
+        ("emotional_tags", "TEXT DEFAULT '[]'"),
+        ("is_action", "BOOLEAN DEFAULT 0"),
+        ("action_outcome_id", "INTEGER"),
+        ("action_success", "REAL"),
+        ("causally_linked_to", "INTEGER"),
+        ("causal_confidence", "REAL"),
+        ("l_score", "REAL DEFAULT 0.5"),
+        ("reasoning_quality", "REAL DEFAULT 0.5"),
+        ("source_chain", "TEXT"),
+        ("derivation_depth", "INTEGER DEFAULT 0"),
+        ("compaction_level", "INTEGER DEFAULT 0"),
+        ("pinned", "INTEGER DEFAULT 0"),
+        ("compacted_at", "TIMESTAMP"),
+        ("compacted_summary", "TEXT"),
+        ("integrity_signature", "TEXT"),
+        ("integrity_algorithm", "TEXT"),
+        ("integrity_signed_at", "TIMESTAMP"),
+        ("integrity_signed_by", "TEXT"),
+        ("integrity_status", "TEXT DEFAULT 'unsigned'"),
+        ("integrity_verified_at", "TIMESTAMP"),
+        ("archived_at", "TIMESTAMP"),
+        ("vector_indexed_at", "TIMESTAMP"),
+        ("valid_until", "TIMESTAMP"),
+        ("superseded_by", "INTEGER"),
+    )
+
+    def _converge_entity_columns(self, cursor) -> None:
+        cursor.execute("PRAGMA table_info(entities)")
+        have = {row[1] for row in cursor.fetchall()}
+        for column, ddl in self._ENTITY_EXTRA_COLUMNS:
+            if column not in have:
+                cursor.execute(f"ALTER TABLE entities ADD COLUMN {column} {ddl}")
+                logger.info("Added missing entities.%s column", column)
+
+    _AGI_MIGRATIONS = (
+        "001_agi_phase1_foundation.sql",
+        "002_agi_phase2_temporal_reasoning.sql",
+        "003_agi_phase3_emotional_associative.sql",
+        "004_agi_phase4_metacognition.sql",
+        "add_agi_tables.sql",
+    )
+
+    def _apply_agi_migrations(self, cursor) -> None:
+        """Create the AGI tables (identity, actions, causal, emotional, metacognition).
+
+        Statement by statement: the files mix CREATE TABLE IF NOT EXISTS with
+        ALTER TABLE ADD COLUMN, and a duplicate column must not abort the
+        rest. Anything already present is skipped silently; any other error
+        is logged with the statement so it cannot hide.
+        """
+        mig_dir = Path(__file__).resolve().parent / "migrations"
+        for fname in self._AGI_MIGRATIONS:
+            path = mig_dir / fname
+            if not path.exists():
+                continue
+            for stmt in path.read_text().split(";"):
+                stmt = "\n".join(
+                    line for line in stmt.splitlines() if not line.strip().startswith("--")
+                ).strip()
+                if not stmt:
+                    continue
+                try:
+                    cursor.execute(stmt)
+                except sqlite3.OperationalError as exc:
+                    msg = str(exc).lower()
+                    if "duplicate column" in msg or "already exists" in msg:
+                        continue
+                    logger.warning("migration %s: %s -- %s", fname, exc, stmt[:80])
+
+    def _ensure_version_tables(self, cursor) -> None:
+        cursor.execute(
+            """CREATE TABLE IF NOT EXISTS memory_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id INTEGER NOT NULL,
+                version_number INTEGER NOT NULL,
+                compressed_data BLOB NOT NULL,
+                diff_from_previous TEXT,
+                commit_message TEXT,
+                author TEXT DEFAULT 'system',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_current BOOLEAN DEFAULT 0,
+                branch_name TEXT DEFAULT 'main',
+                parent_version_id INTEGER,
+                FOREIGN KEY (entity_id) REFERENCES entities (id),
+                FOREIGN KEY (parent_version_id) REFERENCES memory_versions (id),
+                UNIQUE(entity_id, version_number, branch_name)
+            )"""
+        )
+        cursor.execute(
+            """CREATE TABLE IF NOT EXISTS memory_branches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id INTEGER NOT NULL,
+                branch_name TEXT NOT NULL,
+                base_version_id INTEGER,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by TEXT DEFAULT 'system',
+                description TEXT,
+                FOREIGN KEY (entity_id) REFERENCES entities (id),
+                FOREIGN KEY (base_version_id) REFERENCES memory_versions (id),
+                UNIQUE(entity_id, branch_name)
+            )"""
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_versions_entity ON memory_versions(entity_id)"
+        )
+
+    def _record_version(self, cursor, entity_id: int, compressed: bytes, entity_data: Dict[str, Any], message: str) -> int:
+        """Append a version row for this write and return its number.
+
+        Before 2026-08-25 nothing on the write path created versions: the
+        11,944 rows in the production table were all a one-off "backfill v1",
+        no entity had two versions, and memory_diff could never return a diff
+        (it needs two rows) while memory_branch/memory_revert reported "No
+        current version". Now every create writes v1 and every content change
+        writes v(n+1) with a unified diff against the previous version.
+        """
+        row = cursor.execute(
+            "SELECT current_branch FROM entities WHERE id = ?", (entity_id,)
+        ).fetchone()
+        branch = (row[0] if row and row[0] else "main")
+        prev = cursor.execute(
+            """SELECT version_number, compressed_data FROM memory_versions
+               WHERE entity_id = ? AND branch_name = ?
+               ORDER BY version_number DESC LIMIT 1""",
+            (entity_id, branch),
+        ).fetchone()
+        new_number = (prev[0] + 1) if prev else 1
+        diff_text = None
+        if prev:
+            try:
+                old_str = json.dumps(self._decompress_data(prev[1]), indent=2, default=str, sort_keys=True)
+                new_str = json.dumps(entity_data, indent=2, default=str, sort_keys=True)
+                diff_text = "".join(
+                    difflib.unified_diff(
+                        old_str.splitlines(keepends=True),
+                        new_str.splitlines(keepends=True),
+                        fromfile=f"v{prev[0]}",
+                        tofile=f"v{new_number}",
+                    )
+                )
+            except Exception as exc:  # a bad old blob must not block the write
+                diff_text = f"(diff unavailable: {exc})"
+        cursor.execute(
+            "UPDATE memory_versions SET is_current = 0 WHERE entity_id = ? AND branch_name = ?",
+            (entity_id, branch),
+        )
+        cursor.execute(
+            """INSERT INTO memory_versions
+               (entity_id, version_number, compressed_data, diff_from_previous,
+                commit_message, author, is_current, branch_name)
+               VALUES (?, ?, ?, ?, ?, 'memory-db', 1, ?)""",
+            (entity_id, new_number, compressed, diff_text, message, branch),
+        )
+        cursor.execute(
+            "UPDATE entities SET current_version = ? WHERE id = ?", (new_number, entity_id)
+        )
+        return new_number
 
     def _compress_data(self, data: Any) -> bytes:
         """Serialize as JSON, then zlib-compress.
@@ -337,7 +512,7 @@ class MemoryDatabase:
                     checksum = self._calculate_checksum(compressed)
 
                     # Check if entity exists
-                    cursor.execute("SELECT id FROM entities WHERE name = ?", (name,))
+                    cursor.execute("SELECT id, checksum FROM entities WHERE name = ?", (name,))
                     existing = cursor.fetchone()
 
                     if existing:
@@ -366,6 +541,11 @@ class MemoryDatabase:
                         )
                         results["updated"] += 1
                         entity_id = existing[0]
+                        if existing[1] != checksum:
+                            self._record_version(
+                                cursor, entity_id, compressed, entity_data,
+                                "update via create_entities",
+                            )
                     else:
                         # Create new entity
                         cursor.execute(
@@ -389,6 +569,9 @@ class MemoryDatabase:
                         )
                         results["created"] += 1
                         entity_id = cursor.lastrowid
+                        self._record_version(
+                            cursor, entity_id, compressed, entity_data, "create"
+                        )
 
                     # Store observations. Exact-content duplicates are skipped
                     # (issue #8): re-importing an unchanged entity used to

@@ -148,8 +148,14 @@ class LLMProvider(ABC):
 class OllamaProvider(LLMProvider):
     """Ollama local LLM provider (free)"""
 
-    def __init__(self, model: str = "llama3"):
-        self.model = model
+    def __init__(self, model: str = None):
+        # An uninstalled tag made every call return "" as success until
+        # 2026-08-25. Default to the enrichment model the host already serves.
+        self.model = (
+            model
+            or os.environ.get("MEMORY_LLM_MODEL")
+            or os.environ.get("ENRICHMENT_OLLAMA_MODEL", "gemma4:e4b-it-q8_0")
+        )
         self.base_url = "http://localhost:11434"
 
     async def generate(
@@ -163,6 +169,10 @@ class OllamaProvider(LLMProvider):
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            # Thinking models spend the whole num_predict budget reasoning and
+            # return an empty response without this; non-thinking models
+            # ignore it (same finding as contextual_llm, 2026-08-24).
+            "think": False,
             "options": {"temperature": temperature, "num_predict": max_tokens},
         }
 
@@ -1014,7 +1024,7 @@ def register_contextual_retrieval_tools(app, nmf):
 
     # Initialize LLM provider (Ollama by default, fallback to OpenAI)
     try:
-        llm_provider = OllamaProvider(model="llama3")
+        llm_provider = OllamaProvider()
         logger.info("Using Ollama for context generation")
     except Exception as e:
         logger.warning(f"Ollama not available: {e}, checking for OpenAI")
@@ -1056,6 +1066,12 @@ def register_contextual_retrieval_tools(app, nmf):
             contextual_chunk = await context_generator.generate_context(
                 chunk=chunk, document=document, metadata=metadata
             )
+            if not (contextual_chunk.contextual_prefix or "").strip():
+                return {
+                    "success": False,
+                    "error": f"LLM ({contextual_chunk.llm_provider}/{contextual_chunk.llm_model}) returned no context",
+                    "chunk": chunk,
+                }
 
             return {
                 "success": True,

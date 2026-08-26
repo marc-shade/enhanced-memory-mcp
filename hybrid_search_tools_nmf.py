@@ -36,7 +36,7 @@ def register_hybrid_search_tools_nmf(app, nmf):
         Combines sparse (BM25) lexical matching with dense (vector) semantic
         similarity using Reciprocal Rank Fusion (RRF) for result combination.
 
-        Expected improvement: +20-30% recall over vector-only search
+        Searches the Neural Memory Fabric store (separate from the main entity store; empty until NMF is populated).
 
         Args:
             query: Search query string

@@ -12,7 +12,7 @@ Research basis:
 - Multi-resolution retrieval for improved precision
 - Progressive disclosure reduces context window usage
 
-Expected improvement: +15-25% precision through multi-level matching
+The index is held in this process's memory only: it is not persisted and does not survive a restart or a new stdio session.
 """
 
 import logging
@@ -861,7 +861,7 @@ def register_hierarchical_rag_tools(app, nmf_instance=None):
                     'chunk_size': index.chunk_size,
                     'chunk_overlap': index.chunk_overlap
                 },
-                'expected_improvement': '+15-25% precision through multi-level matching'
+                'persistence': 'in-process only; empty after restart'
             }
 
         except Exception as e:

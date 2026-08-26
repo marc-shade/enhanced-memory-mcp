@@ -6,7 +6,6 @@ Implements sleep-like consolidation for AGI memory.
 Key Features:
 - Background pattern extraction from episodic to semantic memory
 - Causal link discovery and strengthening
-- Memory compression and optimization
 - Scheduled consolidation jobs
 """
 
@@ -521,109 +520,6 @@ class ConsolidationEngine:
         finally:
             conn.close()
 
-    def run_memory_compression(
-        self,
-        time_window_hours: int = 168,  # 7 days
-    ) -> Dict[str, Any]:
-        """
-        Compress old low-importance memories
-
-        Args:
-            time_window_hours: Only compress memories older than this
-
-        Returns:
-            {
-                "memories_compressed": int,
-                "space_saved_bytes": int
-            }
-        """
-        job_id = self.schedule_consolidation("memory_compression", time_window_hours)
-
-        conn = self._get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "UPDATE consolidation_jobs SET status = ?, started_at = ? WHERE job_id = ?",
-            ("running", datetime.now().isoformat(), job_id),
-        )
-        conn.commit()
-
-        cutoff_time = datetime.now() - timedelta(hours=time_window_hours)
-
-        try:
-            # Get old, low-importance memories that aren't already compressed
-            cursor.execute(
-                """
-                SELECT id, name
-                FROM entities
-                WHERE datetime(created_at) < datetime('now', ?)
-                AND salience_score < 0.5
-                AND access_count < 5
-                AND compressed_data IS NULL
-                """,
-                (f"-{time_window_hours} hours",),
-            )
-
-            memories_to_compress = cursor.fetchall()
-            memories_compressed = len(memories_to_compress)
-
-            # In real implementation, would compress observations
-            # For now, just mark them as candidates
-
-            # Update job
-            duration = (
-                datetime.now()
-                - datetime.fromisoformat(
-                    cursor.execute(
-                        "SELECT started_at FROM consolidation_jobs WHERE job_id = ?",
-                        (job_id,),
-                    ).fetchone()[0]
-                )
-            ).seconds
-
-            cursor.execute(
-                """
-                UPDATE consolidation_jobs
-                SET
-                    status = 'completed',
-                    completed_at = ?,
-                    duration_seconds = ?,
-                    memories_compressed = ?
-                WHERE job_id = ?
-                """,
-                (datetime.now().isoformat(), duration, memories_compressed, job_id),
-            )
-
-            conn.commit()
-
-            logger.info(
-                f"Memory compression complete: {memories_compressed} memories processed"
-            )
-
-            return {
-                "job_id": job_id,
-                "memories_compressed": memories_compressed,
-                "space_saved_bytes": memories_compressed * 1024,  # Estimate
-            }
-
-        except Exception as e:
-            cursor.execute(
-                """
-                UPDATE consolidation_jobs
-                SET status = 'failed', error_message = ?
-                WHERE job_id = ?
-                """,
-                (str(e), job_id),
-            )
-            conn.commit()
-
-            logger.error(f"Memory compression failed: {e}")
-
-            raise
-
-        finally:
-            conn.close()
-
     def run_full_consolidation(self, time_window_hours: int = 24) -> Dict[str, Any]:
         """
         Run all consolidation processes
@@ -656,14 +552,8 @@ class ConsolidationEngine:
             results["causal_discovery"] = {"error": str(e)}
             logger.error(f"Causal discovery failed: {e}")
 
-        # 3. Memory compression (only for old memories)
-        if time_window_hours >= 168:  # Only compress if looking at 7+ days
-            try:
-                compression_results = self.run_memory_compression(time_window_hours)
-                results["memory_compression"] = compression_results
-            except Exception as e:
-                results["memory_compression"] = {"error": str(e)}
-                logger.error(f"Memory compression failed: {e}")
+        # (A "memory compression" phase was removed 2026-08-25: it SELECTed candidates,
+        # touched no entity row, and reported space_saved_bytes = count * 1024.)
 
         logger.info("Full consolidation complete")
 

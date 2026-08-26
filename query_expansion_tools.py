@@ -7,7 +7,7 @@ Implements query expansion strategies to improve recall and coverage:
 2. Synonym expansion (lexical variations)
 3. Conceptual expansion (related terms)
 
-Expected improvement: +15-25% recall
+Searches the Neural Memory Fabric store (separate from the main entity store; empty until NMF is populated).
 """
 
 import logging
@@ -235,7 +235,7 @@ def register_query_expansion_tools(app, nmf):
 
         Then performs hybrid search on all expanded queries and aggregates results.
 
-        Expected improvement: +15-25% recall
+        Searches the Neural Memory Fabric store (separate from the main entity store; empty until NMF is populated).
 
         Args:
             query: Original search query

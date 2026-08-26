@@ -197,7 +197,8 @@ class EmotionalMemory:
 
         query = f'''
             SELECT
-                e.*,
+                e.id, e.name, e.entity_type, e.tier, e.created_at, e.last_accessed,
+                e.access_count, e.current_version, e.current_branch,
                 et.valence,
                 et.arousal,
                 et.dominance,

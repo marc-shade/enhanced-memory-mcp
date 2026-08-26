@@ -35,7 +35,7 @@ def register_reranking_tools_nmf(app, nmf):
         2. Re-rank with cross-encoder model (ms-marco-MiniLM-L-6-v2)
         3. Return top k results
 
-        Expected improvement: +40-55% precision over vector-only search
+        Re-ranks results from the Neural Memory Fabric store (separate from the main entity store; empty until NMF is populated).
 
         Args:
             query: Search query string

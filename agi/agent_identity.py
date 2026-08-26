@@ -320,6 +320,7 @@ class SessionManager:
         conn.close()
 
         logger.info(f"Ended session {session_id} (duration: {duration}s)")
+        return row is not None
 
     def get_session_context(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get complete session context"""

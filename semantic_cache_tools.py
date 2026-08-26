@@ -105,9 +105,9 @@ def register_semantic_cache_tools(app):
                 return {
                     "hit": True,
                     "response": response,
-                    "similarity": round(similarity, 4),
+                    "similarity": round(float(similarity), 4),
                     "latency_ms": round(latency, 1),
-                    "message": f"Cache HIT (similarity: {similarity:.4f})",
+                    "message": f"Cache HIT (similarity: {float(similarity):.4f})",
                 }
             else:
                 return {
@@ -204,7 +204,7 @@ def register_semantic_cache_tools(app):
                     {
                         "cached_query": q[:100],
                         "response_preview": r[:200] + "..." if len(r) > 200 else r,
-                        "similarity": round(sim, 4),
+                        "similarity": round(float(sim), 4),
                     }
                     for q, r, sim in results
                 ],

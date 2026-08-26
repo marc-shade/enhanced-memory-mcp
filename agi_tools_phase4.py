@@ -382,9 +382,10 @@ def register_agi_phase4_tools(app, db_path: Path):
         changes: List[str]
     ) -> Dict[str, Any]:
         """
-        Apply improvement strategies and record changes
+        RECORD the strategies the caller applied and what changed
 
-        Documents what strategies were tried and what changed.
+        This tool applies nothing itself: it stores the caller-supplied
+        strategies and change list on the cycle row.
 
         Returns:
             Application summary
@@ -408,10 +409,10 @@ def register_agi_phase4_tools(app, db_path: Path):
         success_criteria: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Validate that improvements met success criteria
+        Compare CALLER-SUPPLIED new metrics against the cycle's stored baseline
 
-        Compares new performance to baseline.
-        Auto-marks cycle as successful if criteria met.
+        Nothing is measured here: new_metrics come from the caller. The cycle
+        is marked successful when they meet success_criteria.
 
         Returns:
             Validation results with success status

@@ -435,6 +435,36 @@ class ARTHybrid:
     - Get interpretable prototypes without catastrophic forgetting
     """
 
+    # Persistence and identity: art_tools called .name/.save()/.load() on this
+    # class for months while none existed, so art_hybrid_learn failed with
+    # "'ARTHybrid' object has no attribute 'save'" and hybrid state never
+    # survived a process. The inner FuzzyART already serialises itself; this
+    # wraps it and adds embedding_dim (measured/fixed 2026-08-25).
+    @property
+    def name(self) -> str:
+        return getattr(self.art, "name", "art_hybrid")
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self.art.name = value
+
+    def save(self, filepath: str) -> None:
+        self.art.save(filepath)
+        with open(filepath) as f:
+            state = json.load(f)
+        state["embedding_dim"] = self.embedding_dim
+        state["name"] = self.name
+        with open(filepath, "w") as f:
+            json.dump(state, f, indent=2)
+
+    @classmethod
+    def load(cls, filepath: str) -> "ARTHybrid":
+        with open(filepath) as f:
+            state = json.load(f)
+        art = FuzzyART.load(filepath)
+        art.name = state.get("name", "art_hybrid")
+        return cls(art_network=art, embedding_dim=int(state.get("embedding_dim", 384)))
+
     def __init__(
         self,
         art_network: FuzzyART,
@@ -560,3 +590,4 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Fuzzy ART test complete!")
     print("=" * 60)
+

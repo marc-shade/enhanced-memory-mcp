@@ -86,7 +86,7 @@ def register_knowledge_wiki_tools(app, db_path: str):
             limit: Max results (default 20)
 
         Returns:
-            Dict with results: [{id, title, path, score}]
+            Dict with results: [{id, title, path, score}]; score = -bm25 (higher is better; magnitudes are tiny on small corpora, so 6 decimals; 0.0 only from the LIKE fallback)
         """
         tokens = re.findall(r"[\w']+", query)
         if not tokens:
@@ -98,10 +98,13 @@ def register_knowledge_wiki_tools(app, db_path: str):
             try:
                 rows = conn.execute(
                     """
-                    SELECT p.id, p.title, p.path, MIN(f.rank) AS rank
-                    FROM wiki_pages_fts f
-                    JOIN wiki_pages p ON p.id = f.rowid
-                    WHERE wiki_pages_fts MATCH ?
+                    SELECT p.id, p.title, p.path, MIN(s.rank) AS rank
+                    FROM (
+                        SELECT rowid, bm25(wiki_pages_fts) AS rank
+                        FROM wiki_pages_fts
+                        WHERE wiki_pages_fts MATCH ?
+                    ) s
+                    JOIN wiki_pages p ON p.id = s.rowid
                     GROUP BY p.id
                     ORDER BY rank
                     LIMIT ?
@@ -128,7 +131,7 @@ def register_knowledge_wiki_tools(app, db_path: str):
             "success": True,
             "query": query,
             "results": [
-                {"id": r[0], "title": r[1], "path": r[2], "score": round(r[3], 4)}
+                {"id": r[0], "title": r[1], "path": r[2], "score": (0.0 if not r[3] else round(-float(r[3]), 6))}
                 for r in rows
             ],
         }

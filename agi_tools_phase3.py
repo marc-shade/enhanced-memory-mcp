@@ -97,7 +97,7 @@ def register_agi_phase3_tools(app: FastMCP, db_path: str):
         entity_id: int,
         salience_delta: float,
         reason: str
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Update importance/salience score for an entity
 
@@ -187,7 +187,7 @@ def register_agi_phase3_tools(app: FastMCP, db_path: str):
     def boost_memory_strength(
         entity_id: int,
         boost_amount: float = 0.2
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Boost memory strength (spacing effect on retrieval)
 
@@ -312,7 +312,7 @@ def register_agi_phase3_tools(app: FastMCP, db_path: str):
         entity_a_id: int,
         entity_b_id: int,
         reinforcement: float = 0.1
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Reinforce an association (e.g., when co-activated)
 
@@ -368,7 +368,7 @@ def register_agi_phase3_tools(app: FastMCP, db_path: str):
         recency_weight: float = 0.3,
         frequency_weight: float = 0.3,
         emotional_weight: float = 0.4
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """
         Set attention weights for selective retrieval
 

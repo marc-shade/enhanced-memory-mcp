@@ -89,7 +89,11 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         action_entity_id: int, context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Predict likely outcomes of an action based on causal history
+        Estimate outcomes of an action from its STORED causal links
+
+        Not a predictive model: probabilities are the evidence-weighted
+        frequency of outcomes already recorded as causal links from this
+        action entity. No links means confidence 0.0 and no estimate.
 
         Args:
             action_entity_id: Entity representing the action to predict
@@ -230,29 +234,6 @@ def register_agi_phase2_tools(app: FastMCP, db_path: str):
         """
         consolidation = ConsolidationEngine()
         return consolidation.run_causal_discovery(time_window_hours, min_confidence)
-
-    @app.tool()
-    def run_memory_compression(
-        time_window_hours: int = 168,  # 7 days
-    ) -> Dict[str, Any]:
-        """
-        Compress old low-importance memories
-
-        Frees up space while preserving important information.
-
-        Args:
-            time_window_hours: Only compress memories older than this
-
-        Returns:
-            {
-                "memories_compressed": int,
-                "space_saved_bytes": int
-            }
-
-        Run this weekly to maintain memory efficiency.
-        """
-        consolidation = ConsolidationEngine()
-        return consolidation.run_memory_compression(time_window_hours)
 
     @app.tool()
     def run_full_consolidation(time_window_hours: int = 24) -> Dict[str, Any]:

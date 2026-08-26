@@ -891,12 +891,22 @@ async def _enrich_new_entities(entities: list[dict[str, Any]]) -> dict[str, Any]
         return {"enriched": 0, "failed": len(entities), "error": str(e)}
 
 
+def _score_meta() -> dict:
+    try:
+        import tpu_importance as _ti
+
+        return dict(getattr(_ti, "LAST_SCORE_META", {}) or {})
+    except Exception:
+        return {}
+
+
 async def _score_and_tier_entities(entities: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Score entity importance via TPU and assign appropriate memory tier.
 
-    TPU IMPORTANCE SCORING: Uses TPU Warm Service (port 8780) for fast
-    semantic scoring, with fallback to heuristics when unavailable.
+    Importance scoring via the warm scoring service (port 8780) when reachable,
+    else local heuristics. The response names the device that scored
+    (warm_service_cpu / warm_service_tpu / heuristic).
 
     Tier assignment rules:
     - score >= 0.8: long_term (permanent storage, high importance)
@@ -964,8 +974,16 @@ async def _score_and_tier_entities(entities: list[dict[str, Any]]) -> dict[str, 
         return {
             "scored": scored_count,
             "tier_assignments": tier_changes,
-            "tpu_available": tpu_used,
-            "scoring_method": "tpu_warm_service" if tpu_used else "heuristic",
+            "warm_service_reachable": tpu_used,
+            # Named from what actually scored (the warm service reports its
+            # device per request; on 2026-08-25 it was "cpu" for every call
+            # while advertising tpu_available). "tpu_warm_service" was the
+            # old label regardless of device.
+            "scoring_method": (
+                f"warm_service_{_score_meta().get('device') or 'unknown'}"
+                if tpu_used and _score_meta().get("method") != "heuristic"
+                else "heuristic"
+            ),
         }
 
     except Exception as e:
@@ -1987,16 +2005,10 @@ if __name__ == "__main__":
         except Exception as e:
             logger.warning(f"⚠️  Shadow Vector integration skipped: {e}")
 
-    # Register Surprise-Based Consolidation tools (Titans/MIRAS inspired)
-    try:
-        from surprise_consolidation_tools import register_surprise_consolidation_tools
-
-        register_surprise_consolidation_tools(app, DB_PATH)
-        logger.info(
-            "✅ Surprise Consolidation tools integrated (Titans/MIRAS inspired novelty-based memory)"
-        )
-    except Exception as e:
-        logger.warning(f"⚠️  Surprise Consolidation integration skipped: {e}")
+    # Surprise-Based Consolidation tools REMOVED 2026-08-25: calculate_surprise_score
+    # rated every input (including verbatim copies of stored observations) novelty
+    # 1.0 because its embedding lookup always returned [], and run_surprise_consolidation
+    # failed on a missing column every call.
 
     # Register ART (Adaptive Resonance Theory) tools - Online learning without catastrophic forgetting
     try:

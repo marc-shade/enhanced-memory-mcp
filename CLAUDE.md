@@ -39,7 +39,7 @@ python3 test_rag_integration_comprehensive.py
 ```
 
 **Store-safety warning:** `test_agi_phase2.py`, `test_agi_phase3.py`,
-`test_agi_phase4.py`, and `test_advanced_tool_use.py` operate on whatever
+and `test_agi_phase4.py` operate on whatever
 database the environment resolves - on a configured machine that is the REAL
 store. Run them only with `ENHANCED_MEMORY_DIR` pointed at a scratch
 directory. (The pytest suite under `tests/` is isolated by its conftest; these
@@ -95,7 +95,6 @@ Registered in server.py's `__main__` block:
 | 2 | Query Expansion | `search_with_query_expansion` | `query_expansion_tools.py` |
 | 2 | Multi-Query RAG | `search_with_multi_query` | `multi_query_rag_tools.py` |
 | 3.1 | Contextual Retrieval | `generate_context_for_chunk`, `reindex_with_context` | `contextual_retrieval_tools.py` |
-| 3.2 | Context-Aware Chunking | `chunk_document_semantic` | `context_aware_chunking.py` |
 | 3.3 | Hierarchical RAG | `index_document_hierarchical`, `search_hierarchical` | `hierarchical_rag_tools.py` |
 | 4.1+4.3 | Agentic + Self-Reflective RAG | `agentic_retrieve`, `analyze_query`, `evaluate_results` | `agentic_rag_tools.py` |
 | 4 | GraphRAG | `graph_enhanced_search`, `get_entity_neighbors` | `graphrag_tools.py` |
@@ -117,7 +116,6 @@ register_query_expansion_tools(app, nmf_instance)
 **To add new tools**:
 1. Create `{feature}_tools.py` with `register_{feature}_tools(app, ...)`
 2. Import and call it in server.py's registration section
-3. Add to `tool_catalog.py` for progressive tool discovery
 4. Add tests (`tests/` for pytest, or `test_rag_integration_comprehensive.py`
    for registration-level coverage)
 
